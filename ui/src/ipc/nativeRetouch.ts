@@ -1,9 +1,11 @@
 export const MAX_NATIVE_RETOUCH_EDITS = 1024;
 import { invoke } from '@tauri-apps/api/core';
+import polishedWedding from '../config/polishedWedding.json';
 import type { RecipeDto, RenderDto } from './types';
 import { EFFECT_SOURCE, EFFECT_TOOLS, isEffectTool } from './retouchEffects';
 
 export const RETOUCH_TOOLS = [
+  ['color_saturation', 'Local saturation & vibrance', 'Color', 'Adjust saturation and gently boost muted colors inside your selection. Preserves linear brightness and neutral tones. Combine with a sampled color range to target a garment, backdrop or other color; protect skin manually when needed.'],
   ['acne_clear', 'Acne & blemish clear · brush', 'Repair', 'Paint over pimples, red or brown marks and bumps that are left. Each one is measured against the clean skin around it and rebuilt from that skin, keeping the pores. Works on the nose and between the brows too; creases, hair and nostrils are left alone.'],
   ['heal', 'Heal blemish / flyaway / lint', 'Repair', 'Samples nearby pixels; choose a source for precise repairs.'],
   ['patch_heal', 'Texture-aware patch heal', 'Repair', 'Matches nearby texture and blends surrounding light. Auto source works on small ellipses; choose a source for painted or larger repairs.'],
@@ -23,11 +25,21 @@ export const RETOUCH_TOOLS = [
   ['mattify', 'Reduce oily shine', 'Skin', 'Attenuates local highlights without replacing skin texture.'],
   ['under_eye', 'Under-eye shadow lift', 'Skin', 'Lifts local shadows; select only the under-eye area.'],
   ['wrinkle', 'Soften fine lines', 'Skin', 'Reduces mid-frequency contrast; texture remains separately adjustable.'],
+  ['stretch_marks', 'Stretch-mark softening', 'Body', 'Softens long faint marks within your selection, following the skin surface while retaining its texture. Keep anatomy and jewelry outside the selection.'],
   ['teeth', 'Natural teeth whitening', 'Details', 'Reduces yellow casts and gently lifts tooth brightness.'],
   ['eye_clean', 'Eye redness reduction', 'Details', 'Reduces excess red chroma inside the selected sclera.'],
   ['eye_detail', 'Iris and eyelash detail', 'Details', 'Adds fine local contrast to existing eye detail.'],
   ['red_eye', 'Flash red-eye correction', 'Details', 'Reduces dominant red inside the selected pupil.'],
   ['fabric', 'Fabric crease softening', 'Cleanup', 'Reduces broad texture variations; keep seams outside the selection.'],
+  ['fabric_moire', 'Fabric moiré reduction', 'Clothing', 'Reduces false color ripples while preserving luminance detail and fabric weave. Select one material; exclude real colored patterns, seams and skin. Does not reconstruct luminance moiré.'],
+  ['fabric_stain', 'Fabric stain correction', 'Clothing', 'Sample clean fabric of the same material and lighting, then paint over a sweat stain or discoloration. Corrects broad color and brightness differences while retaining fine texture. Keep printed designs and seams outside the selection.'],
+  ['shadow_balance', 'Shadow balancing', 'Light', 'Lifts shadows toward the selected area’s upper midtones with a smooth, bounded exposure correction. Select one face or surface; exclude eyes, hair and deep creases. Preserves RGB proportions and existing detail.'],
+  ['background_blur', 'Background blur', 'Background', 'Blurs only selected background pixels. Use a saved background mask or paint behind the subject; excluded subject colors stay out of the blur. This is a selection blur without inferred lens depth.'],
+  ['highlight_glow', 'Highlight glow', 'Effects', 'Spreads light from highlights above your threshold inside the selection. Adjust spread and strength for a soft glow; the original detail remains underneath.'],
+  ['motion_blur', 'Directional motion blur', 'Effects', 'Creates a straight motion trail at your chosen angle. Uses only selected pixels, so a protected subject does not smear into the effect. This adds motion; it does not repair camera shake.'],
+  ['zoom_blur', 'Radial zoom blur', 'Effects', 'Creates radial motion around a movable focus center. The center stays fixed, and excluded pixels do not contribute to the blur. Set the center for this photograph, then adjust travel and strength.'],
+  ['color_despill', 'Color spill suppression', 'Color', 'Reduces a chosen color cast inside your selection while retaining brightness. Choose the spill color and refine hue selectivity; protect legitimate clothing, hair and skin colors with the mask.'],
+  ['highlight_compress', 'Highlight compression', 'Light', 'Softens bright highlights above a threshold with a smooth tonal shoulder. Preserves channel ratios and the tones below the threshold. Cannot recover detail already clipped in the source.'],
   ['backdrop', 'Backdrop smoothing', 'Cleanup', 'Smooths a selected backdrop patch. Avoid subject edges.'],
   ['defringe', 'Defringe · purple and green edges', 'Cleanup', 'Removes the purple or green rims a lens leaves on the dark side of bright edges: branches against a sky, a veil against the light, a dark suit beside a white shirt. Each rim pixel takes the colour of its calm surroundings at its own brightness. Purple or green things, and the glow of coloured lights, keep their colour.'],
   ['glare', 'Glare softening', 'Details', 'Reduces bright reflections; cannot reconstruct detail hidden by glare.'],
@@ -45,6 +57,7 @@ export type BrushMask = { strokes: BrushStroke[] };
 /** `connected` limits the change to skin touching the sample, never a same-coloured background. */
 export type SkinSettings = { tolerance: number; edgeProtection: number; connected?: boolean };
 export type RetouchSelection = {
+  color?: { sample: [number, number]; tolerance: number; softness: number; lightness: number } | null;
   inverted?: boolean;
   gradient?: { start: [number, number]; end: [number, number] } | null;
   luminance?: { low: number; high: number; softness: number } | null;
@@ -59,7 +72,7 @@ export type RetouchScope = 'face' | 'body' | 'face_and_body';
  * measured strength. Signed values are -1..1. Missing keys take the Rust defaults.
  */
 export type RetouchSettings = {
-  aiSkinDetection: boolean; mainSubjectOnly: boolean; maskPrecision: number; edgeSoftness: number; protectFacialHair: boolean; protectEyeArea: boolean; protectNoseDetail: boolean;
+  aiSkinDetection: boolean; mainSubjectOnly: boolean; portraitOnlyAdvanced: boolean; protectCeremonialMarks: boolean; maskPrecision: number; edgeSoftness: number; protectFacialHair: boolean; protectEyeArea: boolean; protectNoseDetail: boolean;
   smoothing: number; texture: number; smoothingSize: number; toneEvenness: number; lightEvenness: number; microDodgeBurn: number;
   poreRefine: number; shine: number; redness: number; glow: number; skinBrightness: number; skinWarmth: number; skinTint: number;
   blemishSensitivity: number; cleanupPasses: number; maxSpots: number; keepFreckles: boolean;
@@ -74,6 +87,7 @@ export type RetouchSettings = {
   teethWhitening: number; lipColour: number; lipDefinition: number;
   contour: number; highlight: number; blush: number; faceLight: number;
   bodySmoothing: number; bodyTone: number; matchBodyToFace: number; bodyShine: number; bodyRedness: number; bodyBlemishes: number;
+  bodyDarkMarks: boolean;
   /** Stretch marks evened out of body skin (ADR-0118); 0 is off. */
   stretchMarks: number;
   hairDetail: number; hairShine: number; fabric: number; backdrop: number;
@@ -81,7 +95,7 @@ export type RetouchSettings = {
   backdropLift: number;
 };
 export const DEFAULT_RETOUCH_SETTINGS: RetouchSettings = {
-  aiSkinDetection: true, mainSubjectOnly: false, maskPrecision: .5, edgeSoftness: .35, protectFacialHair: true, protectEyeArea: true, protectNoseDetail: true,
+  aiSkinDetection: true, mainSubjectOnly: false, portraitOnlyAdvanced: false, protectCeremonialMarks: false, maskPrecision: .5, edgeSoftness: .35, protectFacialHair: true, protectEyeArea: true, protectNoseDetail: true,
   smoothing: .5, texture: .85, smoothingSize: .5, toneEvenness: .5, lightEvenness: .5, microDodgeBurn: .25,
   poreRefine: 0, shine: .5, redness: .5, glow: 0, skinBrightness: 0, skinWarmth: 0, skinTint: 0,
   blemishSensitivity: .5, cleanupPasses: 2, maxSpots: 12, keepFreckles: true, keepMoles: true,
@@ -92,12 +106,33 @@ export const DEFAULT_RETOUCH_SETTINGS: RetouchSettings = {
   eyeWhitening: .2, eyeVessels: .5, irisDetail: .5, irisBrightness: 0, redEye: true, lashDefinition: 0, browDefinition: 0,
   teethWhitening: .5, lipColour: 0, lipDefinition: 0,
   contour: 0, highlight: 0, blush: 0, faceLight: 0,
-  bodySmoothing: .5, bodyTone: .5, matchBodyToFace: 0, bodyShine: .25, bodyRedness: 0, bodyBlemishes: 0, stretchMarks: 0,
+  bodySmoothing: .5, bodyTone: .5, matchBodyToFace: 0, bodyShine: .25, bodyRedness: 0, bodyBlemishes: 0, bodyDarkMarks: false, stretchMarks: 0,
   hairDetail: 0, hairShine: 0, fabric: 0, backdrop: 0, backdropLift: 0,
 };
 /** `adaptive` measures each face and tunes the fine controls for it (ADR-0086); missing means on. */
 export type AutoRetouchOptions = { intensity: number; blemishes: boolean; eyes: boolean; teeth: boolean; refine: boolean; scope: RetouchScope; settings?: RetouchSettings; adaptive?: boolean };
 export const DEFAULT_AUTO_RETOUCH: AutoRetouchOptions = { intensity: 1, blemishes: true, eyes: true, teeth: true, refine: true, scope: 'face', adaptive: true };
+/** Automatic photo finish; neutral tool defaults above still decode older saved choices. */
+export const BRIGHT_POLISHED_SETTINGS: RetouchSettings = {
+  ...DEFAULT_RETOUCH_SETTINGS,
+  deepBlemishCleanup: true, keepFreckles: true, removeDarkMarks: false,
+  maxSpots: 900, blemishSensitivity: 1, frequencyHeal: 1, cleanupPasses: 4,
+  smoothing: .35, texture: .9, poreRefine: .8, toneEvenness: .7, lightEvenness: .3,
+  microDodgeBurn: .15, shine: .45, redness: .5, darkCircles: .75, faceLight: 1,
+  bodySmoothing: .4, bodyTone: .45, matchBodyToFace: .25,
+  bodyShine: .25, bodyRedness: .3, bodyBlemishes: 1,
+};
+export const BRIGHT_POLISHED_RETOUCH: AutoRetouchOptions = {
+  ...DEFAULT_AUTO_RETOUCH, intensity: 1.25, scope: 'face_and_body', teeth: false,
+  settings: BRIGHT_POLISHED_SETTINGS,
+};
+/** Stronger local cleanup for new wedding photographs; permanent facial details stay protected. */
+export const POLISHED_WEDDING_SETTINGS: RetouchSettings = {
+  ...DEFAULT_RETOUCH_SETTINGS, ...polishedWedding.settings,
+};
+export const POLISHED_WEDDING_RETOUCH: AutoRetouchOptions = {
+  ...polishedWedding, scope: 'face_and_body', settings: POLISHED_WEDDING_SETTINGS,
+};
 export const DEFAULT_SKIN: SkinSettings = { tolerance: .08, edgeProtection: .8, connected: true };
 export const isSampledSkinTool = (tool: RetouchTool) => ['skin_smooth', 'skin_uniformity', 'portrait_dodge_burn'].includes(tool);
 export type NativeRetouchEdit = {
@@ -127,13 +162,16 @@ export type NativeRetouchEdit = {
   matte?: string | null;
 };
 export const extendedRetouchShape = (edit: NativeRetouchEdit) => Boolean(edit.selection?.inverted || edit.selection?.gradient);
-export const needsRetouchSource = (edit: NativeRetouchEdit) => ['clone', 'color_match'].includes(edit.tool)
+export const needsRetouchSource = (edit: NativeRetouchEdit) => ['clone', 'color_match', 'fabric_stain'].includes(edit.tool)
   || (isEffectTool(edit.tool) && Boolean(EFFECT_SOURCE[edit.tool]?.required))
   || isSampledSkinTool(edit.tool)
   || (edit.tool === 'heal' && extendedRetouchShape(edit))
   || (edit.tool === 'patch_heal' && (Boolean(edit.mask) || edit.region[2] > .1 || edit.region[3] > .1 || extendedRetouchShape(edit)));
 export function validRetouchSelection(edit: NativeRetouchEdit): boolean {
-  const { gradient, luminance } = edit.selection ?? {};
+  const { gradient, luminance, color } = edit.selection ?? {};
+  if (color && (![...color.sample,color.tolerance,color.softness,color.lightness].every(Number.isFinite)
+    || color.sample.length !== 2 || color.sample.some(v => v < 0 || v > 1)
+    || color.tolerance < 0 || color.tolerance > 100 || color.softness < 0 || color.softness > 100 || color.lightness < 0 || color.lightness > 1)) return false;
   if (gradient && (edit.mask || ![...gradient.start,...gradient.end].every(v => Number.isFinite(v) && v >= 0 && v <= 1)
     || Math.hypot(gradient.start[0]-gradient.end[0],gradient.start[1]-gradient.end[1]) < .001)) return false;
   return !luminance || ([luminance.low,luminance.high,luminance.softness].every(Number.isFinite)

@@ -6,7 +6,7 @@ export function RetouchSkinSelection({ draft, edits, onChange }: {
   edits: NativeRetouchEdit[];
   onChange: (patch: Partial<NativeRetouchEdit>) => void;
 }) {
-  const colorTool = ['colorize', 'background_color'].includes(draft.tool);
+  const colorTool = ['color_saturation', 'colorize', 'background_color', 'fabric_moire', 'fabric_stain', 'background_blur', 'highlight_glow', 'motion_blur', 'zoom_blur', 'color_despill', 'highlight_compress'].includes(draft.tool);
   const choices = edits.filter((edit, index) => edit.matte
     && (colorTool || /-(face|body|skin|surface)(-blemish)?(-feature-safe|-outside-faces)?$/.test(edit.matte))
     && edits.findIndex(other => other.matte === edit.matte) === index);
@@ -15,7 +15,7 @@ export function RetouchSkinSelection({ draft, edits, onChange }: {
       onChange={event => {
         const edit = choices.find(e => e.matte === event.target.value);
         if (edit) onChange({ matte: edit.matte, mask: edit.mask, region: [...edit.region],
-          source: edit.source ? [...edit.source] : null, skin: null, selection: null, feather: edit.feather });
+          source: ['fabric_stain','zoom_blur'].includes(draft.tool) ? draft.source : edit.source ? [...edit.source] : null, skin: null, selection: draft.selection?.color ? {color:draft.selection.color} : null, feather: edit.feather });
       }}>
       <option value="" disabled>{colorTool ? 'Choose hair, clothing, background or skin' : 'Choose face or body skin'}</option>
       {choices.map(edit => {

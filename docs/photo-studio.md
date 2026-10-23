@@ -39,6 +39,17 @@ Use a dedicated test folder. Results include `results.json`, before/after PNGs,
 `before-after.jpg`, two editor screenshots and the verified `exports` directory.
 This is functional validation on five portraits, not a general aesthetic quality benchmark.
 
+## Fine-tune an automatic finish or a single edited reference
+
+In **Retouch**, expand **Adjust automatic finish** to reduce or increase saved
+automatic operations by category or overall, with reversible 0–200% strengths.
+In Develop, **Reference colour matching** accepts one edited JPEG/PNG/TIFF or a
+reference captured from the current saved edit. Its reusable library supports
+groups, favorites and saved matching strengths, plus independent fine colour
+and white-balance controls. Follow the
+[adjustable finishing and reference guide](adjustable-finishing-and-reference-colour.md)
+for application, restoration, collection matching and current limits.
+
 ## The start screen: look, reference, photos
 
 AURA opens on **Start**, three steps on one page:

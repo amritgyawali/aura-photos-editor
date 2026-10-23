@@ -47,6 +47,9 @@ confidence-threshold = 0.9
 # fails the gate.
 exceptions = [
   { crate = "jpeg-encoder", allow = ["IJG"] },
+  # Naga's existing hexadecimal-float parser is dedicated to the public domain
+  # under CC0. Keep this scoped to the parser; see THIRD-PARTY-NOTICES.md.
+  { crate = "hexf-parse", allow = ["CC0-1.0"] },
   # `webpki-roots` is the Mozilla trusted-root certificate set, and it is *data*
   # rather than code - which is why it carries the Community Data License
   # Agreement rather than a software licence. CDLA-Permissive-2.0 imposes no

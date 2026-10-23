@@ -74,36 +74,122 @@ pub fn run(
         })?;
     }
 
-    for root in &plan.roots {
-        let outcome = import_root(
-            catalog,
-            plan,
-            root,
-            cancel,
-            progress,
-            &mut report,
-            &mut quarantine_counts,
-        )?;
-
-        if outcome == RootOutcome::Cancelled {
-            finish_run(
-                catalog,
-                plan,
-                ImportState::Cancelled,
-                Some(&job::cancelled("ingest")),
-            )?;
-            report.duration_ms = catalog.clock().monotonic_ms().saturating_sub(started_ms);
-            report.quarantine_by_code = quarantine_counts.into_iter().collect();
-            return Ok(report);
-        }
-    }
-
-    align_clocks(catalog, plan)?;
-    finish_run(catalog, plan, ImportState::Completed, None)?;
+    let outcome = run_roots(
+        catalog,
+        plan,
+        cancel,
+        progress,
+        &mut report,
+        &mut quarantine_counts,
+    );
+    let cancelled = job::cancelled("ingest");
+    let (state, error) = match &outcome {
+        Ok(RootOutcome::Finished) => (ImportState::Completed, None),
+        Ok(RootOutcome::Cancelled) => (ImportState::Cancelled, Some(&cancelled)),
+        Err(err) => (ImportState::Failed, Some(err)),
+    };
+    // Final counters include fast skips and rejected files, including a run
+    // with no hash batches. Failed runs retain their committed work.
+    finish_run(catalog, plan, state, error, &report)?;
+    outcome?;
 
     report.duration_ms = catalog.clock().monotonic_ms().saturating_sub(started_ms);
     report.quarantine_by_code = quarantine_counts.into_iter().collect();
     Ok(report)
+}
+
+fn run_roots(
+    catalog: &Catalog,
+    plan: &ImportPlan,
+    cancel: &CancelToken,
+    progress: &dyn ProgressSink,
+    report: &mut ImportReport,
+    quarantine_counts: &mut BTreeMap<String, u64>,
+) -> AuraResult<RootOutcome> {
+    // Discover the entire selection before reporting a denominator. Otherwise
+    // each file-picker root resets progress to 1/1, hiding incomplete imports.
+    let mut scans = Vec::with_capacity(plan.roots.len());
+    let mut total = 0;
+    for root in &plan.roots {
+        if cancel.is_cancelled() {
+            return Ok(RootOutcome::Cancelled);
+        }
+        let now_ms = catalog.clock().now_utc().unix_timestamp() * 1000;
+        let scan = crate::scan::scan_root(root, plan, now_ms)?;
+        total += (scan.files.len() + scan.rejected.len()) as u64;
+        report.files_discovered += scan.files.len() as u64;
+        scans.push(scan);
+    }
+    let mut done = 0;
+    progress.report(ProgressUpdate {
+        stage: "ingest.import",
+        done,
+        total,
+        current: None,
+    });
+    for (root, scan) in plan.roots.iter().zip(scans) {
+        if cancel.is_cancelled() {
+            return Ok(RootOutcome::Cancelled);
+        }
+        let root_count = (scan.files.len() + scan.rejected.len()) as u64;
+        let root_progress = RootProgress {
+            sink: progress,
+            offset: done,
+            total,
+        };
+        let outcome = import_root(
+            catalog,
+            plan,
+            RootScan { root, scan },
+            cancel,
+            &root_progress,
+            report,
+            quarantine_counts,
+        )?;
+        if outcome == RootOutcome::Cancelled {
+            return Ok(outcome);
+        }
+        done += root_count;
+        progress.report(ProgressUpdate {
+            stage: "ingest.import",
+            done,
+            total,
+            current: None,
+        });
+    }
+    if cancel.is_cancelled() {
+        return Ok(RootOutcome::Cancelled);
+    }
+    align_clocks(catalog, plan)?;
+    Ok(RootOutcome::Finished)
+}
+
+#[derive(Debug)]
+struct RootProgress<'a> {
+    sink: &'a dyn ProgressSink,
+    offset: u64,
+    total: u64,
+}
+
+impl ProgressSink for RootProgress<'_> {
+    fn report(&self, update: ProgressUpdate) {
+        self.sink.report(ProgressUpdate {
+            stage: update.stage,
+            done: self.offset + update.done,
+            total: self.total,
+            current: update.current,
+        });
+    }
+}
+
+fn counters(report: &ImportReport) -> ImportCounters {
+    ImportCounters {
+        files_discovered: report.files_discovered,
+        files_imported: report.files_imported,
+        files_duplicate: report.files_already_present,
+        files_quarantined: report.files_quarantined,
+        bytes_hashed: report.bytes_hashed,
+    }
 }
 
 /// Whether one root finished or observed the cancel token.
@@ -115,25 +201,28 @@ enum RootOutcome {
     Cancelled,
 }
 
+struct RootScan<'a> {
+    root: &'a Path,
+    scan: crate::scan::ScanOutcome,
+}
+
 /// Walk, hash and insert one root. Steps 1 to 7 of the algorithm above.
 fn import_root(
     catalog: &Catalog,
     plan: &ImportPlan,
-    root: &Path,
+    root_scan: RootScan<'_>,
     cancel: &CancelToken,
     progress: &dyn ProgressSink,
     report: &mut ImportReport,
     quarantine_counts: &mut BTreeMap<String, u64>,
 ) -> AuraResult<RootOutcome> {
+    let RootScan { root, scan } = root_scan;
     {
         let now = rfc3339(catalog.clock().now_utc());
         let root_id = register_root(catalog, plan, root, &now)?;
         let import_id = plan.import_id.to_db();
 
-        let scan_started_ms = catalog.clock().now_utc().unix_timestamp() * 1000;
-        let scan = crate::scan::scan_root(root, plan, scan_started_ms)?;
-        report.files_discovered += scan.files.len() as u64;
-
+        let rejected = scan.rejected.len() as u64;
         for (path, err) in &scan.rejected {
             quarantine(catalog, plan, path, err, quarantine_counts)?;
             report.files_quarantined += 1;
@@ -156,6 +245,7 @@ fn import_root(
             }
         }
 
+        let mut done = untouched.len() as u64 + rejected;
         if !untouched.is_empty() {
             catalog.writer().transact({
                 let root_id = root_id.clone();
@@ -172,8 +262,7 @@ fn import_root(
 
         // Steps 4 to 7: hash, group, insert in batches.
         let threads = crate::tuning::hash_threads_for(root);
-        let total = todo.len() as u64;
-        let mut done: u64 = 0;
+        let total = todo.len() as u64 + done;
 
         for chunk in todo.chunks(BATCH) {
             if cancel.is_cancelled() {
@@ -181,7 +270,7 @@ fn import_root(
             }
 
             let prepared = prepare_batch(catalog, plan, chunk, threads, report, quarantine_counts)?;
-            let inserted = insert_batch(catalog, plan, &root_id, prepared)?;
+            let inserted = insert_batch(catalog, plan, &root_id, prepared, counters(report))?;
 
             report.files_imported += inserted.files;
             report.photos_created += inserted.photos;
@@ -194,27 +283,17 @@ fn import_root(
                 total,
                 current: None,
             });
-
-            let counters = ImportCounters {
-                files_discovered: report.files_discovered,
-                files_imported: report.files_imported,
-                files_duplicate: report.files_already_present,
-                files_quarantined: report.files_quarantined,
-                bytes_hashed: report.bytes_hashed,
-            };
-            catalog.writer().transact({
-                let import_id = plan.import_id.to_db();
-                move |tx| repo::import_run_update(tx, &import_id, "importing", counters)
-            })?;
         }
 
         // Files in the catalog that this scan did not see: mark absent, do not
         // delete. A photographer who unplugged a drive has not deleted a wedding.
-        catalog.writer().transact({
-            let root_id = root_id.clone();
-            let import_id = import_id.clone();
-            move |tx| repo::mark_absent_unseen(tx, &root_id, &import_id).map(|_| ())
-        })?;
+        if root.is_dir() {
+            catalog.writer().transact({
+                let root_id = root_id.clone();
+                let import_id = import_id.clone();
+                move |tx| repo::mark_absent_unseen(tx, &root_id, &import_id).map(|_| ())
+            })?;
+        }
     }
 
     Ok(RootOutcome::Finished)
@@ -243,6 +322,7 @@ fn register_root(
     if !root.exists() {
         return Err(aura_core::errors::io::not_found(root));
     }
+    let root = crate::util::source_directory(root);
     let row = SourceRootRow {
         root_id: project_scoped_id("src", &plan.project_id.to_db(), &root.to_string_lossy()),
         project_id: plan.project_id.to_db(),
@@ -381,6 +461,7 @@ fn insert_batch(
     plan: &ImportPlan,
     root_id: &str,
     prepared: Vec<Prepared>,
+    mut counters: ImportCounters,
 ) -> AuraResult<BatchOutcome> {
     let project_id = plan.project_id.to_db();
     let import_id = plan.import_id.to_db();
@@ -445,6 +526,9 @@ fn insert_batch(
         }
 
         repo::refresh_camera_counts(tx, &project_id)?;
+        counters.files_imported += outcome.files;
+        counters.files_duplicate += outcome.duplicates;
+        repo::import_run_update(tx, &import_id, "importing", counters)?;
         Ok(outcome)
     })
 }
@@ -581,11 +665,14 @@ fn finish_run(
     plan: &ImportPlan,
     state: ImportState,
     error: Option<&AuraError>,
+    report: &ImportReport,
 ) -> AuraResult<()> {
     let import_id = plan.import_id.to_db();
     let code = error.map(|e| e.code.0.to_string());
     let now = rfc3339(catalog.clock().now_utc());
+    let counters = counters(report);
     catalog.writer().transact(move |tx| {
+        repo::import_run_update(tx, &import_id, state.as_str(), counters)?;
         repo::import_run_finish(tx, &import_id, state.as_str(), code.as_deref(), &now)
     })
 }

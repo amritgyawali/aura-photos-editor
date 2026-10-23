@@ -51,12 +51,14 @@
 
 pub mod advanced_retouch;
 pub mod ai_settings;
+pub mod automatic_strength;
 pub mod autopilot_commands;
 pub mod biometric_keys;
 pub mod blemish_review;
 pub mod camera_commands;
 pub mod cleanup_commands;
 pub mod cloud_commands;
+pub mod color_match;
 pub mod colour_commands;
 pub mod commands;
 pub mod composition_commands;
@@ -73,6 +75,7 @@ pub mod lightroom;
 pub mod native_retouch;
 pub mod personal_style;
 pub mod provider_links;
+pub mod studio_color_commands;
 pub mod studio_tools;
 
 /// Frozen contracts. Changing anything in here requires an ADR and a matching
@@ -84,8 +87,10 @@ pub mod contract {
 pub mod activity;
 pub mod adaptive_look;
 pub mod emotion_commands;
+pub mod evoto_workflow;
 pub mod explain_commands;
 pub mod finish_commands;
+pub mod framing_workflows;
 pub mod geometry_commands;
 pub mod index_commands;
 pub mod infer_commands;
@@ -96,6 +101,7 @@ pub mod local_mask_commands;
 pub mod local_range;
 pub mod look_commands;
 pub mod mask_commands;
+pub mod mask_workflows;
 pub mod measured_cull;
 pub mod micro_commands;
 pub mod moment_commands;
@@ -107,6 +113,7 @@ mod photo_frames;
 pub mod portrait_auto;
 pub mod portrait_commands;
 pub mod portrait_features;
+mod portrait_preflight;
 pub mod preview_commands;
 pub mod preview_render;
 pub mod qc_commands;

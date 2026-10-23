@@ -7,6 +7,10 @@
 //! ```text
 //! AURA_PERF=1 AURA_PROFILE_DIR=<folder> cargo test --release -p aura-app --test batch_profile -- --ignored --nocapture
 //! ```
+//!
+//! `AURA_PROFILE_EXPORT=<folder>` keeps the exported files there instead of in a temporary
+//! folder, so they can be looked at; a photograph whose analysis or edit fails is counted
+//! and named rather than skipped silently.
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -97,16 +101,22 @@ fn where_the_time_goes() {
             }
         });
     };
+    let failures = std::sync::Mutex::new(Vec::<String>::new());
     let t = Instant::now();
     each(&|p| {
-        let _ = aura_app::photo_analysis(
+        if let Err(err) = aura_app::photo_analysis(
             &state,
             &PhotoAutoEditInput {
                 project_id: project.id.clone(),
                 photo_id: p.id.clone(),
                 job_id: "profile".into(),
             },
-        );
+        ) {
+            failures
+                .lock()
+                .unwrap()
+                .push(format!("analysis {}: {err:?}", p.file_name));
+        }
     });
     record(
         &mut table,
@@ -115,12 +125,17 @@ fn where_the_time_goes() {
     );
     let t = Instant::now();
     each(&|p| {
-        let _ = aura_app::photo_enhance::enhance_photo(
+        if let Err(err) = aura_app::photo_enhance::enhance_photo(
             &state,
             &DevelopImageInput {
                 photo_id: p.id.clone(),
             },
-        );
+        ) {
+            failures
+                .lock()
+                .unwrap()
+                .push(format!("edit {}: {err:?}", p.file_name));
+        }
     });
     record(
         &mut table,
@@ -138,7 +153,11 @@ fn where_the_time_goes() {
         ExportJobInput {
             project_id: project.id.clone(),
             sets: vec![serde_json::from_value(set).unwrap()],
-            destination: dir.path().join("export").to_string_lossy().into_owned(),
+            destination: std::env::var("AURA_PROFILE_EXPORT")
+                .map(std::path::PathBuf::from)
+                .unwrap_or_else(|_| dir.path().join("export"))
+                .to_string_lossy()
+                .into_owned(),
             destination_kind: "folder".into(),
             copyright: None,
             contact: None,
@@ -160,6 +179,10 @@ fn where_the_time_goes() {
     }
     for (label, ms) in aura_render::perf::take() {
         record(&mut table, &format!("    {label}"), u128::from(ms));
+    }
+    let failures = failures.into_inner().unwrap();
+    for failure in &failures {
+        println!("FAILED {failure}");
     }
     let total = started.elapsed().as_secs_f64();
     println!(

@@ -1,0 +1,1010 @@
+{
+  "date": "2026-10-20",
+  "branch": "feat/fifty-studio-capabilities",
+  "count": 50,
+  "countingRule": "Complete distinct operations/workflows, not channels/sliders/presets/reset aliases. Physical sizing and print export count together. Existing selected vibrance and luma curves excluded.",
+  "allFiftyClaimedAsEvotoFeatures": false,
+  "completeEvotoParity": false,
+  "proprietaryAssetsIncluded": false,
+  "priorEvidence": "AURA-Evoto-native-research-2026-10-20.json",
+  "sources": [
+    "https://support.evoto.ai/color-adjustment-feature-modules/",
+    "https://support.evoto.ai/feature-introduction-masking/",
+    "https://support.evoto.ai/feature-introduction-ai-color-match/",
+    "https://support.evoto.ai/crop/",
+    "https://support.evoto.ai/color-adjustments-module/"
+  ],
+  "capabilities": [
+    {
+      "id": 1,
+      "name": "Full-image Levels with joint RGB and independent channels",
+      "family": "colour",
+      "provenanceAndLimit": "Documented category; AURA's curve-domain operator",
+      "implementation": [
+        "crates/aura-recipe/src/studio_color.rs",
+        "crates/aura-render/src/studio_color.rs",
+        "crates/aura-app/src/studio_color_commands.rs",
+        "ui/src/components/develop/StudioColorPanel.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/tests/studio_color.rs",
+        "ui/src/components/develop/StudioColorPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 2,
+      "name": "Hue-preserving luminosity Levels",
+      "family": "colour",
+      "provenanceAndLimit": "AURA extension; individual channel controls still follow",
+      "implementation": [
+        "crates/aura-recipe/src/studio_color.rs",
+        "crates/aura-render/src/studio_color.rs",
+        "crates/aura-app/src/studio_color_commands.rs",
+        "ui/src/components/develop/StudioColorPanel.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/tests/studio_color.rs",
+        "ui/src/components/develop/StudioColorPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 3,
+      "name": "Nine-range selective CMYK correction, relative/absolute modes",
+      "family": "colour",
+      "provenanceAndLimit": "Documented category; independently implemented range weights",
+      "implementation": [
+        "crates/aura-recipe/src/studio_color.rs",
+        "crates/aura-render/src/studio_color.rs",
+        "crates/aura-app/src/studio_color_commands.rs",
+        "ui/src/components/develop/StudioColorPanel.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/tests/studio_color.rs",
+        "ui/src/components/develop/StudioColorPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 4,
+      "name": "Percentile auto Levels",
+      "family": "colour",
+      "provenanceAndLimit": "AURA extension; measured endpoints are proposals",
+      "implementation": [
+        "crates/aura-recipe/src/studio_color.rs",
+        "crates/aura-render/src/studio_color.rs",
+        "crates/aura-app/src/studio_color_commands.rs",
+        "ui/src/components/develop/StudioColorPanel.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/tests/studio_color.rs",
+        "ui/src/components/develop/StudioColorPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 5,
+      "name": "Sampled Levels input black point",
+      "family": "colour",
+      "provenanceAndLimit": "Documented workflow; bounded coordinate-selected patch",
+      "implementation": [
+        "crates/aura-recipe/src/studio_color.rs",
+        "crates/aura-render/src/studio_color.rs",
+        "crates/aura-app/src/studio_color_commands.rs",
+        "ui/src/components/develop/StudioColorPanel.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/tests/studio_color.rs",
+        "ui/src/components/develop/StudioColorPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 6,
+      "name": "Sampled Levels input white point",
+      "family": "colour",
+      "provenanceAndLimit": "Documented workflow; bounded coordinate-selected patch",
+      "implementation": [
+        "crates/aura-recipe/src/studio_color.rs",
+        "crates/aura-render/src/studio_color.rs",
+        "crates/aura-app/src/studio_color_commands.rs",
+        "ui/src/components/develop/StudioColorPanel.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/tests/studio_color.rs",
+        "ui/src/components/develop/StudioColorPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 7,
+      "name": "Mask-local point curves",
+      "family": "colour",
+      "provenanceAndLimit": "Documented category; uses the existing mask's coverage",
+      "implementation": [
+        "crates/aura-recipe/src/studio_color.rs",
+        "crates/aura-render/src/studio_color.rs",
+        "crates/aura-app/src/studio_color_commands.rs",
+        "ui/src/components/develop/StudioColorPanel.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/tests/studio_color.rs",
+        "ui/src/components/develop/StudioColorPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 8,
+      "name": "Mask-local eight-band HSL",
+      "family": "colour",
+      "provenanceAndLimit": "Documented category; independent local parameters",
+      "implementation": [
+        "crates/aura-recipe/src/studio_color.rs",
+        "crates/aura-render/src/studio_color.rs",
+        "crates/aura-app/src/studio_color_commands.rs",
+        "ui/src/components/develop/StudioColorPanel.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/tests/studio_color.rs",
+        "ui/src/components/develop/StudioColorPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 9,
+      "name": "Mask-local three-way colour grading",
+      "family": "colour",
+      "provenanceAndLimit": "Documented category; blending and balance included",
+      "implementation": [
+        "crates/aura-recipe/src/studio_color.rs",
+        "crates/aura-render/src/studio_color.rs",
+        "crates/aura-app/src/studio_color_commands.rs",
+        "ui/src/components/develop/StudioColorPanel.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/tests/studio_color.rs",
+        "ui/src/components/develop/StudioColorPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 10,
+      "name": "Mask-local sharpening",
+      "family": "colour",
+      "provenanceAndLimit": "Documented category; not a new semantic detector",
+      "implementation": [
+        "crates/aura-recipe/src/studio_color.rs",
+        "crates/aura-render/src/studio_color.rs",
+        "crates/aura-app/src/studio_color_commands.rs",
+        "ui/src/components/develop/StudioColorPanel.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/tests/studio_color.rs",
+        "ui/src/components/develop/StudioColorPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 11,
+      "name": "Mask-local dehaze",
+      "family": "colour",
+      "provenanceAndLimit": "AURA extension; review edge and haze behaviour",
+      "implementation": [
+        "crates/aura-recipe/src/studio_color.rs",
+        "crates/aura-render/src/studio_color.rs",
+        "crates/aura-app/src/studio_color_commands.rs",
+        "ui/src/components/develop/StudioColorPanel.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/tests/studio_color.rs",
+        "ui/src/components/develop/StudioColorPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 12,
+      "name": "Sampled colour targeting for HSL",
+      "family": "colour",
+      "provenanceAndLimit": "Documented workflow counterpart; coordinates select the band, not drag-on-image adjustment",
+      "implementation": [
+        "crates/aura-recipe/src/studio_color.rs",
+        "crates/aura-render/src/studio_color.rs",
+        "crates/aura-app/src/studio_color_commands.rs",
+        "ui/src/components/develop/StudioColorPanel.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/tests/studio_color.rs",
+        "ui/src/components/develop/StudioColorPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 13,
+      "name": "Duplicate an authored mask and its extended colour settings",
+      "family": "selection",
+      "provenanceAndLimit": "AURA extension to mask management",
+      "implementation": [
+        "crates/aura-app/src/mask_workflows.rs",
+        "crates/aura-app/src/mask_workflows/plane.rs",
+        "ui/src/components/develop/MaskWorkflowControls.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/src/mask_workflows/tests/mod.rs",
+        "ui/src/components/develop/MasksPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 14,
+      "name": "Invert the whole composed selection",
+      "family": "selection",
+      "provenanceAndLimit": "Documented counterpart; not per-component inversion",
+      "implementation": [
+        "crates/aura-app/src/mask_workflows.rs",
+        "crates/aura-app/src/mask_workflows/plane.rs",
+        "ui/src/components/develop/MaskWorkflowControls.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/src/mask_workflows/tests/mod.rs",
+        "ui/src/components/develop/MasksPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 15,
+      "name": "Union two existing composed mask selections",
+      "family": "selection",
+      "provenanceAndLimit": "AURA extension to documented selection combination",
+      "implementation": [
+        "crates/aura-app/src/mask_workflows.rs",
+        "crates/aura-app/src/mask_workflows/plane.rs",
+        "ui/src/components/develop/MaskWorkflowControls.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/src/mask_workflows/tests/mod.rs",
+        "ui/src/components/develop/MasksPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 16,
+      "name": "Intersect two existing composed mask selections",
+      "family": "selection",
+      "provenanceAndLimit": "AURA extension; differs from adding a newly detected component",
+      "implementation": [
+        "crates/aura-app/src/mask_workflows.rs",
+        "crates/aura-app/src/mask_workflows/plane.rs",
+        "ui/src/components/develop/MaskWorkflowControls.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/src/mask_workflows/tests/mod.rs",
+        "ui/src/components/develop/MasksPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 17,
+      "name": "Subtract an existing composed mask selection",
+      "family": "selection",
+      "provenanceAndLimit": "AURA extension; preserves the destination mask's parameters",
+      "implementation": [
+        "crates/aura-app/src/mask_workflows.rs",
+        "crates/aura-app/src/mask_workflows/plane.rs",
+        "ui/src/components/develop/MaskWorkflowControls.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/src/mask_workflows/tests/mod.rs",
+        "ui/src/components/develop/MasksPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 18,
+      "name": "Freeze computed selection coverage",
+      "family": "selection",
+      "provenanceAndLimit": "AURA extension; stores a bounded full-frame matte",
+      "implementation": [
+        "crates/aura-app/src/mask_workflows.rs",
+        "crates/aura-app/src/mask_workflows/plane.rs",
+        "ui/src/components/develop/MaskWorkflowControls.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/src/mask_workflows/tests/mod.rs",
+        "ui/src/components/develop/MasksPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 19,
+      "name": "Feather the completed selection",
+      "family": "selection",
+      "provenanceAndLimit": "Documented refinement category; grid-cell radius",
+      "implementation": [
+        "crates/aura-app/src/mask_workflows.rs",
+        "crates/aura-app/src/mask_workflows/plane.rs",
+        "ui/src/components/develop/MaskWorkflowControls.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/src/mask_workflows/tests/mod.rs",
+        "ui/src/components/develop/MasksPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 20,
+      "name": "Expand the completed selection",
+      "family": "selection",
+      "provenanceAndLimit": "Documented refinement category; bounded dilation",
+      "implementation": [
+        "crates/aura-app/src/mask_workflows.rs",
+        "crates/aura-app/src/mask_workflows/plane.rs",
+        "ui/src/components/develop/MaskWorkflowControls.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/src/mask_workflows/tests/mod.rs",
+        "ui/src/components/develop/MasksPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 21,
+      "name": "Contract the completed selection",
+      "family": "selection",
+      "provenanceAndLimit": "Documented refinement category; bounded erosion",
+      "implementation": [
+        "crates/aura-app/src/mask_workflows.rs",
+        "crates/aura-app/src/mask_workflows/plane.rs",
+        "ui/src/components/develop/MaskWorkflowControls.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/src/mask_workflows/tests/mod.rs",
+        "ui/src/components/develop/MasksPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 22,
+      "name": "Refine completed selection edge contrast",
+      "family": "selection",
+      "provenanceAndLimit": "AURA extension",
+      "implementation": [
+        "crates/aura-app/src/mask_workflows.rs",
+        "crates/aura-app/src/mask_workflows/plane.rs",
+        "ui/src/components/develop/MaskWorkflowControls.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/src/mask_workflows/tests/mod.rs",
+        "ui/src/components/develop/MasksPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 23,
+      "name": "Remove small isolated selection islands",
+      "family": "selection",
+      "provenanceAndLimit": "AURA extension; bounded connected-component area",
+      "implementation": [
+        "crates/aura-app/src/mask_workflows.rs",
+        "crates/aura-app/src/mask_workflows/plane.rs",
+        "ui/src/components/develop/MaskWorkflowControls.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/src/mask_workflows/tests/mod.rs",
+        "ui/src/components/develop/MasksPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 24,
+      "name": "Fill small enclosed selection holes",
+      "family": "selection",
+      "provenanceAndLimit": "AURA extension; border-connected background stays empty",
+      "implementation": [
+        "crates/aura-app/src/mask_workflows.rs",
+        "crates/aura-app/src/mask_workflows/plane.rs",
+        "ui/src/components/develop/MaskWorkflowControls.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/src/mask_workflows/tests/mod.rs",
+        "ui/src/components/develop/MasksPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 25,
+      "name": "Create durable empty reference groups",
+      "family": "reference_library",
+      "provenanceAndLimit": "Documented management counterpart",
+      "implementation": [
+        "crates/aura-app/src/color_match/library/workflows.rs",
+        "ui/src/components/look/ReferenceLibraryManager.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/src/color_match/library/workflows/tests/mod.rs",
+        "ui/src/components/look/ReferenceLibraryManager.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 26,
+      "name": "Rename a group and its members together",
+      "family": "reference_library",
+      "provenanceAndLimit": "Documented management counterpart",
+      "implementation": [
+        "crates/aura-app/src/color_match/library/workflows.rs",
+        "ui/src/components/look/ReferenceLibraryManager.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/src/color_match/library/workflows/tests/mod.rs",
+        "ui/src/components/look/ReferenceLibraryManager.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 27,
+      "name": "Delete a group while safely ungrouping its references",
+      "family": "reference_library",
+      "provenanceAndLimit": "Documented category; source files retained",
+      "implementation": [
+        "crates/aura-app/src/color_match/library/workflows.rs",
+        "ui/src/components/look/ReferenceLibraryManager.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/src/color_match/library/workflows/tests/mod.rs",
+        "ui/src/components/look/ReferenceLibraryManager.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 28,
+      "name": "Manually reorder reference groups",
+      "family": "reference_library",
+      "provenanceAndLimit": "Documented management counterpart",
+      "implementation": [
+        "crates/aura-app/src/color_match/library/workflows.rs",
+        "ui/src/components/look/ReferenceLibraryManager.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/src/color_match/library/workflows/tests/mod.rs",
+        "ui/src/components/look/ReferenceLibraryManager.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 29,
+      "name": "Move multiple selected references together",
+      "family": "reference_library",
+      "provenanceAndLimit": "Documented batch counterpart",
+      "implementation": [
+        "crates/aura-app/src/color_match/library/workflows.rs",
+        "ui/src/components/look/ReferenceLibraryManager.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/src/color_match/library/workflows/tests/mod.rs",
+        "ui/src/components/look/ReferenceLibraryManager.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 30,
+      "name": "Remove multiple selected references together",
+      "family": "reference_library",
+      "provenanceAndLimit": "Documented batch counterpart; target edits retained",
+      "implementation": [
+        "crates/aura-app/src/color_match/library/workflows.rs",
+        "ui/src/components/look/ReferenceLibraryManager.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/src/color_match/library/workflows/tests/mod.rs",
+        "ui/src/components/look/ReferenceLibraryManager.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 31,
+      "name": "Persist manual reference order within a group",
+      "family": "reference_library",
+      "provenanceAndLimit": "AURA extension; normal library reads honour the order",
+      "implementation": [
+        "crates/aura-app/src/color_match/library/workflows.rs",
+        "ui/src/components/look/ReferenceLibraryManager.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/src/color_match/library/workflows/tests/mod.rs",
+        "ui/src/components/look/ReferenceLibraryManager.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 32,
+      "name": "Batch favorite/unfavorite selected references",
+      "family": "reference_library",
+      "provenanceAndLimit": "AURA extension; counted as one operation",
+      "implementation": [
+        "crates/aura-app/src/color_match/library/workflows.rs",
+        "ui/src/components/look/ReferenceLibraryManager.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/src/color_match/library/workflows/tests/mod.rs",
+        "ui/src/components/look/ReferenceLibraryManager.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 33,
+      "name": "Save matching defaults to a selection of references",
+      "family": "reference_library",
+      "provenanceAndLimit": "AURA extension; includes fine strengths",
+      "implementation": [
+        "crates/aura-app/src/color_match/library/workflows.rs",
+        "ui/src/components/look/ReferenceLibraryManager.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/src/color_match/library/workflows/tests/mod.rs",
+        "ui/src/components/look/ReferenceLibraryManager.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 34,
+      "name": "Reset matching defaults for selected references",
+      "family": "reference_library",
+      "provenanceAndLimit": "AURA extension; existing target sessions unchanged",
+      "implementation": [
+        "crates/aura-app/src/color_match/library/workflows.rs",
+        "ui/src/components/look/ReferenceLibraryManager.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/src/color_match/library/workflows/tests/mod.rs",
+        "ui/src/components/look/ReferenceLibraryManager.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 35,
+      "name": "Export a portable descriptor library",
+      "family": "reference_library",
+      "provenanceAndLimit": "AURA extension; no image pixels, thumbnails, paths or source coordinates",
+      "implementation": [
+        "crates/aura-app/src/color_match/library/workflows.rs",
+        "ui/src/components/look/ReferenceLibraryManager.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/src/color_match/library/workflows/tests/mod.rs",
+        "ui/src/components/look/ReferenceLibraryManager.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 36,
+      "name": "Import and merge a portable descriptor library",
+      "family": "reference_library",
+      "provenanceAndLimit": "AURA extension; version/engine/collision validation",
+      "implementation": [
+        "crates/aura-app/src/color_match/library/workflows.rs",
+        "ui/src/components/look/ReferenceLibraryManager.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/src/color_match/library/workflows/tests/mod.rs",
+        "ui/src/components/look/ReferenceLibraryManager.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 37,
+      "name": "Interactive free crop handles with numeric edges",
+      "family": "framing_matching_inspection",
+      "provenanceAndLimit": "Documented crop counterpart; source-coordinate view",
+      "implementation": [
+        "crates/aura-app/src/framing_workflows.rs",
+        "ui/src/components/develop/FramingPanel.tsx",
+        "ui/src/components/develop/framingMath.ts",
+        "ui/src/components/develop/PhotoStudio.tsx",
+        "ui/src/components/look/RegionalColorMatchPanel.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/tests/color_reference_match.rs",
+        "ui/src/components/develop/FramingPanel.test.tsx",
+        "ui/src/components/develop/framingMath.test.ts",
+        "ui/src/components/look/RegionalColorMatchPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 38,
+      "name": "Custom aspect-ratio entry",
+      "family": "framing_matching_inspection",
+      "provenanceAndLimit": "Documented crop counterpart",
+      "implementation": [
+        "crates/aura-app/src/framing_workflows.rs",
+        "ui/src/components/develop/FramingPanel.tsx",
+        "ui/src/components/develop/framingMath.ts",
+        "ui/src/components/develop/PhotoStudio.tsx",
+        "ui/src/components/look/RegionalColorMatchPanel.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/tests/color_reference_match.rs",
+        "ui/src/components/develop/FramingPanel.test.tsx",
+        "ui/src/components/develop/framingMath.test.ts",
+        "ui/src/components/look/RegionalColorMatchPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 39,
+      "name": "Exact original-pixel crop dimensions",
+      "family": "framing_matching_inspection",
+      "provenanceAndLimit": "Documented sizing counterpart; no upscaling",
+      "implementation": [
+        "crates/aura-app/src/framing_workflows.rs",
+        "ui/src/components/develop/FramingPanel.tsx",
+        "ui/src/components/develop/framingMath.ts",
+        "ui/src/components/develop/PhotoStudio.tsx",
+        "ui/src/components/look/RegionalColorMatchPanel.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/tests/color_reference_match.rs",
+        "ui/src/components/develop/FramingPanel.test.tsx",
+        "ui/src/components/develop/framingMath.test.ts",
+        "ui/src/components/look/RegionalColorMatchPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 40,
+      "name": "Physical print sizing and verified framed-print export",
+      "family": "framing_matching_inspection",
+      "provenanceAndLimit": "Documented workflow counterpart; millimetres/PPI calculate pixels, not compliance or embedded DPI",
+      "implementation": [
+        "crates/aura-app/src/framing_workflows.rs",
+        "ui/src/components/develop/FramingPanel.tsx",
+        "ui/src/components/develop/framingMath.ts",
+        "ui/src/components/develop/PhotoStudio.tsx",
+        "ui/src/components/look/RegionalColorMatchPanel.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/tests/color_reference_match.rs",
+        "ui/src/components/develop/FramingPanel.test.tsx",
+        "ui/src/components/develop/framingMath.test.ts",
+        "ui/src/components/look/RegionalColorMatchPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 41,
+      "name": "Durable framing templates",
+      "family": "framing_matching_inspection",
+      "provenanceAndLimit": "Documented preset counterpart; device-local settings",
+      "implementation": [
+        "crates/aura-app/src/framing_workflows.rs",
+        "ui/src/components/develop/FramingPanel.tsx",
+        "ui/src/components/develop/framingMath.ts",
+        "ui/src/components/develop/PhotoStudio.tsx",
+        "ui/src/components/look/RegionalColorMatchPanel.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/tests/color_reference_match.rs",
+        "ui/src/components/develop/FramingPanel.test.tsx",
+        "ui/src/components/develop/framingMath.test.ts",
+        "ui/src/components/look/RegionalColorMatchPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 42,
+      "name": "Source-orientation-aware crop ratio",
+      "family": "framing_matching_inspection",
+      "provenanceAndLimit": "Partial documented counterpart; current image, not batch crop sync",
+      "implementation": [
+        "crates/aura-app/src/framing_workflows.rs",
+        "ui/src/components/develop/FramingPanel.tsx",
+        "ui/src/components/develop/framingMath.ts",
+        "ui/src/components/develop/PhotoStudio.tsx",
+        "ui/src/components/look/RegionalColorMatchPanel.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/tests/color_reference_match.rs",
+        "ui/src/components/develop/FramingPanel.test.tsx",
+        "ui/src/components/develop/framingMath.test.ts",
+        "ui/src/components/look/RegionalColorMatchPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 43,
+      "name": "Subject-centred crop placement",
+      "family": "framing_matching_inspection",
+      "provenanceAndLimit": "Documented category; requires an available subject silhouette",
+      "implementation": [
+        "crates/aura-app/src/framing_workflows.rs",
+        "ui/src/components/develop/FramingPanel.tsx",
+        "ui/src/components/develop/framingMath.ts",
+        "ui/src/components/develop/PhotoStudio.tsx",
+        "ui/src/components/look/RegionalColorMatchPanel.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/tests/color_reference_match.rs",
+        "ui/src/components/develop/FramingPanel.test.tsx",
+        "ui/src/components/develop/framingMath.test.ts",
+        "ui/src/components/look/RegionalColorMatchPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 44,
+      "name": "Measured-face crop placement",
+      "family": "framing_matching_inspection",
+      "provenanceAndLimit": "Documented category; user selects a measured face",
+      "implementation": [
+        "crates/aura-app/src/framing_workflows.rs",
+        "ui/src/components/develop/FramingPanel.tsx",
+        "ui/src/components/develop/framingMath.ts",
+        "ui/src/components/develop/PhotoStudio.tsx",
+        "ui/src/components/look/RegionalColorMatchPanel.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/tests/color_reference_match.rs",
+        "ui/src/components/develop/FramingPanel.test.tsx",
+        "ui/src/components/develop/framingMath.test.ts",
+        "ui/src/components/look/RegionalColorMatchPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 45,
+      "name": "Joint face-size, top-margin and horizontal framing rules",
+      "family": "framing_matching_inspection",
+      "provenanceAndLimit": "Documented category; one tool, not three sliders counted separately",
+      "implementation": [
+        "crates/aura-app/src/framing_workflows.rs",
+        "ui/src/components/develop/FramingPanel.tsx",
+        "ui/src/components/develop/framingMath.ts",
+        "ui/src/components/develop/PhotoStudio.tsx",
+        "ui/src/components/look/RegionalColorMatchPanel.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/tests/color_reference_match.rs",
+        "ui/src/components/develop/FramingPanel.test.tsx",
+        "ui/src/components/develop/framingMath.test.ts",
+        "ui/src/components/look/RegionalColorMatchPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 46,
+      "name": "Measured eye-line alignment",
+      "family": "framing_matching_inspection",
+      "provenanceAndLimit": "Documented category; requires two measured eyes",
+      "implementation": [
+        "crates/aura-app/src/framing_workflows.rs",
+        "ui/src/components/develop/FramingPanel.tsx",
+        "ui/src/components/develop/framingMath.ts",
+        "ui/src/components/develop/PhotoStudio.tsx",
+        "ui/src/components/look/RegionalColorMatchPanel.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/tests/color_reference_match.rs",
+        "ui/src/components/develop/FramingPanel.test.tsx",
+        "ui/src/components/develop/framingMath.test.ts",
+        "ui/src/components/look/RegionalColorMatchPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 47,
+      "name": "Subject-silhouette axis alignment",
+      "family": "framing_matching_inspection",
+      "provenanceAndLimit": "Partial counterpart; not skeletal or pose-based inference",
+      "implementation": [
+        "crates/aura-app/src/framing_workflows.rs",
+        "ui/src/components/develop/FramingPanel.tsx",
+        "ui/src/components/develop/framingMath.ts",
+        "ui/src/components/develop/PhotoStudio.tsx",
+        "ui/src/components/look/RegionalColorMatchPanel.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/tests/color_reference_match.rs",
+        "ui/src/components/develop/FramingPanel.test.tsx",
+        "ui/src/components/develop/framingMath.test.ts",
+        "ui/src/components/look/RegionalColorMatchPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 48,
+      "name": "Linked regional matching strengths",
+      "family": "framing_matching_inspection",
+      "provenanceAndLimit": "Documented workflow; other draft fields stay independent",
+      "implementation": [
+        "crates/aura-app/src/framing_workflows.rs",
+        "ui/src/components/develop/FramingPanel.tsx",
+        "ui/src/components/develop/framingMath.ts",
+        "ui/src/components/develop/PhotoStudio.tsx",
+        "ui/src/components/look/RegionalColorMatchPanel.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/tests/color_reference_match.rs",
+        "ui/src/components/develop/FramingPanel.test.tsx",
+        "ui/src/components/develop/framingMath.test.ts",
+        "ui/src/components/look/RegionalColorMatchPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 49,
+      "name": "Temporary full-quality colour-only comparison",
+      "family": "framing_matching_inspection",
+      "provenanceAndLimit": "Documented category; saved recipe remains unchanged",
+      "implementation": [
+        "crates/aura-app/src/framing_workflows.rs",
+        "ui/src/components/develop/FramingPanel.tsx",
+        "ui/src/components/develop/framingMath.ts",
+        "ui/src/components/develop/PhotoStudio.tsx",
+        "ui/src/components/look/RegionalColorMatchPanel.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/tests/color_reference_match.rs",
+        "ui/src/components/develop/FramingPanel.test.tsx",
+        "ui/src/components/develop/framingMath.test.ts",
+        "ui/src/components/look/RegionalColorMatchPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    },
+    {
+      "id": 50,
+      "name": "Rendered RGB / CIE Lab D65 point inspection",
+      "family": "framing_matching_inspection",
+      "provenanceAndLimit": "Documented inspection counterpart; not sensor/RAW values",
+      "implementation": [
+        "crates/aura-app/src/framing_workflows.rs",
+        "ui/src/components/develop/FramingPanel.tsx",
+        "ui/src/components/develop/framingMath.ts",
+        "ui/src/components/develop/PhotoStudio.tsx",
+        "ui/src/components/look/RegionalColorMatchPanel.tsx"
+      ],
+      "testEvidence": [
+        "crates/aura-app/tests/color_reference_match.rs",
+        "ui/src/components/develop/FramingPanel.test.tsx",
+        "ui/src/components/develop/framingMath.test.ts",
+        "ui/src/components/look/RegionalColorMatchPanel.test.tsx"
+      ],
+      "independentImplementation": true,
+      "evotoPixelParityVerified": false
+    }
+  ],
+  "validation": {
+    "frontendTestsPassed": 876,
+    "frontendFilesPassed": 104,
+    "frontendBuild": "passed",
+    "nativeAppUnitPassed": 314,
+    "nativeAppUnitIgnored": 2,
+    "recipeUnitPassed": 78,
+    "renderUnitPassed": 263,
+    "renderUnitIgnored": 3,
+    "qualification": "Synthetic workflow/pixel regressions do not establish photographic or proprietary algorithm equivalence.",
+    "nativeWorkflowIntegrationsPassed": 6,
+    "nativeWorkflowIntegrationsIgnored": 1,
+    "nativeTotalPassed": 661,
+    "nativeTotalIgnored": 6,
+    "strictWorkspaceAllTargetsClippy": "passed",
+    "workspaceAndDesktopFormatting": "passed",
+    "bannedPatternScan": "passed",
+    "frozenContractsLocked": 83,
+    "desktopProductionAssetsBuild": "passed",
+    "desktopSmokePassed": 12,
+    "desktopSmokeScenarios": [
+      "GUI Levels gamma saves a real native pixel change",
+      "GUI luminosity and selective CMYK settings persist",
+      "GUI local point curve changes rendered pixels through an existing mask",
+      "GUI mask duplication retains extended local colour settings",
+      "GUI inversion and feather operate on frozen native selection coverage",
+      "GUI durable empty groups and selected reference move persist",
+      "GUI portable library export/import excludes thumbnails and preserves target edit",
+      "GUI exact pixel crop delivers an actual 80 by 60 native render",
+      "Native framed-print export verifies a real JPEG and honors no upscaling",
+      "GUI framing templates persist locally",
+      "GUI colour-only native preview and rendered RGB Lab point readout work",
+      "Source and reference originals stay byte-identical"
+    ],
+    "originalSha256": {
+      "fifty-chart.png": "c09e9df44dc5411861fe4e73db18de8afaeda94d9a1dbae624a875e6a94a677a",
+      "warm-reference.png": "07367a5cca689bd2bdfeee295b4a88ccbdd77202cf223759f5b3de58535c3cc3"
+    },
+    "diagnosticDirectory": ".work-checks/fifty/desktop-212942",
+    "buildAdvisories": [
+      "Existing frontend large-chunk advisory",
+      "Windows GNU resource-manifest merge warning"
+    ],
+    "unmeasured": [
+      "Paired Evoto photographic output",
+      "Permissioned native-resolution portrait cohorts",
+      "Three-machine performance deltas"
+    ],
+    "screenshots": [
+      "assets/aura-fifty-selection-tools-2026-10-20.png",
+      "assets/aura-fifty-framing-inspection-2026-10-20.png"
+    ]
+  },
+  "dependencyFollowUp": {
+    "reason": "First PR 62 CI run failed on existing rustls advisories and the hexf-parse license policy entry",
+    "rustlsVersion": "0.23.46",
+    "workspaceAndDesktopLocksUpdated": true,
+    "resolvedAdvisories": [
+      "RUSTSEC-2026-0346",
+      "RUSTSEC-2026-0347",
+      "RUSTSEC-2026-0348",
+      "RUSTSEC-2026-0349"
+    ],
+    "newAdvisoryExceptions": false,
+    "licenseException": {
+      "crate": "hexf-parse",
+      "publishedVersion": "0.2.1",
+      "license": "CC0-1.0",
+      "scope": "This crate only; existing Naga dependency"
+    },
+    "cargoDenyVersion": "0.20.2",
+    "cargoDenyCategories": {
+      "advisories": "passed",
+      "bans": "passed",
+      "licenses": "passed",
+      "sources": "passed"
+    },
+    "cloudTestsPassed": 169,
+    "cloudTestsIgnored": 1,
+    "desktopLockedCheck": "passed",
+    "ipcDefinitions": 342,
+    "ipcRegistrations": 342,
+    "ipcTypedCalls": 342,
+    "remoteCiStatus": "Follow the latest PR 62 check run; local checks do not certify pending remote lanes"
+  }
+}

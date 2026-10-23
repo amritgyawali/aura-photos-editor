@@ -36,6 +36,17 @@ struct EditedPhoto {
     model: String,
     reasons: Vec<String>,
     recipe: RecipeDto,
+    boundary_preflight: Option<crate::portrait_preflight::Report>,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WithheldPhoto {
+    photo_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    code: Option<String>,
+    message: String,
+    disposition: &'static str,
 }
 
 /// `photo-edits.json`, written as the run goes. A wedding is two thousand recipes with a
@@ -233,6 +244,7 @@ fn edit_one(
             photo_id: photo.to_owned(),
             source: "local".into(),
             model: "AURA measured edit with your look".into(),
+            boundary_preflight: None,
             reasons,
             recipe,
         });
@@ -262,6 +274,7 @@ fn edit_one(
             photo_id: photo.to_owned(),
             source: answer.source,
             model: answer.model,
+            boundary_preflight: None,
             reasons: answer.reasons,
             recipe: answer.recipe,
         });
@@ -273,6 +286,7 @@ fn edit_one(
         photo_id: photo.to_owned(),
         source: "local".into(),
         model: "AURA measured edit".into(),
+        boundary_preflight: None,
         reasons: vec!["Light, colour, white balance and scene measured from this photograph; portrait retouch evaluated with its saved preferences. Every decision is recorded as a step in its history.".into()],
         recipe,
     })
@@ -1046,6 +1060,11 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
     // edit is local work the image gate already bounds.
     let lanes = if cloud { 1 } else { workers(state) };
     let done = std::sync::atomic::AtomicUsize::new(0);
+    let mut retouched = 0_usize;
+    let mut retouched_faces = 0_u64;
+    let mut without_retouch = Vec::new();
+    let mut successful_edits = BTreeMap::new();
+    let mut failed_edits = Vec::new();
     for chunk in targets.chunks(lanes.saturating_mul(16).max(1)) {
         if stopped(job) {
             return Ok(());
@@ -1081,7 +1100,74 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
             };
             match result {
                 None => return Ok(()),
-                Some(Ok(entry)) => {
+                Some(Ok(mut entry)) => {
+                    let recipe: aura_recipe::Recipe = serde_json::from_str(&entry.recipe.body)
+                        .map_err(|e| error(&e.to_string()))?;
+                    let pid = aura_core::PhotoId::from_db(photo)
+                        .map_err(|_| error("Invalid photo identifier."))?;
+                    update(job, |s| {
+                        s.phase_label = format!(
+                            "Checking portrait boundaries: {}",
+                            names.get(photo.as_str()).copied().unwrap_or(photo)
+                        );
+                    });
+                    let checked = crate::portrait_preflight::check(state, pid, &recipe);
+                    if stopped(job) {
+                        return Ok(());
+                    }
+                    let refusal = match checked {
+                        Ok(report) => {
+                            let refusal = (!report.eligible()).then(|| {
+                                format!(
+                                    "Portrait boundary check is {}: {}",
+                                    report.status,
+                                    report.reasons.join(" ")
+                                )
+                            });
+                            entry.boundary_preflight = Some(report);
+                            refusal
+                        }
+                        Err(err) => Some(format!(
+                            "Portrait boundary check could not render: {}",
+                            err.user_message
+                        )),
+                    };
+                    edits.push(&entry)?;
+                    if let Some(reason) = refusal {
+                        update(job, |s| s.failed_edits += 1);
+                        failed_edits.push(WithheldPhoto {
+                            photo_id: photo.clone(),
+                            code: None,
+                            message: reason.clone(),
+                            disposition: "withheld_from_delivery",
+                        });
+                        note(
+                            job,
+                            format!(
+                                "{} withheld from delivery: {reason}",
+                                names.get(photo.as_str()).copied().unwrap_or(photo)
+                            ),
+                        );
+                        continue;
+                    }
+                    let body: serde_json::Value = serde_json::from_str(&entry.recipe.body)
+                        .map_err(|e| error(&e.to_string()))?;
+                    let portrait = body.get(crate::portrait_auto::KEY);
+                    if portrait
+                        .and_then(|value| value.get("operations"))
+                        .and_then(serde_json::Value::as_u64)
+                        .unwrap_or(0)
+                        > 0
+                    {
+                        retouched += 1;
+                        retouched_faces += portrait
+                            .and_then(|value| value.get("retouchedFaces"))
+                            .and_then(serde_json::Value::as_u64)
+                            .unwrap_or(0);
+                    } else {
+                        without_retouch
+                            .push(names.get(photo.as_str()).copied().unwrap_or(photo.as_str()));
+                    }
                     update(job, |s| {
                         if entry.source == "cloud" || entry.source == "cache" {
                             s.ai_edited += 1;
@@ -1089,14 +1175,20 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
                             s.local_edited += 1;
                         }
                     });
-                    edits.push(&entry)?;
+                    successful_edits.insert(photo.clone(), aura_recipe::recipe_hash(&recipe)?);
                 }
                 Some(Err(err)) => {
                     update(job, |s| s.failed_edits += 1);
+                    failed_edits.push(WithheldPhoto {
+                        photo_id: photo.clone(),
+                        code: Some(err.code.clone()),
+                        message: err.message.clone(),
+                        disposition: "withheld_from_delivery",
+                    });
                     note(
                         job,
                         format!(
-                            "{} edit or retouch failed; exporting its last saved reversible recipe: {}",
+                            "{} edit or retouch failed and was withheld from delivery: {}",
                             names.get(photo.as_str()).copied().unwrap_or(photo),
                             err.message
                         ),
@@ -1106,6 +1198,23 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
         }
     }
     edits.close()?;
+    let failures_path = Path::new(&input.destination).join("photo-edit-failures.json");
+    let failures = serde_json::to_vec_pretty(&failed_edits).map_err(|e| error(&e.to_string()))?;
+    std::fs::write(&failures_path, failures)
+        .map_err(|e| aura_core::errors::io::from_io(&e, &failures_path))?;
+    note(job, format!(
+        "Portrait retouch applied to {retouched} of {} edited photos ({retouched_faces} detected faces). {} photos have no automatic retouch operations{}.",
+        retouched + without_retouch.len(),
+        without_retouch.len(),
+        if without_retouch.is_empty() { String::new() } else {
+            format!(": {}{}; inspect these photos and their portrait reports", without_retouch.iter().take(5).copied().collect::<Vec<_>>().join(", "),
+                if without_retouch.len() > 5 { ", ..." } else { "" })
+        }
+    ));
+    targets.retain(|photo| successful_edits.contains_key(photo));
+    if targets.is_empty() && !failed_edits.is_empty() {
+        return Err(error("No selected photo completed its edit. Export was withheld; inspect photo-edit-failures.json."));
+    }
     if stopped(job) {
         return Ok(());
     }
@@ -1175,7 +1284,7 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
             };
         });
     };
-    let report = crate::delivery_commands::export_run_reporting(
+    let report = crate::delivery_commands::export_run_checked(
         state,
         ExportJobInput {
             project_id: project.clone(),
@@ -1203,6 +1312,7 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
         },
         None,
         Some(&exported),
+        Some(&successful_edits),
     )?;
     update(job, |s| {
         s.written = u64::from(report.written);

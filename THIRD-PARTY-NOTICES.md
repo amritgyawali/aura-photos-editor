@@ -1,5 +1,13 @@
 # Third-party notices
 
+## Reference image decoding and colour management
+
+Reference colour matching uses `image` 0.25.10 (MIT OR Apache-2.0) with its JPEG,
+PNG and TIFF codecs, and `moxcms` 0.8.1 (BSD-3-Clause OR Apache-2.0) for ICC
+conversion. These are independent open-source libraries; no Evoto implementation
+or model weights are bundled. The release dependency notice generator includes
+the resolved codecs, mathematical dependencies and their original licence texts.
+
 ## GPU output runtime
 
 AURA uses the wgpu 27.0.1 graphics runtime and its wgpu-core, wgpu-hal, wgpu-types and
@@ -8,6 +16,20 @@ and bytemuck (MIT OR Apache-2.0 OR Zlib). Their original licence texts are inclu
 the existing release notice generator, `scripts/third-party-notices.py`, which resolves
 all compiled Windows dependencies. GPU output uses the installed graphics driver;
 no proprietary GPU SDK or separately downloaded driver is bundled by this change.
+
+## Hexadecimal float parser - `hexf-parse` 0.2.1
+
+Naga's shader parser depends on `hexf-parse` 0.2.1 by Kang Seonghoon. The
+published 0.2.1 crate declares `CC0-1.0` in its packaged `Cargo.toml`; the
+scoped entry in `deny.toml` covers this existing dependency only. It does not
+allow CC0 for other crates. This records the published artifact's terms rather
+than the license on the upstream development branch.
+
+CC0 dedicates copyright and related rights to the public domain, with a fallback
+license where the waiver is ineffective. It does not grant patent or trademark
+rights and provides no warranties. The release notice generator retains the
+resolved dependency's license record. Sources: [published crate](https://crates.io/crates/hexf-parse/0.2.1)
+and [CC0 legal text](https://creativecommons.org/publicdomain/zero/1.0/legalcode.en).
 
 ## MediaPipe Selfie Multiclass segmentation weights
 

@@ -23,6 +23,7 @@ import { MatchLookPanel } from './components/look/MatchLookPanel';
 import { CuratePanel } from './components/curate/CuratePanel';
 import { DeliveryPanel } from './components/delivery/DeliveryPanel';
 import { PhotoStudio } from './components/develop/PhotoStudio';
+import { EffectsLibrary } from './components/effects/EffectsLibrary';
 import { GalleryPanel } from './components/gallery/GalleryPanel';
 import { QcPanel } from './components/qc/QcPanel';
 import { VirtualGrid } from './components/grid/VirtualGrid';
@@ -224,6 +225,7 @@ export function App(): JSX.Element {
           }
           void refreshProjects();
         } else if (event.kind === 'warning') {
+          editAfterImport.current = false;
           setError({ code: event.code, message: event.message });
         }
       })
@@ -321,6 +323,7 @@ export function App(): JSX.Element {
     ['start', 'Start', 'Look, reference, photos'],
     ['library', 'Photos', 'Browse your collection'],
     ['edit', 'Auto edit', 'One click, start to finish'],
+    ['effects', 'Effects', 'Every retouch tool & creative look'],
     ['look', 'Match a look', 'Your reference, your photos'],
     ['export', 'Export', 'Ready to share'],
     ['advanced', 'Advanced', 'Quality, curation & settings'],
@@ -377,7 +380,8 @@ export function App(): JSX.Element {
             <p className="studio-footnote">Choose photos or Choose a folder imports and edits, then waits for you to review before you export.</p>
             {!inTauri() && <p className="studio-footnote">Open the AURA desktop app to import and edit your photos.</p>}
           </section>}
-          {!activeProjectId ? workspace === 'start' ? null : <section className="studio-welcome">
+          {workspace === 'effects' && <EffectsLibrary photoName={activeProjectId ? focusedPhoto?.fileName ?? null : null} disabled={locked} onOpen={() => setWorkspace('edit')} />}
+          {!activeProjectId ? workspace === 'start' || workspace === 'effects' ? null : <section className="studio-welcome">
             <span className="eyebrow">LESS EDITING. MORE CREATING.</span>
             <h1>Or start with<br /><em>your own photos.</em></h1>
             <p>Portraits, travel, family, or everyday moments. Start a collection, choose your photos, and let AURA balance the light. Review the result, add your touch, and export.</p>

@@ -762,6 +762,7 @@ impl CpuEngine {
             let _t = crate::perf::step("render.local_masks");
             crate::local_masks::apply(&mut rgb, width, height, recipe, frame);
         }
+        crate::studio_color::apply(&mut rgb, width, height, recipe, frame);
         // ---- sharpening ----------------------------------------------------------------
         if plan.stages.contains(&Stage::Sharpen) {
             spatial::unsharp(
@@ -837,6 +838,7 @@ impl CpuEngine {
         before.extra.remove(aura_recipe::local_masks::KEY);
         before.extra.remove(aura_recipe::local_masks::MATTE_KEY);
         before.extra.remove(aura_recipe::studio_finish::KEY);
+        before.extra.remove(aura_recipe::studio_color::KEY);
         before.global.sharpen.amount = 0;
         before.global.effects = aura_recipe::Effects::default();
         before.geometry = aura_recipe::Geometry::default();

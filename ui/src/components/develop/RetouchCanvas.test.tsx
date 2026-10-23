@@ -3,9 +3,9 @@ import { expect, it, vi } from 'vitest';
 import { RetouchCanvas } from './RetouchCanvas';
 import { freshRetouch } from '../../ipc/nativeRetouch';
 
-function pointer(element: HTMLElement, type: string, x: number, y: number, pressure = .4) {
+function pointer(element: HTMLElement, type: string, x: number, y: number, pressure = .4, buttons = type === 'pointerup' ? 0 : 1) {
   const event = new Event(type, { bubbles: true, cancelable: true });
-  Object.assign(event, { pointerId: 1, button: 0, clientX: x, clientY: y, pressure, pointerType: 'pen' });
+  Object.assign(event, { pointerId: 1, button: 0, buttons, clientX: x, clientY: y, pressure, pointerType: 'pen' });
   fireEvent(element, event);
 }
 function open(disabled = false, split = false, gradient = false, maskView = false) {
@@ -87,4 +87,37 @@ it('discards pointer cancellation instead of saving a partial gesture', () => {
   pointer(surface, 'pointerdown', 200, 100); pointer(surface, 'pointermove', 220, 100);
   pointer(surface, 'pointercancel', 220, 100); pointer(surface, 'pointerup', 220, 100);
   expect(stroke).not.toHaveBeenCalled();
+});
+it('discards a stroke after focus leaves the app and starts a fresh gesture on return', () => {
+  const { surface, stroke } = open();
+  pointer(surface, 'pointerdown', 150, 75);
+  pointer(surface, 'pointermove', 170, 80);
+  fireEvent(window, new Event('blur'));
+  pointer(surface, 'pointerup', 190, 90);
+  expect(stroke).not.toHaveBeenCalled();
+  pointer(surface, 'pointerdown', 200, 100);
+  pointer(surface, 'pointerup', 220, 100);
+  expect(stroke).toHaveBeenCalledTimes(1);
+  expect(stroke.mock.calls[0]![0].points[0]).toEqual([.5, .5, .4]);
+});
+it('does not paint on hover when an outside release was missed', () => {
+  const { surface, stroke } = open();
+  pointer(surface, 'pointerdown', 150, 75);
+  pointer(surface, 'pointermove', 190, 90, .4, 0);
+  pointer(surface, 'pointerup', 190, 90);
+  expect(stroke).not.toHaveBeenCalled();
+});
+it('retains coalesced pen samples and their pressure without saving during movement', () => {
+  const { surface, stroke } = open();
+  pointer(surface, 'pointerdown', 120, 70, .2);
+  const move = new Event('pointermove', { bubbles: true, cancelable: true });
+  Object.assign(move, { pointerId: 1, buttons: 1, clientX: 180, clientY: 90, pressure: .5, pointerType: 'pen',
+    getCoalescedEvents: () => [
+      {clientX: 140, clientY: 72, pressure: .9, pointerType: 'pen'},
+      {clientX: 160, clientY: 80, pressure: .3, pointerType: 'pen'},
+    ] });
+  fireEvent(surface, move);
+  expect(stroke).not.toHaveBeenCalled();
+  pointer(surface, 'pointerup', 180, 90, .5);
+  expect(stroke.mock.calls[0]![0].points).toEqual([[.1, .2, .2], [.2, .22, .9], [.3, .3, .3], [.4, .4, .5]]);
 });

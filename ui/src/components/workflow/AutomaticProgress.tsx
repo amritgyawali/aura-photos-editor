@@ -20,7 +20,7 @@ export function summary(status: OneClickStatusDto): string {
     `${analyzed} analyzed`,
     unreadable > 0 ? `${unreadable} could not be opened` : '',
     culled > 0 ? `${culled} left out by the cull` : '',
-    `${status.aiEdited + status.localEdited} of ${status.selected || analyzed || status.frames} edited and retouched`,
+    `${status.aiEdited + status.localEdited} of ${status.selected || analyzed || status.frames} edited`,
     `${status.written} written`,
     `${status.verified} verified exports`,
     `${failed} failed edits`,

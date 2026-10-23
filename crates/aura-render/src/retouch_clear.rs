@@ -40,6 +40,7 @@ const SECTORS: usize = 8;
 const SPREAD_SAMPLES: usize = 60_000;
 /// Find-and-rebuild passes one operation makes.
 const PASSES: usize = 2;
+pub(crate) const VERSION: &str = "enclosed-light-v2";
 /// The frequency radius, in samples, that marks are found and tone is rebuilt at.
 ///
 /// Everything that finds a mark and rebuilds the tone under it is a neighbourhood mean at
@@ -604,8 +605,14 @@ impl Surround<'_> {
         // candidate from incompatible light on opposite sides, or from a ring
         // substantially darker than the candidate itself. Leaving an ambiguous
         // mark is preferable to flattening a facial contour.
+        // Even mild opposing gradients can be a cheek/nose contour. A mixed
+        // ring whose dark side is below the candidate must not be rebuilt from
+        // its bright side. A genuinely bright inflamed head is a separate case:
+        // it sits above every side of an otherwise consistently lit ring.
+        let surrounded_tone = darkest_ring >= own_luma * 0.98;
+        let bright_head = own_luma >= brightest_ring * 1.02;
         let consistent_light =
-            darkest_ring >= own_luma * 0.8 && brightest_ring <= darkest_ring * 1.65;
+            brightest_ring <= darkest_ring * 1.35 && (surrounded_tone || bright_head);
         valid >= SECTORS - 2
             && consistent_light
             && (darker_than >= valid - 1 || redder_than >= valid - 1)
@@ -1113,6 +1120,56 @@ pub(crate) fn mark_plane(
 #[cfg(test)]
 mod tests {
     use super::{Group, Surround};
+
+    #[test]
+    fn mild_coloured_face_shading_is_not_a_mark_but_an_enclosed_bright_head_is() {
+        let w = 41;
+        let mut light = vec![0.25; w * w];
+        let mut red = vec![0.05; w * w];
+        let mut cells = Vec::new();
+        for y in 0..w {
+            for x in 0..w {
+                let i = y * w + x;
+                light[i] = 0.25 + (x as f32 - 20.0) * 0.0015;
+                if (x as f32 - 20.0).hypot(y as f32 - 20.0) <= 3.0 {
+                    light[i] = 0.25;
+                    red[i] = 0.2;
+                    cells.push(i);
+                }
+            }
+        }
+        let alpha = vec![1.0; w * w];
+        let group = Group {
+            cells,
+            centre: [20., 20.],
+            axes: [2., 2.],
+            reach: 3.,
+        };
+        let shape = Surround {
+            luma: &light,
+            red: &red,
+            alpha: &alpha,
+            w,
+            h: w,
+            radius: 3.,
+        };
+        assert!(
+            !shape.encloses(&group, 0.1, 0.15),
+            "mild lighting cannot be replaced as a red blemish"
+        );
+        let mut light = vec![0.25; w * w];
+        for i in &group.cells {
+            light[*i] = 0.29;
+        }
+        let shape = Surround {
+            luma: &light,
+            ..shape
+        };
+        assert!(
+            shape.encloses(&group, 0.1, 0.15),
+            "bright inflamed heads remain repairable"
+        );
+    }
 
     #[test]
     fn redness_cannot_override_incompatible_light_around_a_candidate() {

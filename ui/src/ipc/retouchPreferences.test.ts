@@ -1,12 +1,12 @@
 import { expect, it } from 'vitest';
-import { DEFAULT_AUTO_RETOUCH, DEFAULT_RETOUCH_SETTINGS } from './nativeRetouch';
+import { POLISHED_WEDDING_RETOUCH, POLISHED_WEDDING_SETTINGS, DEFAULT_RETOUCH_SETTINGS } from './nativeRetouch';
 import { readRetouchPreferences } from './retouchPreferences';
 import type { RecipeDto } from './types';
 
 const recipe = (options: unknown) => ({ body: JSON.stringify({ studio_portrait_auto_v1: { options } }) }) as RecipeDto;
 
-it('starts new photos with pore retention and natural body colour, while retaining saved choices', () => {
-  expect(readRetouchPreferences().settings).toMatchObject({ texture: .85, matchBodyToFace: 0,
+it('starts new photos with the polished wedding finish while retaining saved choices', () => {
+  expect(readRetouchPreferences().settings).toMatchObject({ texture: .7, matchBodyToFace: .1, faceLight: .35, smoothing: .45,
     skinBrightness: 0, skinWarmth: 0, skinTint: 0 });
   expect(readRetouchPreferences(recipe({ settings: { texture: .5, matchBodyToFace: .25 } })).settings)
     .toMatchObject({ texture: .5, matchBodyToFace: .25 });
@@ -20,7 +20,7 @@ it('restores all fine controls and per-photo scope without sharing mutable defau
   const first = readRetouchPreferences(recipe(saved));
   first.settings!.smoothing = .9;
   expect(readRetouchPreferences(recipe(saved)).settings?.smoothing).toBe(.23);
-  expect(readRetouchPreferences().settings).toEqual(DEFAULT_RETOUCH_SETTINGS);
+  expect(readRetouchPreferences().settings).toEqual(POLISHED_WEDDING_SETTINGS);
 });
 
 it('bounds numeric values and ignores unknown or incorrectly typed fields', () => {
@@ -33,8 +33,8 @@ it('bounds numeric values and ignores unknown or incorrectly typed fields', () =
 
 it.each(['bad json', 'null', '[]', '{}', '{"studio_portrait_auto_v1":{"options":[]}}'])('uses independent defaults for legacy or invalid recipe %s', body => {
   const actual = readRetouchPreferences({ body } as RecipeDto);
-  expect(actual).toEqual({ ...DEFAULT_AUTO_RETOUCH, settings: DEFAULT_RETOUCH_SETTINGS });
-  expect(actual.settings).not.toBe(DEFAULT_RETOUCH_SETTINGS);
+  expect(actual).toEqual({ ...POLISHED_WEDDING_RETOUCH, settings: POLISHED_WEDDING_SETTINGS });
+  expect(actual.settings).not.toBe(POLISHED_WEDDING_SETTINGS);
 });
 
 it('restores the adaptive choice and the larger spot limit only with deep cleanup', () => {

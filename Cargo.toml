@@ -107,7 +107,8 @@ parking_lot       = "0.12"
 
 # TLS for the cloud gateway (phase 04's waiver, discharged in ADR-0066). No
 # default features: rustls defaults to `aws-lc-rs`, which needs a C compiler.
-rustls            = { version = "0.23", default-features = false, features = ["std", "tls12", "logging"] }
+# 0.23.46 fixes RUSTSEC-2026-0346 through RUSTSEC-2026-0349.
+rustls            = { version = "0.23.46", default-features = false, features = ["std", "tls12", "logging"] }
 rustls-rustcrypto = "0.0.2-alpha"
 webpki-roots      = "0.26"
 

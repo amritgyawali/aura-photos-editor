@@ -15,6 +15,11 @@
 //!    one per slider, so twenty moves cost the same softness as one.
 //! 5. **Glow** - a soft bloom from the finished frame's highlights.
 //!
+//! ADR-0150 adds a measured pass before the colours (skin, makeup, hair, attire and the people's
+//! own light, `crate::studio_evoto`), the background's own adjustments after it is replaced, a
+//! vignette that avoids faces at the very end, two more backgrounds, and twenty more face and
+//! ten more body sliders in the one displacement field.
+//!
 //! The regions and landmarks come from `aura_portrait` and the frame as it arrived, exactly as
 //! the portrait operators' do, so the four values a delivered file is re-created from still
 //! decide every pixel. Nothing here runs unless a photographer moved a control: there is no
@@ -75,11 +80,23 @@ pub(crate) fn apply(
     } else {
         None
     };
+    // The people as the learned selection found them, where one was frozen into the recipe:
+    // every tool that tells them from their background reads it instead of the parse's colour
+    // models. ADR-0150.
+    let map = match (map, finish.subject_matte.as_ref()) {
+        (Some(parsed), Some(matte)) => {
+            Some(with_subject(&parsed, matte).map_or(parsed, std::sync::Arc::new))
+        }
+        (map, _) => map,
+    };
     if let Some(map) = map.as_deref() {
+        // Measured on the photograph as parsed, before any colour or background replaces it.
+        crate::studio_evoto::before_shape(rgb, w, h, &finish, map);
         apply_colours(rgb, w, h, &finish.colours, map);
         if let Some(background) = finish.background.filter(|b| b.amount > 0.0) {
-            apply_background(rgb, w, h, background, map);
+            apply_background(rgb, w, h, background, map, finish.subject_matte.as_ref());
         }
+        crate::studio_evoto::after_background(rgb, w, h, &finish, map);
         // Light follows the face as photographed, so it goes on before any reshape moves it.
         if finish.light.needs_faces() {
             crate::portrait_light::apply(rgb, w, h, &finish.light, map);
@@ -88,13 +105,23 @@ pub(crate) fn apply(
     let mut field = Field::new(w, h);
     if let Some(map) = map.as_deref() {
         let scale = Scale::of(map, w, h);
+        let chosen = crate::studio_evoto::chosen_faces(map, &finish.faces);
         if !finish.face.is_identity() {
-            for face in &map.faces {
-                face_warps(&mut field, &scale, face, &finish.face);
+            for face in &chosen {
+                face_warps(&mut field, &scale, map, face, &finish.face, rgb);
             }
         }
         if !finish.body.is_identity() {
-            body_warps(&mut field, &scale, map, &finish.body);
+            for face in &chosen {
+                head_and_neck_warps(&mut field, &scale, face, &finish.body, rgb);
+            }
+            body_warps(
+                &mut field,
+                &scale,
+                map,
+                &finish.body,
+                chosen.first().copied(),
+            );
         }
     }
     for stroke in &finish.liquify {
@@ -106,6 +133,9 @@ pub(crate) fn apply(
     }
     // The glow blooms from the finished frame's highlights.
     crate::portrait_light::apply_glow(rgb, w, h, finish.light.glow);
+    if let Some(map) = map.as_deref() {
+        crate::studio_evoto::last(rgb, w, h, &finish, map);
+    }
 }
 
 // ---- colour -----------------------------------------------------------------------------
@@ -286,13 +316,28 @@ fn short_edge(w: usize, h: usize) -> f32 {
     w.min(h) as f32
 }
 
-fn apply_background(rgb: &mut [f32], w: usize, h: usize, b: Background, map: &PortraitMap) {
-    let which = if b.mode == BackgroundMode::Sky {
-        Region::Sky
-    } else {
-        Region::Background
+fn apply_background(
+    rgb: &mut [f32],
+    w: usize,
+    h: usize,
+    b: Background,
+    map: &PortraitMap,
+    subject: Option<&aura_recipe::retouch_tools::Matte>,
+) {
+    let sky = matches!(b.mode, BackgroundMode::Sky | BackgroundMode::CloudSky);
+    let which = if sky { Region::Sky } else { Region::Background };
+    // A learned selection of the people, refined against the photograph's own edges at full
+    // resolution, is the cleanest line between them and what replaces their background.
+    let refined = subject
+        .filter(|_| !sky)
+        .and_then(|m| crate::retouch_matte::MattePlane::render(m, rgb, w, h));
+    let mut weight = match &refined {
+        Some(person) => (0..w * h)
+            .into_par_iter()
+            .map(|i| 1.0 - person.at(i % w, i / w).clamp(0.0, 1.0))
+            .collect(),
+        None => region(map, which, w, h),
     };
-    let mut weight = region(map, which, w, h);
     if weight.iter().all(|v| *v <= 1e-3) {
         return;
     }
@@ -306,6 +351,8 @@ fn apply_background(rgb: &mut [f32], w: usize, h: usize, b: Background, map: &Po
             let c = picked_colour(b.colour);
             fill(rgb, &weight, amount, w, |_| c);
         }
+        BackgroundMode::KeepShadows => keep_shadows(rgb, w, h, &weight, amount, b.colour),
+        BackgroundMode::CloudSky => cloud_sky(rgb, w, h, &weight, amount, b),
         BackgroundMode::Gradient => {
             let (top, bottom) = (picked_colour(b.colour), picked_colour(b.colour2));
             fill(rgb, &weight, amount, w, |y| {
@@ -385,6 +432,195 @@ fn apply_background(rgb: &mut [f32], w: usize, h: usize, b: Background, map: &Po
     }
 }
 
+/// A flat colour that keeps the shadows on the backdrop: the backdrop's own light, measured
+/// against its lit level and smoothed of its texture, multiplies the new colour. ADR-0150.
+fn keep_shadows(
+    rgb: &mut [f32],
+    w: usize,
+    h: usize,
+    weight: &[f32],
+    amount: f32,
+    colour: [f32; 3],
+) {
+    let c = picked_colour(colour);
+    let base = crate::spatial::luma_plane(rgb, w, h);
+    let mut lit: Vec<f32> = base
+        .iter()
+        .zip(weight)
+        .step_by(7)
+        .filter(|(_, k)| **k > 0.5)
+        .map(|(l, _)| *l)
+        .collect();
+    if lit.len() < 16 {
+        fill(rgb, weight, amount, w, |_| c);
+        return;
+    }
+    lit.sort_by(f32::total_cmp);
+    let level = lit[(lit.len() - 1) * 85 / 100].max(1e-4);
+    // The backdrop's light without its texture, measured over the backdrop alone.
+    let radius = (0.01 * short_edge(w, h)).round().max(1.0) as usize;
+    let masked: Vec<f32> = base.iter().zip(weight).map(|(l, k)| l * k).collect();
+    let top = crate::spatial::blur_plane(&masked, w, h, radius);
+    let bottom = crate::spatial::blur_plane(weight, w, h, radius);
+    rgb.par_chunks_mut(w * 3).enumerate().for_each(|(y, row)| {
+        for x in 0..w {
+            let i = y * w + x;
+            let k = weight[i].clamp(0.0, 1.0) * amount;
+            if k <= 1e-4 {
+                continue;
+            }
+            let here = if bottom[i] > 1e-3 {
+                top[i] / bottom[i]
+            } else {
+                base[i]
+            };
+            let shade = (here / level).clamp(0.15, 1.0);
+            for ch in 0..3 {
+                let p = &mut row[x * 3 + ch];
+                *p += (c[ch] * shade - *p) * k;
+            }
+        }
+    });
+}
+
+/// A deterministic value in `0..1` for one lattice point.
+fn lattice(x: i64, y: i64, seed: u64) -> f32 {
+    let mut v = seed ^ 0x9e37_79b9_7f4a_7c15;
+    for part in [x as u64, y as u64] {
+        v ^= part.wrapping_mul(0xbf58_476d_1ce4_e5b9);
+        v = v.rotate_left(31).wrapping_mul(0x94d0_49bb_1331_11eb);
+    }
+    v ^= v >> 29;
+    (v >> 40) as f32 / (1_u64 << 24) as f32
+}
+
+/// Smooth value noise in `0..1`, five octaves, `cell` pixels across the coarsest.
+fn clouds_at(x: f32, y: f32, cell: f32) -> f32 {
+    let mut total = 0.0_f32;
+    let mut norm = 0.0_f32;
+    let mut size = cell.max(2.0);
+    let mut weight = 1.0_f32;
+    for octave in 0..5_u64 {
+        let (fx, fy) = (x / size, y / size * 1.8);
+        let (x0, y0) = (fx.floor(), fy.floor());
+        let (tx, ty) = (fx - x0, fy - y0);
+        let (sx, sy) = (tx * tx * (3.0 - 2.0 * tx), ty * ty * (3.0 - 2.0 * ty));
+        let (ix, iy) = (x0 as i64, y0 as i64);
+        let a = lattice(ix, iy, octave);
+        let b = lattice(ix + 1, iy, octave);
+        let c = lattice(ix, iy + 1, octave);
+        let d = lattice(ix + 1, iy + 1, octave);
+        let top = a + (b - a) * sx;
+        let bottom = c + (d - c) * sx;
+        total += (top + (bottom - top) * sy) * weight;
+        norm += weight;
+        weight *= 0.5;
+        size *= 0.5;
+    }
+    total / norm
+}
+
+/// The sky replaced by a gradient with soft clouds, thinning toward the top. ADR-0150.
+fn cloud_sky(rgb: &mut [f32], w: usize, h: usize, weight: &[f32], amount: f32, b: Background) {
+    let horizon = (0..h)
+        .rev()
+        .find(|y| weight[y * w..(y + 1) * w].iter().any(|v| *v > 0.5))
+        .unwrap_or(h / 2)
+        .max(1);
+    let (top, low) = (picked_colour(b.colour), picked_colour(b.colour2));
+    let cloud = picked_colour([0.97, 0.97, 0.98]);
+    let shadow = picked_colour([0.78, 0.8, 0.84]);
+    let cell = w.max(h) as f32 / 4.0;
+    rgb.par_chunks_mut(w * 3).enumerate().for_each(|(y, row)| {
+        let depth = (y as f32 / horizon as f32).min(1.0);
+        let sky = lerp3(top, low, depth);
+        for x in 0..w {
+            let k = weight[y * w + x].clamp(0.0, 1.0) * amount;
+            if k <= 1e-4 {
+                continue;
+            }
+            let n = clouds_at(x as f32, y as f32, cell);
+            let density = smooth(0.52, 0.78, n) * (0.55 + 0.45 * depth);
+            // The underside of a cloud is in its own shade.
+            let under = smooth(
+                0.0,
+                0.08,
+                clouds_at(x as f32, y as f32 - cell * 0.04, cell) - n,
+            );
+            let white = lerp3(cloud, shadow, under * 0.6);
+            let c = lerp3(sky, white, density * 0.9);
+            for ch in 0..3 {
+                let p = &mut row[x * 3 + ch];
+                *p += (c[ch] - *p) * k;
+            }
+        }
+    });
+}
+
+fn smooth(low: f32, high: f32, v: f32) -> f32 {
+    let t = ((v - low) / (high - low)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
+
+/// The parse with its people and background taken from a stored selection of the people, on the
+/// parse's own grid: the person is the selection, the background its complement, and hair,
+/// clothing, body skin and sky are kept inside the side of the line they belong to. `None` when
+/// the selection does not decode. ADR-0150.
+fn with_subject(
+    map: &PortraitMap,
+    matte: &aura_recipe::retouch_tools::Matte,
+) -> Option<PortraitMap> {
+    let alpha = matte.decode()?;
+    let (mw, mh) = (matte.width as usize, matte.height as usize);
+    if mw == 0 || mh == 0 || alpha.len() != mw * mh {
+        return None;
+    }
+    let [l, t, r, b] = matte.bounds;
+    let (pw, ph) = (map.width as usize, map.height as usize);
+    let cell = |x: usize, y: usize| f32::from(alpha[y.min(mh - 1) * mw + x.min(mw - 1)]) / 255.0;
+    let person: Vec<f32> = (0..pw * ph)
+        .into_par_iter()
+        .map(|i| {
+            let u = (((i % pw) as f32 + 0.5) / pw as f32 - l) / (r - l).max(1e-6);
+            let v = (((i / pw) as f32 + 0.5) / ph as f32 - t) / (b - t).max(1e-6);
+            if !(0.0..=1.0).contains(&u) || !(0.0..=1.0).contains(&v) {
+                return 0.0;
+            }
+            let fx = (u * mw as f32 - 0.5).clamp(0.0, (mw - 1) as f32);
+            let fy = (v * mh as f32 - 0.5).clamp(0.0, (mh - 1) as f32);
+            let (x0, y0) = (fx as usize, fy as usize);
+            let (tx, ty) = (fx - x0 as f32, fy - y0 as f32);
+            let top = cell(x0, y0) + (cell(x0 + 1, y0) - cell(x0, y0)) * tx;
+            let bottom = cell(x0, y0 + 1) + (cell(x0 + 1, y0 + 1) - cell(x0, y0 + 1)) * tx;
+            (top + (bottom - top) * ty).clamp(0.0, 1.0)
+        })
+        .collect();
+    let mut out = map.clone();
+    for (region, plane) in &mut out.planes {
+        if plane.values.len() != pw * ph {
+            continue;
+        }
+        match region {
+            Region::Body => plane.values.clone_from(&person),
+            Region::Background => {
+                plane.values = person.iter().map(|p| 1.0 - p).collect();
+            }
+            Region::Sky => {
+                for (v, p) in plane.values.iter_mut().zip(&person) {
+                    *v = v.min(1.0 - p);
+                }
+            }
+            Region::Hair | Region::Clothing | Region::BodySkin => {
+                for (v, p) in plane.values.iter_mut().zip(&person) {
+                    *v = v.min(*p);
+                }
+            }
+            _ => {}
+        }
+    }
+    Some(out)
+}
+
 fn lerp3(a: [f32; 3], b: [f32; 3], t: f32) -> [f32; 3] {
     let t = t.clamp(0.0, 1.0);
     [0, 1, 2].map(|c| a[c] + (b[c] - a[c]) * t)
@@ -442,6 +678,9 @@ enum Warp {
     },
     /// Takes the displacement already in the field back toward none.
     Restore { c: [f32; 2], r: f32, k: f32 },
+    /// Turns what is inside the circle by `angle` radians (clockwise on screen), fully at the
+    /// centre and not at all at the rim. ADR-0150.
+    Rotate { c: [f32; 2], r: f32, angle: f32 },
 }
 
 /// The falloff every primitive shares: smooth, one at the centre, zero with zero slope at the rim.
@@ -474,7 +713,7 @@ impl Field {
     fn add(&mut self, warp: Warp) {
         let (c, reach) = match warp {
             Warp::Move { c, r, .. } | Warp::Scale { c, r, .. } => (c, r[0].max(r[1])),
-            Warp::Restore { c, r, .. } => (c, r),
+            Warp::Restore { c, r, .. } | Warp::Rotate { c, r, .. } => (c, r),
         };
         if !reach.is_finite() || reach < 0.5 || !c[0].is_finite() || !c[1].is_finite() {
             return;
@@ -525,6 +764,15 @@ impl Field {
                         rx_row[x] *= 1.0 - k * f;
                         ry_row[x] *= 1.0 - k * f;
                     }
+                    Warp::Rotate { r, angle, .. } => {
+                        let f = falloff((px * px + py * py) / (r * r));
+                        if f > 0.0 {
+                            // The output shows the input turned back by the same angle.
+                            let (s, co) = (-angle * f).sin_cos();
+                            rx_row[x] += px * co - py * s - px;
+                            ry_row[x] += px * s + py * co - py;
+                        }
+                    }
                 }
             }
         });
@@ -557,6 +805,40 @@ impl Field {
                 let edge = ((x - left).min(right - x) / soft).clamp(0.0, 1.0);
                 let k = edge * edge * (3.0 - 2.0 * edge);
                 *slot += depth * factor * k;
+            }
+        });
+    }
+
+    /// A vertical stretch of the rows between `from` and `to` by `1 + s`, with everything below
+    /// `to` carried down by what the band grew, eased in above `from` and out below `to` so
+    /// neither end creases. ADR-0150.
+    fn stretch_band(&mut self, from: f32, to: f32, s: f32, x_range: (f32, f32, f32)) {
+        if s == 0.0 || !from.is_finite() || !to.is_finite() || to <= from {
+            return;
+        }
+        self.ensure();
+        self.touched = true;
+        let w = self.w;
+        let (left, right, soft) = x_range;
+        let span = to - from;
+        let ease = span * 0.15;
+        let grown = span * s;
+        self.dy.par_chunks_mut(w).enumerate().for_each(|(y, row)| {
+            let y = y as f32 + 0.5;
+            // How far this output row looks back up the frame, smoothly from zero to `grown`.
+            let back = if y <= from - ease {
+                return;
+            } else if y < from + span * (1.0 + s) {
+                let t = ((y - (from - ease)) / (span * (1.0 + s) + ease)).clamp(0.0, 1.0);
+                grown * t * t * (3.0 - 2.0 * t)
+            } else {
+                grown
+            };
+            for (x, slot) in row.iter_mut().enumerate() {
+                let x = x as f32 + 0.5;
+                let edge = ((x - left).min(right - x) / soft).clamp(0.0, 1.0);
+                let k = edge * edge * (3.0 - 2.0 * edge);
+                *slot -= back * k;
             }
         });
     }
@@ -597,6 +879,15 @@ fn moving(c: [f32; 2], r: [f32; 2], angle: f32, v: [f32; 2]) -> Warp {
     Warp::Move { c, r, angle, v }
 }
 
+/// A turn, bounded to about eleven degrees so the field cannot fold.
+fn turning(c: [f32; 2], r: f32, angle: f32) -> Warp {
+    Warp::Rotate {
+        c,
+        r,
+        angle: angle.clamp(-0.2, 0.2),
+    }
+}
+
 /// A scale, bounded to `-0.5..=0.5` on each axis.
 fn scaling(c: [f32; 2], r: [f32; 2], angle: f32, a: [f32; 2]) -> Warp {
     Warp::Scale {
@@ -622,14 +913,17 @@ pub(crate) struct Face {
     pub(crate) u: [f32; 2],
     pub(crate) v: [f32; 2],
     pub(crate) io: f32,
-    roll: f32,
+    pub(crate) roll: f32,
     pub(crate) left_eye: [f32; 2],
     pub(crate) right_eye: [f32; 2],
     /// Eye line to nose and to mouth, in interocular units.
-    nose: f32,
+    pub(crate) nose: f32,
     pub(crate) mouth: f32,
     /// Mouth width in interocular units.
-    mouth_width: f32,
+    pub(crate) mouth_width: f32,
+    /// Eye line to the bottom of the chin, in interocular units: measured with
+    /// [`Face::measure_chin`], a fixed distance below the mouth until then.
+    pub(crate) chin: f32,
 }
 
 impl Scale {
@@ -671,13 +965,61 @@ impl Scale {
             nose,
             mouth,
             mouth_width: (g.mouth_width * k / io).clamp(0.4, 1.4),
+            chin: mouth + 0.8,
         }
     }
 }
 
 impl Face {
+    /// The bottom of the chin, measured: down the face's centre line below the mouth, the
+    /// strongest step from light to dark is the jaw's edge over the neck in its shadow. A face
+    /// looking down has its chin much nearer its mouth than the average one, and a chin tool
+    /// that assumed the average worked on the necklace. Keeps the prior when no step stands out.
+    /// ADR-0150.
+    pub(crate) fn measure_chin(mut self, rgb: &[f32], w: usize, h: usize) -> Self {
+        const STEPS: usize = 48;
+        let (lo, hi) = (self.mouth + 0.3, self.mouth + 1.05);
+        let luma_at = |p: [f32; 2]| {
+            let x = (p[0].max(0.0) as usize).min(w.saturating_sub(1));
+            let y = (p[1].max(0.0) as usize).min(h.saturating_sub(1));
+            let i = (y * w + x) * 3;
+            rgb.get(i..i + 3).map_or(0.0, |p| luma([p[0], p[1], p[2]]))
+        };
+        let profile: Vec<f32> = (0..STEPS)
+            .map(|k| {
+                let v = lo + (hi - lo) * k as f32 / (STEPS - 1) as f32;
+                [-0.2_f32, -0.1, 0.0, 0.1, 0.2]
+                    .iter()
+                    .map(|u| luma_at(self.at(*u, v)))
+                    .sum::<f32>()
+                    / 5.0
+            })
+            .collect();
+        let smooth: Vec<f32> = (0..STEPS)
+            .map(|k| {
+                let a = profile[k.saturating_sub(1)];
+                let c = profile[(k + 1).min(STEPS - 1)];
+                (a + 2.0 * profile[k] + c) / 4.0
+            })
+            .collect();
+        let mean = smooth.iter().sum::<f32>() / STEPS as f32;
+        let mut best = (0.0_f32, None);
+        for k in 2..STEPS - 2 {
+            let step = smooth[k - 2] - smooth[k + 2];
+            if step > best.0 {
+                best = (step, Some(k));
+            }
+        }
+        if let (step, Some(k)) = best {
+            if step > 0.06 * mean {
+                self.chin = lo + (hi - lo) * k as f32 / (STEPS - 1) as f32;
+            }
+        }
+        self
+    }
+
     /// A point `x` across and `y` down from the eye line, in interocular units.
-    fn at(&self, x: f32, y: f32) -> [f32; 2] {
+    pub(crate) fn at(&self, x: f32, y: f32) -> [f32; 2] {
         [
             self.mid[0] + (self.u[0] * x + self.v[0] * y) * self.io,
             self.mid[1] + (self.u[1] * x + self.v[1] * y) * self.io,
@@ -699,8 +1041,15 @@ impl Face {
 
 // One block per slider, in the order the panel lists them; splitting it would scatter the list.
 #[allow(clippy::too_many_lines)]
-fn face_warps(field: &mut Field, scale: &Scale, g: &FaceGeometry, s: &FaceShape) {
-    let f = scale.face(g);
+fn face_warps(
+    field: &mut Field,
+    scale: &Scale,
+    map: &PortraitMap,
+    g: &FaceGeometry,
+    s: &FaceShape,
+    rgb: &[f32],
+) {
+    let f = scale.face(g).measure_chin(rgb, field.w, field.h);
     let t = |v: f32| (v / 100.0).clamp(-1.0, 1.0);
     let m = f.mouth;
     // Whole head first, so the features move within the resized head.
@@ -814,6 +1163,259 @@ fn face_warps(field: &mut Field, scale: &Scale, g: &FaceGeometry, s: &FaceShape)
             [t(s.lips) * 0.08, t(s.lips) * 0.3],
         ));
     }
+    more_face_warps(field, &f, s);
+    if s.eye_symmetry > 0.0 {
+        eye_symmetry(field, map, g, &f, s.eye_symmetry / 100.0);
+    }
+}
+
+/// The twenty ADR-0150 face sliders, in the order the panel lists them.
+#[allow(clippy::too_many_lines)]
+fn more_face_warps(field: &mut Field, f: &Face, s: &FaceShape) {
+    let t = |v: f32| (v / 100.0).clamp(-1.0, 1.0);
+    let m = f.mouth;
+    for side in [-1.0_f32, 1.0] {
+        let eye = if side < 0.0 { f.left_eye } else { f.right_eye };
+        let outward = |k: f32| f.across(side * k);
+        if s.eye_height != 0.0 {
+            field.add(moving(
+                eye,
+                f.r(0.5, 0.42),
+                f.roll,
+                f.down(-t(s.eye_height) * 0.06),
+            ));
+        }
+        if s.eye_tilt != 0.0 {
+            // A clockwise turn lifts the image-left eye's outer corner and lowers the other's.
+            field.add(turning(eye, 0.45 * f.io, -side * t(s.eye_tilt) * 0.12));
+        }
+        let eye_u = side * 0.5;
+        if s.inner_corner != 0.0 {
+            field.add(moving(
+                f.at(eye_u - side * 0.22, 0.0),
+                f.r(0.17, 0.13),
+                f.roll,
+                outward(-t(s.inner_corner) * 0.035),
+            ));
+        }
+        if s.outer_corner != 0.0 {
+            field.add(moving(
+                f.at(eye_u + side * 0.24, 0.0),
+                f.r(0.19, 0.14),
+                f.roll,
+                outward(t(s.outer_corner) * 0.04),
+            ));
+        }
+        if s.nostrils != 0.0 {
+            field.add(moving(
+                f.at(side * 0.19, f.nose + 0.02),
+                f.r(0.14, 0.13),
+                f.roll,
+                outward(-t(s.nostrils) * 0.035),
+            ));
+        }
+        if s.cheek_apples != 0.0 {
+            // Fuller apples show at the face's own outline, so the cheek's edge moves out as
+            // well as the apple swelling.
+            field.add(scaling(
+                f.at(side * 0.6, 0.62),
+                f.r(0.36, 0.3),
+                f.roll,
+                [t(s.cheek_apples) * 0.2; 2],
+            ));
+            field.add(moving(
+                f.at(side * 1.0, 0.75),
+                f.r(0.38, 0.38),
+                f.roll,
+                outward(t(s.cheek_apples) * 0.05),
+            ));
+        }
+        if s.brow_height != 0.0 {
+            field.add(moving(
+                f.at(side * 0.5, -0.36),
+                f.r(0.5, 0.26),
+                f.roll,
+                f.down(-t(s.brow_height) * 0.06),
+            ));
+        }
+        if s.brow_tilt != 0.0 {
+            field.add(moving(
+                f.at(side * 0.78, -0.34),
+                f.r(0.24, 0.2),
+                f.roll,
+                f.down(-t(s.brow_tilt) * 0.045),
+            ));
+        }
+        if s.brow_thickness != 0.0 {
+            field.add(scaling(
+                f.at(side * 0.5, -0.36),
+                f.r(0.46, 0.15),
+                f.roll,
+                [0.0, t(s.brow_thickness) * 0.35],
+            ));
+        }
+        if s.temples != 0.0 {
+            field.add(moving(
+                f.at(side * 1.05, -0.45),
+                f.r(0.38, 0.5),
+                f.roll,
+                outward(t(s.temples) * 0.06),
+            ));
+        }
+    }
+    if s.nose_bridge != 0.0 {
+        field.add(scaling(
+            f.at(0.0, f.nose * 0.5),
+            f.r(0.27, f.nose * 0.6),
+            f.roll,
+            [-t(s.nose_bridge) * 0.45, 0.0],
+        ));
+    }
+    if s.nose_tip != 0.0 {
+        field.add(scaling(
+            f.at(0.0, f.nose),
+            f.r(0.2, 0.18),
+            f.roll,
+            [-t(s.nose_tip) * 0.25; 2],
+        ));
+    }
+    if s.nose_lift != 0.0 {
+        field.add(moving(
+            f.at(0.0, f.nose + 0.05),
+            f.r(0.24, 0.22),
+            f.roll,
+            f.down(-t(s.nose_lift) * 0.05),
+        ));
+    }
+    if s.upper_lip != 0.0 {
+        field.add(scaling(
+            f.at(0.0, m - 0.07),
+            f.r(f.mouth_width * 0.62, 0.2),
+            f.roll,
+            [0.0, t(s.upper_lip) * 0.5],
+        ));
+    }
+    if s.lower_lip != 0.0 {
+        field.add(scaling(
+            f.at(0.0, m + 0.1),
+            f.r(f.mouth_width * 0.62, 0.22),
+            f.roll,
+            [0.0, t(s.lower_lip) * 0.5],
+        ));
+    }
+    if s.mouth_height != 0.0 {
+        field.add(moving(
+            f.at(0.0, m),
+            f.r(f.mouth_width * 0.75, 0.36),
+            f.roll,
+            f.down(-t(s.mouth_height) * 0.06),
+        ));
+    }
+    if s.face_length != 0.0 {
+        field.add(scaling(
+            f.at(0.0, (f.nose + m) * 0.5 + 0.3),
+            f.r(1.1, 1.0),
+            f.roll,
+            [0.0, t(s.face_length) * 0.12],
+        ));
+    }
+    if s.chin_width != 0.0 {
+        field.add(scaling(
+            f.at(0.0, f.chin - 0.12),
+            f.r(0.5, 0.35),
+            f.roll,
+            [-t(s.chin_width) * 0.3, 0.0],
+        ));
+    }
+    if s.hair_volume != 0.0 {
+        field.add(scaling(
+            f.at(0.0, -1.7),
+            f.r(1.6, 1.0),
+            f.roll,
+            [t(s.hair_volume) * 0.12, t(s.hair_volume) * 0.15],
+        ));
+    }
+}
+
+/// How open each eye is: the eye region's weight summed over a box around each eye centre, on
+/// the analysis grid.
+fn eye_openings(map: &PortraitMap, g: &FaceGeometry) -> Option<[f32; 2]> {
+    let plane = map.plane(Region::Eyes)?;
+    let io = g.interocular().max(2.0);
+    let (hw, hh) = (0.28 * io, 0.2 * io);
+    let open = |c: [f32; 2]| {
+        let mut sum = 0.0_f32;
+        let (x0, x1) = ((c[0] - hw).floor() as i64, (c[0] + hw).ceil() as i64);
+        let (y0, y1) = ((c[1] - hh).floor() as i64, (c[1] + hh).ceil() as i64);
+        for y in y0..=y1 {
+            for x in x0..=x1 {
+                sum += plane.at(x, y);
+            }
+        }
+        sum
+    };
+    let both = [open(g.left_eye), open(g.right_eye)];
+    (both[0] > 1.0 && both[1] > 1.0).then_some(both)
+}
+
+/// The smaller eye opened toward the larger: mostly in height, a little in width.
+fn eye_symmetry(field: &mut Field, map: &PortraitMap, g: &FaceGeometry, f: &Face, k: f32) {
+    let Some([left, right]) = eye_openings(map, g) else {
+        return;
+    };
+    let ratio = left.min(right) / left.max(right);
+    if ratio >= 0.97 {
+        return;
+    }
+    let eye = if left < right {
+        f.left_eye
+    } else {
+        f.right_eye
+    };
+    let open = ((1.0 / ratio - 1.0) * k * 0.8).min(0.25);
+    field.add(scaling(eye, f.r(0.5, 0.4), f.roll, [open * 0.25, open]));
+}
+
+/// The ADR-0150 body sliders that belong to each face: the neck, the double chin, the head's
+/// tilt.
+fn head_and_neck_warps(
+    field: &mut Field,
+    scale: &Scale,
+    g: &FaceGeometry,
+    s: &BodyShape,
+    rgb: &[f32],
+) {
+    let f = scale.face(g).measure_chin(rgb, field.w, field.h);
+    let t = |v: f32| (v / 100.0).clamp(-1.0, 1.0);
+    let m = f.mouth;
+    if s.neck_width != 0.0 {
+        field.add(scaling(
+            f.at(0.0, f.chin + 0.45),
+            f.r(0.75, 0.5),
+            f.roll,
+            [-t(s.neck_width) * 0.25, 0.0],
+        ));
+    }
+    if s.double_chin > 0.0 {
+        let k = (s.double_chin / 100.0).clamp(0.0, 1.0);
+        field.add(scaling(
+            f.at(0.0, f.chin + 0.12),
+            f.r(0.8, 0.35),
+            f.roll,
+            [0.0, -k * 0.3],
+        ));
+        field.add(moving(
+            f.at(0.0, f.chin + 0.08),
+            f.r(0.7, 0.28),
+            f.roll,
+            f.down(-k * 0.05),
+        ));
+    }
+    if s.head_level > 0.0 && g.roll.abs() > 0.005 {
+        let k = (s.head_level / 100.0).clamp(0.0, 1.0);
+        // The head turned about its own middle, back toward a level eye line.
+        field.add(turning(f.at(0.0, m * 0.45), 2.3 * f.io, -g.roll * k));
+    }
 }
 
 // ---- the body ---------------------------------------------------------------------------
@@ -829,8 +1431,19 @@ struct Person {
 }
 
 impl Person {
-    fn find(map: &PortraitMap, w: usize, h: usize) -> Option<Self> {
-        let plane = region(map, Region::Body, w, h);
+    /// The person under a face: columns more than a few face widths either side are someone
+    /// else in a group photograph. ADR-0150; the whole body region when there is no face.
+    fn find(map: &PortraitMap, w: usize, h: usize, face: Option<(f32, f32)>) -> Option<Self> {
+        let mut plane = region(map, Region::Body, w, h);
+        if let Some((cx, size)) = face {
+            let (lo, hi) = (cx - size * 2.4, cx + size * 2.4);
+            for (i, v) in plane.iter_mut().enumerate() {
+                let x = (i % w) as f32 + 0.5;
+                if x < lo || x > hi {
+                    *v = 0.0;
+                }
+            }
+        }
         let (mut top, mut bottom, mut left, mut right) = (h, 0, w, 0);
         for y in 0..h {
             for x in 0..w {
@@ -870,14 +1483,25 @@ impl Person {
     }
 }
 
-fn body_warps(field: &mut Field, scale: &Scale, map: &PortraitMap, s: &BodyShape) {
-    let Some(person) = Person::find(map, field.w, field.h) else {
+fn body_warps(
+    field: &mut Field,
+    scale: &Scale,
+    map: &PortraitMap,
+    s: &BodyShape,
+    main: Option<&FaceGeometry>,
+) {
+    let main = main.or_else(|| map.faces.first());
+    let around = main.map(|g| {
+        let f = scale.face(g);
+        (f.mid[0], g.size * (scale.sx + scale.sy) * 0.5)
+    });
+    let Some(person) = Person::find(map, field.w, field.h, around) else {
         return;
     };
     let t = |v: f32| (v / 100.0).clamp(-1.0, 1.0);
     let height = person.height();
-    // Where the shoulders are: below the largest face when there is one.
-    let face = map.faces.first().map(|g| scale.face(g));
+    // Where the shoulders are: below the main face when there is one.
+    let face = main.map(|g| scale.face(g));
     let shoulders_y = face
         .as_ref()
         .map_or_else(|| person.y_at(0.2), |f| f.at(0.0, f.mouth + 1.6)[1])
@@ -901,6 +1525,8 @@ fn body_warps(field: &mut Field, scale: &Scale, map: &PortraitMap, s: &BodyShape
     sides(below(0.22), s.arms, 0.18, 0.05, false);
     sides(below(0.38), s.waist, 0.3, 0.07, false);
     sides(below(0.52), s.hips, 0.3, 0.06, false);
+    sides(below(0.68), s.thighs, 0.25, 0.06, false);
+    sides(below(0.86), s.calves, 0.18, 0.05, false);
     if s.slim != 0.0 {
         let cx = (person.left + person.right) as f32 * 0.5;
         let cy = below(0.4);
@@ -923,6 +1549,7 @@ fn body_warps(field: &mut Field, scale: &Scale, map: &PortraitMap, s: &BodyShape
             ));
         }
     }
+    more_body_warps(field, &person, height, shoulders_y, &below, s);
     if s.legs != 0.0 {
         let hip = below(0.55);
         let margin = (person.right - person.left) as f32 * 0.6;
@@ -937,6 +1564,90 @@ fn body_warps(field: &mut Field, scale: &Scale, map: &PortraitMap, s: &BodyShape
             ),
         );
     }
+}
+
+/// The ADR-0150 body sliders that move the silhouette's own lines: the stomach, the hips, the
+/// shoulder line, the torso and the whole height.
+fn more_body_warps(
+    field: &mut Field,
+    person: &Person,
+    height: f32,
+    shoulders_y: f32,
+    below: &dyn Fn(f32) -> f32,
+    s: &BodyShape,
+) {
+    let t = |v: f32| (v / 100.0).clamp(-1.0, 1.0);
+    if s.belly != 0.0 {
+        belly(field, person, height, below, t(s.belly));
+    }
+    if s.hip_lift != 0.0 {
+        if let Some((left, right)) = person.extent(below(0.6)) {
+            let width = right - left;
+            let cx = (left + right) * 0.5;
+            for dx in [-0.22, 0.22] {
+                field.add(moving(
+                    [cx + width * dx, below(0.6)],
+                    [width * 0.28, height * 0.08],
+                    0.0,
+                    [0.0, -height * 0.025 * t(s.hip_lift)],
+                ));
+            }
+        }
+    }
+    if s.shoulder_slope != 0.0 {
+        if let Some((left, right)) = person.extent(shoulders_y) {
+            let width = right - left;
+            for x in [left, right] {
+                field.add(moving(
+                    [x, shoulders_y],
+                    [width * 0.2, height * 0.06],
+                    0.0,
+                    [0.0, -height * 0.02 * t(s.shoulder_slope)],
+                ));
+            }
+        }
+    }
+    let margin = (person.right - person.left) as f32 * 0.6;
+    let x_range = (
+        person.left as f32 - margin,
+        person.right as f32 + margin,
+        margin.max(1.0),
+    );
+    if s.torso != 0.0 {
+        field.stretch_band(shoulders_y, below(0.45), t(s.torso) * 0.1, x_range);
+    }
+    if s.height != 0.0 {
+        field.stretch_below(shoulders_y, height * 0.05, t(s.height) * 0.08, x_range);
+    }
+}
+
+/// A stomach flattened on the side the silhouette shows it: each side is pushed in by how far
+/// it bulges past the line from the ribs to the hips, and by a little more.
+fn belly(field: &mut Field, person: &Person, height: f32, below: &dyn Fn(f32) -> f32, k: f32) {
+    let (Some(ribs), Some(waist), Some(hips)) = (
+        person.extent(below(0.28)),
+        person.extent(below(0.42)),
+        person.extent(below(0.55)),
+    ) else {
+        return;
+    };
+    let width = waist.1 - waist.0;
+    let bulge_left = ((ribs.0 + hips.0) * 0.5 - waist.0).clamp(0.0, width * 0.08);
+    let bulge_right = (waist.1 - (ribs.1 + hips.1) * 0.5).clamp(0.0, width * 0.08);
+    let r = [width * 0.22, height * 0.1];
+    let y = below(0.42);
+    field.add(moving(
+        [waist.0, y],
+        r,
+        0.0,
+        [(bulge_left + width * 0.01) * k, 0.0],
+    ));
+    field.add(moving(
+        [waist.1, y],
+        r,
+        0.0,
+        [-(bulge_right + width * 0.01) * k, 0.0],
+    ));
 }
 
 // ---- liquify ----------------------------------------------------------------------------
@@ -1095,6 +1806,177 @@ mod tests {
         let s: Vec<f32> = (0..w).map(|x| x as f32 + single.dx[row + x]).collect();
         assert!(s.windows(2).all(|p| p[1] > p[0]), "single move folded");
         assert!(xs.iter().all(|v| v.is_finite()));
+    }
+
+    /// No output pixel may sample further back along a row or a column than its neighbour
+    /// does by a whole pixel: a fold would show the same input twice.
+    fn folds(field: &Field) -> usize {
+        if field.dx.is_empty() {
+            return 0;
+        }
+        let (w, h) = (field.w, field.h);
+        let mut n = 0;
+        for y in 0..h {
+            for x in 1..w {
+                let i = y * w + x;
+                if 1.0 + field.dx[i] - field.dx[i - 1] <= 0.0 {
+                    n += 1;
+                }
+            }
+        }
+        for y in 1..h {
+            for x in 0..w {
+                let i = y * w + x;
+                if 1.0 + field.dy[i] - field.dy[i - w] <= 0.0 {
+                    n += 1;
+                }
+            }
+        }
+        n
+    }
+
+    fn largest_move(field: &Field) -> Option<(usize, usize, f32)> {
+        let w = field.w;
+        field
+            .dx
+            .iter()
+            .zip(&field.dy)
+            .enumerate()
+            .map(|(i, (dx, dy))| (i % w, i / w, dx.hypot(*dy)))
+            .max_by(|a, b| a.2.total_cmp(&b.2))
+    }
+
+    #[test]
+    fn every_new_face_slider_moves_its_feature_and_never_folds() {
+        use crate::studio_evoto::testing::{self as t, H, W};
+        let map = t::map();
+        let scale = Scale::of(&map, W, H);
+        let g = t::face();
+        let names = FaceShape::default().sliders().map(|(n, _)| n);
+        // The twenty ADR-0150 sliders are the last twenty.
+        for name in &names[13..] {
+            for value in [100.0, -100.0] {
+                if *name == "eyeSymmetry" {
+                    continue;
+                }
+                let shape: FaceShape =
+                    serde_json::from_value(serde_json::json!({ *name: value })).unwrap();
+                let mut field = Field::new(W, H);
+                face_warps(&mut field, &scale, &map, &g, &shape, &[]);
+                assert!(field.touched, "{name} {value}");
+                assert_eq!(folds(&field), 0, "{name} {value} folded");
+                let (x, y, d) = largest_move(&field).unwrap();
+                assert!(d > 0.3, "{name} {value} moved {d}");
+                // Every face slider stays on and around the head.
+                let dist = (x as f32 - 120.0).hypot(y as f32 - 110.0);
+                assert!(dist < 110.0, "{name} {value} moved ({x}, {y})");
+            }
+        }
+    }
+
+    #[test]
+    fn every_new_body_slider_moves_the_person_and_never_folds() {
+        use crate::studio_evoto::testing::{self as t, H, W};
+        let map = t::map();
+        let scale = Scale::of(&map, W, H);
+        let g = t::face();
+        let names = BodyShape::default().sliders().map(|(n, _)| n);
+        for name in &names[7..] {
+            for value in [100.0, -100.0] {
+                if (*name == "doubleChin" || *name == "headLevel") && value < 0.0 {
+                    continue;
+                }
+                let shape: BodyShape =
+                    serde_json::from_value(serde_json::json!({ *name: value })).unwrap();
+                let mut field = Field::new(W, H);
+                head_and_neck_warps(&mut field, &scale, &g, &shape, &[]);
+                body_warps(&mut field, &scale, &map, &shape, None);
+                if *name == "headLevel" {
+                    // The painted face is level, so there is nothing to turn.
+                    assert!(!field.touched, "{name}");
+                    continue;
+                }
+                assert!(field.touched, "{name} {value}");
+                assert_eq!(folds(&field), 0, "{name} {value} folded");
+            }
+        }
+    }
+
+    #[test]
+    fn a_tilted_head_is_turned_toward_level_and_by_no_more_than_the_tilt() {
+        use crate::studio_evoto::testing::{self as t, H, W};
+        let map = t::map();
+        let scale = Scale::of(&map, W, H);
+        let mut g = t::face();
+        g.roll = 0.1;
+        let shape = BodyShape {
+            head_level: 100.0,
+            ..BodyShape::default()
+        };
+        let mut field = Field::new(W, H);
+        head_and_neck_warps(&mut field, &scale, &g, &shape, &[]);
+        assert!(field.touched);
+        assert_eq!(folds(&field), 0);
+        // A point beside the head's middle is carried up or down - never further than the turn.
+        let f = scale.face(&g);
+        let c = f.at(0.0, f.mouth * 0.45);
+        let probe = ((c[1]) as usize * W) + (c[0] as usize + 20);
+        let moved = field.dy[probe].abs();
+        assert!(moved > 0.5 && moved < 20.0 * 0.1 * 1.05, "{moved}");
+    }
+
+    #[test]
+    fn eye_symmetry_opens_only_the_smaller_eye() {
+        use crate::studio_evoto::testing::{self as t, H, W};
+        let mut map = t::map();
+        // The image-left eye half as open as the other.
+        for (region, plane) in &mut map.planes {
+            if *region == Region::Eyes {
+                for y in 0..H {
+                    for x in 0..W {
+                        let (fx, fy) = (x as f32 + 0.5, y as f32 + 0.5);
+                        let left =
+                            ((fx - 100.0) / 11.0).powi(2) + ((fy - 100.0) / 2.5).powi(2) <= 1.0;
+                        let right =
+                            ((fx - 140.0) / 11.0).powi(2) + ((fy - 100.0) / 5.0).powi(2) <= 1.0;
+                        plane.values[y * W + x] = if left || right { 1.0 } else { 0.0 };
+                    }
+                }
+            }
+        }
+        let scale = Scale::of(&map, W, H);
+        let shape = FaceShape {
+            eye_symmetry: 100.0,
+            ..FaceShape::default()
+        };
+        let mut field = Field::new(W, H);
+        face_warps(&mut field, &scale, &map, &t::face(), &shape, &[]);
+        assert!(field.touched);
+        assert_eq!(folds(&field), 0);
+        let near = |cx: usize| {
+            (95..106)
+                .flat_map(|y| (cx - 8..cx + 8).map(move |x| (x, y)))
+                .map(|(x, y)| field.dy[y * W + x].abs())
+                .fold(0.0_f32, f32::max)
+        };
+        assert!(near(100) > 0.5);
+        assert!(near(140) < 1e-3);
+        // Two eyes of a size are left as they are.
+        let mut level = Field::new(W, H);
+        face_warps(&mut level, &scale, &t::map(), &t::face(), &shape, &[]);
+        assert!(!level.touched);
+    }
+
+    #[test]
+    fn a_turn_moves_a_point_along_its_circle_by_at_most_its_angle() {
+        let mut field = Field::new(100, 100);
+        field.add(turning([50.0, 50.0], 40.0, 0.5));
+        // Clamped to 0.2 radians: a point 10 px right of the centre looks back up the frame.
+        let i = 50 * 100 + 60;
+        let (dx, dy) = (field.dx[i], field.dy[i]);
+        let angle = dy.atan2(10.0 + dx);
+        assert!(angle < 0.0 && angle.abs() <= 0.2 + 1e-4, "{angle}");
+        assert_eq!(folds(&field), 0);
     }
 
     #[test]

@@ -91,6 +91,7 @@ pub const COMPOSITION_ENABLED_ENV: &str = "AURA_COMPOSITION_ENABLED";
 struct ImportWatch {
     counter: ProgressCounter,
     running: bool,
+    error: Option<crate::contract::ipc::IpcError>,
 }
 
 /// A [`ProgressSink`] that folds every update into one counter.
@@ -3129,6 +3130,7 @@ impl AppState {
             ImportWatch {
                 counter: counter.clone(),
                 running: true,
+                error: None,
             },
         );
         counter
@@ -3141,17 +3143,33 @@ impl AppState {
         }
     }
 
+    /// Retain a terminal failure for polling clients even if the event was lost.
+    pub fn fail_import(&self, job_id: &str, error: crate::contract::ipc::IpcError) {
+        if let Some(watch) = self.imports.lock().get_mut(job_id) {
+            watch.error = Some(error);
+            watch.running = false;
+        }
+    }
+
     /// How far one import has got: units done, units expected, and whether it is still going.
     ///
     /// `None` for a job this process never started, which is a different answer from a job
     /// that finished - a panel restored after a reload must not draw a bar for work it cannot
     /// see the end of.
-    #[must_use]
-    pub fn import_watch(&self, job_id: &str) -> Option<(u64, u64, bool)> {
+    /// # Errors
+    /// Returns the worker's terminal failure under the same lock as its state.
+    pub fn import_watch(
+        &self,
+        job_id: &str,
+    ) -> crate::commands::IpcResult<Option<(u64, u64, bool)>> {
         self.imports
             .lock()
             .get(job_id)
-            .map(|watch| (watch.counter.done(), watch.counter.total(), watch.running))
+            .map(|watch| match &watch.error {
+                Some(error) => Err(error.clone()),
+                None => Ok((watch.counter.done(), watch.counter.total(), watch.running)),
+            })
+            .transpose()
     }
 
     /// Imports still running, for the status bar: units done and units expected.

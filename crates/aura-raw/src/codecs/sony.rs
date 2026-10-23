@@ -37,9 +37,10 @@ pub fn build_curve(knots: Option<[u16; 4]>) -> Vec<u16> {
     let mut curve = vec![0u16; CURVE_LEN + 1];
     let Some(knots) = knots else {
         // No knots: expand eleven bits to fourteen and nothing else. The caller
-        // records this as an approximate linearisation.
+        // records this as an approximate linearisation. The curve is indexed by
+        // the eleven-bit value doubled, so a slope of four is a factor of eight.
         for (index, slot) in curve.iter_mut().enumerate() {
-            *slot = u16::try_from(index.saturating_mul(16)).unwrap_or(u16::MAX);
+            *slot = u16::try_from(index.saturating_mul(4)).unwrap_or(u16::MAX);
         }
         return curve;
     };
@@ -116,11 +117,13 @@ pub fn decode(bytes: &[u8], width: usize, height: usize, curve: &[u16]) -> Vec<u
                     let widened = (field << shift) + u32::from(low);
                     u16::try_from(widened.min(0x7FF)).unwrap_or(0)
                 };
+                // The curve's output is already fourteen-bit; the older
+                // reference decoders shifted it down to twelve, which every
+                // current body's black level and white point disagree with.
                 let linear = curve
                     .get(usize::from(value) << 1)
                     .copied()
-                    .unwrap_or(value.saturating_mul(8))
-                    >> 2;
+                    .unwrap_or(value.saturating_mul(8));
                 if let Some(slot) = plane.get_mut(row_start + col) {
                     *slot = linear;
                 }

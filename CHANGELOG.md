@@ -2,6 +2,138 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## A hundred measured portrait, attire, background and delivery tools - 2026-10-22
+
+- **Sliders that find what they act on** (ADR-0150), in the style of Evoto: twenty more face sliders
+  (eye height, tilt, corners and a measured eye symmetry; nose bridge, tip, lift and nostrils; each lip,
+  the brows, temples, chin and hair volume) and ten more body sliders (thighs, calves, a flat stomach on
+  the side the silhouette shows it, hips, shoulders, torso, height, neck, double chin, a level head).
+- **Skin and makeup on every face**: aegyo-sal, lip lines, glow, stubble shadow, rosy complexion, even
+  teeth, feature sharpening, beard definition, clothing colour on skin, pores; eyeliner and wing on the
+  measured lid line, lashes, lip liner, ombre lips, highlighter, bronzer, enhance worn makeup, fill brows.
+- **Hair, attire, background and people**: hair shine, parting, colour depth and edge; gold jewellery,
+  clipped red fabric, veil clarity, embroidery, garment edges, mehndi, white and dark garments, outfit
+  colour; background saturation, brightness, warmth, depth blur, noise, backdrop light, light wrap, a
+  colour that keeps shadows and a sky with clouds; people exposure, warmth, clarity, group face and skin
+  balance, relight, harsh shadows, backlight rescue, a face-aware vignette and face brightness.
+- **Seven tools you place yourself**: body hair, cellulite, tan lines, hands, knuckles and elbows, glasses
+  reflection colour, and a cast shadow.
+- **Framing, delivery and review**: ID photographs on white, measured crops, level eyes, a transparent PNG
+  cut-out, an Instagram grid in posting order, carousel slides, before and after, a 2x enlargement without
+  halos, a face picker and a list of faces showing no white of the eye (not a blink verdict: that needs
+  a trained eye-state model). See [the tool list](docs/evoto-hundred-tools.md).
+- **Fixed**: moving a Portrait studio slider back to zero, Reset all, Keep original background, Clear
+  liquify and turning the light off now take effect; the merge kept the old value of any field the
+  saved finish left out. The portrait parse (version 4) centres the mouth on the line between the lips,
+  keeps blush out of the lips and lid shimmer out of the whites of the eyes.
+
+## Fifty studio capabilities - 2026-10-20
+
+- Update the workspace and desktop TLS locks to rustls 0.23.46 for four
+  RustSec fixes; record the existing GPU parser's scoped CC0 license exception.
+- Add native Levels, luminosity Levels, selective CMYK and sampled endpoints;
+  extend masks with curves, HSL, colour grading, sharpening and dehaze.
+- Add twelve composed-selection workflows, including whole inversion,
+  duplication, saved-mask combinations, morphology and connected-area cleanup.
+- Add durable empty reference groups, ordering, transactional batch management
+  and bounded descriptor-library import/export.
+- Add free/exact/custom framing, physical print sizing/export, measured placement
+  and alignment, reusable templates, linked regional strengths and RGB/Lab inspection.
+- Keep originals, manual work and history; distinguish documented counterparts
+  from AURA extensions in the [50-item report](docs/reports/AURA-fifty-capabilities-2026-10-20.md).
+
+## Adjustable automatic finishing and reference library - 2026-10-20
+
+- Add genuine regional reference-colour fitting with independent skin, hair,
+  clothing and background strengths, frozen masks, native checks and history.
+- Group the editor into seven panels with preserved drafts and a sticky preview;
+  expose automatic finishing directly in Develop.
+- Record current Evoto 8 REA evidence, 24 targeted native traces and a bounded
+  metadata audit. Exact parity and proprietary model recovery remain unestablished.
+- Adjust the overall automatic retouch or individual finishing categories from
+  0–200%, restore original strengths after zero, and retain manual edits and Undo/Redo.
+- Add twelve fine reference-colour strengths, including independent temperature
+  and tint, within the existing native highlight/skin safeguards.
+- Create a reference from a saved edited preview; browse thumbnails, search,
+  groups and favorites; rename/remove entries and remember matching strengths.
+- Import several references with individual outcomes. Keep saved matches
+  adjustable after their reusable reference is removed.
+- See the [workflow guide](docs/adjustable-finishing-and-reference-colour.md),
+  [ADR-0130](docs/adr/ADR-0130-adjustable-automatic-finishing-and-reference-workflows.md)
+  and [research/qualification report](docs/reports/AURA-Evoto-workflows-2026-10-20.md).
+
+## Sampled colour selection and local saturation - 2026-10-19
+
+- Sample a colour on the photo to refine any retouch selection, with tolerance,
+  smooth falloff and lightness sensitivity. Combine it with brushes, gradients,
+  brightness ranges and saved subject/material masks.
+- Add local saturation and adaptive vibrance, preserving working luminance and
+  neutral colours with a uniform chroma limit for negative-channel protection.
+- Keep colour sample coordinates separate from clone sources and zoom centres;
+  preserve the range when attaching a saved region mask.
+- See [ADR-0129](docs/adr/ADR-0129-sampled-colour-range-and-local-saturation.md) and
+  the [validation report](docs/reports/AURA-sampled-colour-tools-2026-10-19.md).
+
+## Selected optical and colour tools - 2026-10-19
+
+- Add native directional motion blur and radial zoom blur with a movable centre.
+  Selected-only sampling protects excluded subjects; prefiltered long trails
+  avoid sparse repeated copies.
+- Add hue-selective colour-spill suppression and a smooth highlight compression
+  shoulder, with dedicated controls and recipe validation.
+- Use existing masks, presets, editable history, preview and export. The zoom
+  centre can be positioned on the photo or entered numerically.
+- See [ADR-0128](docs/adr/ADR-0128-selected-optical-and-colour-tools.md) and the
+  [validation report](docs/reports/AURA-optical-and-colour-tools-2026-10-19.md).
+
+## Selected material and light tools - 2026-10-19
+
+- Add native fabric chroma moiré reduction, sampled fabric stain correction,
+  bounded shadow balancing, selected background blur and highlight glow.
+- Reuse manual and saved selections, strength controls, persisted history and
+  export. Require a clean fabric sample for stain correction.
+- Search executable retouch tools by name, purpose and material.
+- Record tested behavior and remaining feature gaps in the
+  [material and light report](docs/reports/AURA-material-and-light-tools-2026-10-19.md)
+  and [ADR-0127](docs/adr/ADR-0127-selected-material-and-light-effects.md).
+
+## Import recovery and responsive retouch review - 2026-10-19
+
+- Fix duplicate selected files stopping mixed imports. Individual file selections
+  retain sibling availability; progress covers the whole selection, including skips.
+- Seal failed/cancelled import journals and retain terminal errors for polling and
+  automatic-workflow callers. Commit imported rows and their counters together.
+- Validate whole-number edit fields locally and recover failed writes without
+  requiring a preview retry.
+- Search and filter saved retouch operations, with 24 rows per page and every
+  operation still editable by its stable ID. Remove duplicate command registration.
+- See [ADR-0126](docs/adr/ADR-0126-import-recovery-and-responsive-retouch-review.md)
+  and the [validation report](docs/reports/AURA-workflow-improvements-2026-10-19.md).
+
+## An Effects screen, and twenty more tools - 2026-10-20
+
+- **Effects in the sidebar** (ADR-0135): all 119 retouch tools and effects in one searchable place,
+  grouped, with quick jobs, favourites and recently used. Each card says what the tool needs (a
+  point, a skin sample, a colour). **Use on this photo** opens Retouch with the tool chosen and
+  never replaces an unsaved draft.
+- **Grooming**: darken lashes and liner, fill thin hair or brows, and match grain, which gives an
+  over-smoothed area the grain the photograph itself measures.
+- **Stylised looks**: channel swap, sunset glow, day to night with lamps kept lit, Lomo, instant
+  film, pop art.
+- **Optics and texture**: iris blur, double exposure echo, ripple, frosted glass, pixel sort, VHS
+  tape, emboss, crosshatch.
+- **Light**: sparkle on real glints, fairy lights, rainbow prism.
+
+## Twenty more effects: colour looks, light and lens, art, repair - 2026-10-20
+
+- **Colour looks** (ADR-0134): split tone, film fade, bleach bypass, teal and orange that holds
+  skin, colour splash, and a sky-blue restore that leaves skin and cloud alone.
+- **Light and lens**: spotlight, rim light along a selected subject's edge, chromatic aberration,
+  fisheye, anamorphic streaks, kaleidoscope.
+- **Art**: watercolour, stained glass, cartoon and neon edges that follow colour edges, thermal.
+- **Repair**: blown highlights given back the colour of their surroundings at their own
+  brightness, dehaze measured on the selection, and the iris's limbal ring.
+
 ## Twenty more tools, a whole-app test, and two fixes it found - 2026-10-20
 
 - **Eight practical repairs** (ADR-0132): dust and scratches, JPEG artifact cleanup, banding

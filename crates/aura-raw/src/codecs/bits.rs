@@ -18,7 +18,8 @@ pub struct BitReader<'a> {
     at: usize,
     accumulator: u64,
     held: u32,
-    overrun: bool,
+    /// Zero bytes supplied past the end of the buffer by look-ahead.
+    padding: usize,
 }
 
 impl<'a> BitReader<'a> {
@@ -30,16 +31,21 @@ impl<'a> BitReader<'a> {
             at: 0,
             accumulator: 0,
             held: 0,
-            overrun: false,
+            padding: 0,
         }
     }
 
-    /// True once the reader has been asked for bits that the buffer did not
-    /// hold. The decoders check this at the end of a frame and report a
-    /// truncated stream rather than pretending the zeros were real samples.
+    /// True once the reader has handed out bits that the buffer did not hold.
+    /// The decoders check this at the end of a frame and report a truncated
+    /// stream rather than pretending the zeros were real samples.
+    ///
+    /// Only bits actually consumed count. The look-ahead reads up to eight
+    /// bytes past what a decoder has asked for, and a frame whose entropy data
+    /// ends flush with its strip - every Nikon D780, D7500 and Z 50 file - had
+    /// been reported as truncated because of it.
     #[must_use]
     pub const fn overrun(&self) -> bool {
-        self.overrun
+        (self.at + self.padding) * 8 - self.held as usize > self.bytes.len() * 8
     }
 
     fn fill(&mut self) {
@@ -48,7 +54,7 @@ impl<'a> BitReader<'a> {
                 self.at += 1;
                 *byte
             } else {
-                self.overrun = true;
+                self.padding += 1;
                 0
             };
             self.accumulator = (self.accumulator << 8) | u64::from(byte);

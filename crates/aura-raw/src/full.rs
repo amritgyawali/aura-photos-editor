@@ -14,10 +14,17 @@
 //!
 //! Full decodes are never speculative. Only the survivors that reach final
 //! render get one.
+//!
+//! Tiles are independent by construction - that is what the halo buys - so they
+//! decode on every core. The result is turned upright by the file's EXIF
+//! orientation before it is returned, exactly as tiers 1 and 2 are: a portrait
+//! frame that previewed upright must not export on its side.
 
 use aura_core::clock::Clock;
 use aura_core::errors::raw::{corrupt, mosaic_unsupported};
 use aura_core::AuraResult;
+
+use rayon::prelude::*;
 
 use crate::cfa;
 use crate::colour::{profile, working_space};
@@ -25,6 +32,7 @@ use crate::contract::pixels::{ColourSpace, PixelBuffer, PixelData, PixelSource, 
 use crate::demosaic::{self, Levels};
 use crate::format::MosaicSupport;
 use crate::meta::RawMeta;
+use crate::orientation::{apply as apply_orientation, Orientation};
 use crate::timeout::{check_dimensions, timed, DecodeLimits};
 
 /// Edge length of the region a tile commits.
@@ -32,6 +40,9 @@ pub const TILE_SIZE: u32 = 512;
 
 /// Context decoded around each tile and then discarded.
 pub const HALO: u32 = 32;
+
+/// Full-size reconstruction identity, separate from the unchanged model-proxy pipeline.
+pub const DEMOSAIC_VER: u32 = 2;
 
 /// Decode a file at full sensor resolution, tile by tile.
 ///
@@ -63,12 +74,13 @@ pub fn tier3(
 
         let columns = mosaic.width.div_ceil(TILE_SIZE);
         let rows = mosaic.height.div_ceil(TILE_SIZE);
-        let mut tiles = Vec::with_capacity((columns as usize) * (rows as usize));
+        let origins: Vec<(u32, u32)> = (0..rows)
+            .flat_map(|row| (0..columns).map(move |column| (column * TILE_SIZE, row * TILE_SIZE)))
+            .collect();
 
-        for row in 0..rows {
-            for column in 0..columns {
-                let x = column * TILE_SIZE;
-                let y = row * TILE_SIZE;
+        let tiles: Vec<Tile> = origins
+            .par_iter()
+            .map(|&(x, y)| {
                 let width = TILE_SIZE.min(mosaic.width - x);
                 let height = TILE_SIZE.min(mosaic.height - y);
 
@@ -78,7 +90,7 @@ pub fn tier3(
                 let halo_width = (x + width + HALO).min(mosaic.width) - halo_x;
                 let halo_height = (y + height + HALO).min(mosaic.height) - halo_y;
 
-                let region = demosaic::full_bilinear_region(
+                let region = demosaic::full_malvar_region(
                     &mosaic,
                     meta.cfa,
                     levels,
@@ -98,18 +110,19 @@ pub fn tier3(
                         }
                     }
                 }
-
-                tiles.push(Tile {
+                Tile {
                     x,
                     y,
                     width,
                     height,
                     data: committed,
-                });
-            }
-        }
+                }
+            })
+            .collect();
 
-        Ok::<_, aura_core::AuraError>((mosaic.width, mosaic.height, tiles))
+        let (width, height, tiles) =
+            orient_tiles(tiles, mosaic.width, mosaic.height, meta.orientation);
+        Ok::<_, aura_core::AuraError>((width, height, tiles))
     });
 
     let (width, height, tiles) = result?;
@@ -146,14 +159,21 @@ pub fn tier3_whole(
     let (result, decode_ms) = timed(clock, || {
         let (mosaic, levels, matrix) = prepare(bytes, meta, limits)?;
         check_dimensions(mosaic.width, mosaic.height, 12, limits)?;
-        let rgb = demosaic::full_bilinear(&mosaic, meta.cfa, levels);
+        let rgb = demosaic::full_malvar(&mosaic, meta.cfa, levels);
         let working = demosaic::apply_matrix(&rgb, matrix);
         let samples = working
             .data
             .iter()
             .map(|value| crate::colour::curve::scene_to_linear_u16(*value))
             .collect::<Vec<u16>>();
-        Ok::<_, aura_core::AuraError>((working.width, working.height, samples))
+        let (samples, width, height) = apply_orientation(
+            &samples,
+            working.width,
+            working.height,
+            3,
+            Orientation::from_exif(meta.orientation),
+        );
+        Ok::<_, aura_core::AuraError>((width, height, samples))
     });
 
     let (width, height, samples) = result?;
@@ -195,6 +215,54 @@ fn prepare(bytes: &[u8], meta: &RawMeta, limits: DecodeLimits) -> AuraResult<Pre
     .ok_or_else(|| corrupt("camera colour matrix is not invertible"))?;
 
     Ok((mosaic, levels, matrix))
+}
+
+/// Turn decoded tiles upright: stitch, rotate, and cut into tiles again.
+///
+/// Nothing to do for an upright frame, which is most of them; a rotated one pays
+/// one extra copy of the frame, which is cheaper than teaching every tile to
+/// rotate its neighbours' halos.
+fn orient_tiles(tiles: Vec<Tile>, width: u32, height: u32, exif: u16) -> (u32, u32, Vec<Tile>) {
+    let orientation = Orientation::from_exif(exif);
+    if orientation.is_identity() {
+        return (width, height, tiles);
+    }
+    let whole = assemble(
+        &TiledImage {
+            tile_size: TILE_SIZE,
+            halo: HALO,
+            tiles,
+        },
+        width,
+        height,
+    );
+    let (rotated, width, height) = apply_orientation(&whole, width, height, 3, orientation);
+    let columns = width.div_ceil(TILE_SIZE);
+    let rows = height.div_ceil(TILE_SIZE);
+    let tiles = (0..rows)
+        .flat_map(|row| (0..columns).map(move |column| (column * TILE_SIZE, row * TILE_SIZE)))
+        .collect::<Vec<_>>()
+        .into_par_iter()
+        .map(|(x, y)| {
+            let tile_width = TILE_SIZE.min(width - x);
+            let tile_height = TILE_SIZE.min(height - y);
+            let mut pixels = Vec::with_capacity(tile_width as usize * tile_height as usize * 3);
+            for line in y..y + tile_height {
+                let start = (line as usize * width as usize + x as usize) * 3;
+                if let Some(run) = rotated.get(start..start + tile_width as usize * 3) {
+                    pixels.extend_from_slice(run);
+                }
+            }
+            Tile {
+                x,
+                y,
+                width: tile_width,
+                height: tile_height,
+                data: pixels,
+            }
+        })
+        .collect();
+    (width, height, tiles)
 }
 
 /// Stitch a tiled image back into one buffer.

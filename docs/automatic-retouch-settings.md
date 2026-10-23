@@ -12,6 +12,12 @@ within each tool's limits. Everything else is off until you turn it up.
 
 ## Presets
 
+**Polished wedding** is the default for new photographs: stronger compact spot
+and dark-circle cleanup, controlled pore refinement, face and exposed body skin,
+and a persistent single-portrait restriction for frequency separation and
+dodge/burn. Saved photo choices are retained. See the
+[processing strategy and validation](polished-wedding-finish.md).
+
 Natural · Deep acne cleanup · Professional retouch · Subtle · Soft glow · Polished beauty ·
 Bridal · Groom & men · Editorial · Body focus · Studio clean. A preset only sets the controls
 below; change any of them and it becomes *Custom*.
@@ -77,7 +83,7 @@ targeted healing/light balancing in [Retouch4me](https://global.retouch4.me/reto
 and restrained finishing styles in [Imagen](https://support.imagen-ai.com/hc/en-us/articles/36160335937949-Retouch-all-faces-in-your-gallery).
 Those products are workflow references; their proprietary code and models are not used.
 
-## The controls (60)
+## The controls (64)
 
 **Always visible:** what to retouch (face / body skin / both), overall strength, heal
 blemishes, soften lines and redness, eyes, teeth.

@@ -3,6 +3,33 @@ import { expect, it, vi } from 'vitest';
 import { freshRetouch } from '../../ipc/nativeRetouch';
 import { RetouchSkinSelection } from './RetouchSkinSelection';
 
+it('intersects a saved garment matte with the current color range', () => {
+  const change=vi.fn();
+  const color={sample:[.7,.3] as [number,number],tolerance:15,softness:10,lightness:.5};
+  const clothes={...freshRetouch(),id:'clothes',matte:'auto-portrait-v20-0-clothes'};
+  render(<RetouchSkinSelection draft={{...freshRetouch(),tool:'color_saturation',selection:{color}}} edits={[clothes]} onChange={change}/>);
+  fireEvent.change(screen.getByLabelText('Use detected region'),{target:{value:clothes.matte}});
+  expect(change).toHaveBeenCalledWith(expect.objectContaining({matte:clothes.matte,selection:{color}}));
+});
+
+it('keeps the zoom centre when reusing a detected background selection', () => {
+  const change = vi.fn();
+  const background = {...freshRetouch(),matte:'auto-portrait-v20-0-background',id:'background',source:[.1,.2] as [number,number]};
+  render(<RetouchSkinSelection draft={{...freshRetouch(),tool:'zoom_blur',source:[.3,.4]}} edits={[background]} onChange={change}/>);
+  fireEvent.change(screen.getByLabelText('Use detected region'), {target:{value:background.matte}});
+  expect(change).toHaveBeenCalledWith(expect.objectContaining({matte:background.matte,source:[.3,.4]}));
+});
+
+it.each(['fabric_moire','fabric_stain','background_blur','highlight_glow'] as const)('reuses material and background masks for %s', tool => {
+  const change = vi.fn();
+  const material = {...freshRetouch(), matte:'auto-portrait-v20-0-clothes', id:'cloth', source:[.1,.2] as [number,number]};
+  render(<RetouchSkinSelection draft={{...freshRetouch(), tool}} edits={[material]} onChange={change}/>);
+  fireEvent.change(screen.getByLabelText('Use detected region'), {target:{value:material.matte}});
+  expect(change).toHaveBeenCalledWith(expect.objectContaining({matte:material.matte}));
+  expect(change.mock.calls[0]?.[0]).not.toHaveProperty('tool');
+  if (tool === 'fabric_stain') expect(change.mock.calls[0]?.[0].source).toBeNull();
+});
+
 it('reuses the hair selection for color without copying an automatic repair', () => {
   const change = vi.fn();
   const hair = {...freshRetouch(),matte:'auto-portrait-v20-0-hair',id:'hair'};

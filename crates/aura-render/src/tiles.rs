@@ -96,7 +96,8 @@ pub fn render_streamed(
     let native_retouch = retouch.iter().any(|edit| edit.enabled && edit.amount > 0.0);
     let portrait = crate::portrait::wants_parse(&clamped);
     // A mask's AI edge, a gradient and a brush stroke are drawn on the whole photograph.
-    let masked = aura_recipe::local_masks::any_active(&clamped);
+    let masked = aura_recipe::local_masks::any_active(&clamped)
+        || aura_recipe::studio_color::read(&clamped).is_ok_and(|c| !c.local.is_empty());
     // A reshape moves pixels across tile boundaries and a background replacement reads the
     // whole person, so a finished frame is rendered whole too.
     let finished = crate::studio_finish::wants(&clamped);

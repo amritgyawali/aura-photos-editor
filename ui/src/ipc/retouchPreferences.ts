@@ -1,9 +1,10 @@
 import type { RecipeDto } from './types';
-import { DEFAULT_AUTO_RETOUCH, DEFAULT_RETOUCH_SETTINGS, type AutoRetouchOptions, type RetouchSettings } from './nativeRetouch';
+import { POLISHED_WEDDING_RETOUCH, POLISHED_WEDDING_SETTINGS, DEFAULT_AUTO_RETOUCH, DEFAULT_RETOUCH_SETTINGS, type AutoRetouchOptions, type RetouchSettings } from './nativeRetouch';
 
 const record = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 const signed = new Set<keyof RetouchSettings>(['skinBrightness', 'skinWarmth', 'skinTint']);
+const fresh = (): AutoRetouchOptions => ({ ...POLISHED_WEDDING_RETOUCH, settings: { ...POLISHED_WEDDING_SETTINGS } });
 
 /** Restore only known, valid settings from this photograph's recipe extension. */
 export function readRetouchPreferences(recipe?: RecipeDto | null): AutoRetouchOptions {
@@ -13,7 +14,7 @@ export function readRetouchPreferences(recipe?: RecipeDto | null): AutoRetouchOp
     const body: unknown = JSON.parse(recipe?.body ?? '{}');
     const report = record(body) ? body.studio_portrait_auto_v1 : null;
     const saved = record(report) ? report.options : null;
-    if (!record(saved)) return options;
+    if (!record(saved)) return fresh();
     if (typeof saved.intensity === 'number' && Number.isFinite(saved.intensity)) {
       options.intensity = Math.max(.25, Math.min(1.5, saved.intensity));
     }
@@ -33,6 +34,6 @@ export function readRetouchPreferences(recipe?: RecipeDto | null): AutoRetouchOp
         }
       }
     }
-  } catch { /* Invalid or legacy extensions use defaults without breaking the editor. */ }
+  } catch { return fresh(); }
   return options;
 }

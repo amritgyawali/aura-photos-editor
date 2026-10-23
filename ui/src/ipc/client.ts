@@ -17,7 +17,7 @@ import { audit, drainAuditBatch, isQuietIpc } from '../audit/log';
  * always recorded. `ui_audit` is exempt from logging too: it is the log's own pipe,
  * and watching the watcher doubles the traffic it exists to reduce.
  */
-function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+export function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   const quiet = isQuietIpc(command);
   const relay = command === 'ui_audit';
   if (!quiet && !relay) {

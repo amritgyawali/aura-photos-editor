@@ -182,14 +182,101 @@ enum Guard {
     DarkCircle,
 }
 
+struct Boundaries {
+    jaw: Option<super::jaw_guard::Contour>,
+    edges: super::anatomy_edges::Edges,
+}
+
+impl Boundaries {
+    fn measure(g: &Geometry, px: &Pixels<'_>) -> Self {
+        Self {
+            jaw: super::jaw_guard::measure(g, px),
+            edges: super::anatomy_edges::measure(g, px),
+        }
+    }
+
+    fn weight(&self, point: [f32; 2], margin: f32, healing: bool) -> f32 {
+        self.jaw
+            .as_ref()
+            .map_or(1.0, |jaw| jaw.weight(point, margin, healing))
+            .min(self.edges.weight(point, margin, healing))
+    }
+
+    fn has_measured_edges(&self) -> bool {
+        self.edges.measured || self.jaw.as_ref().is_some_and(|jaw| jaw.measured)
+    }
+}
+
+/// A face detector's box locates a subject; it is not a skin contour. Retain the
+/// semantic mask at the forehead while keeping jewellery and neck outside the
+/// lateral/lower limits. A narrow lateral feather avoids the old untreated band.
+fn footprint(g: &Geometry, [x, y]: [f32; 2]) -> f32 {
+    let [l, t, r, b] = g.bounds;
+    let smooth = |distance: f32, feather: f32| {
+        let v = (distance / feather.max(1.0)).clamp(0.0, 1.0);
+        v * v * (3.0 - 2.0 * v)
+    };
+    smooth((x - l).min(r - x), g.d * 0.02)
+        .min(smooth(y - t + g.d * 0.25, g.d * 0.035))
+        .min(smooth(b - y, g.d * 0.04))
+}
+
+/// Resample inside a compact face crop. A full-frame 256-cell guard can span
+/// several dozen source pixels per cell, swallowing skin around a small bindi.
+fn guard_grid(g: &Geometry, px: &Pixels<'_>, original: &Matte) -> Option<(Matte, Vec<u8>)> {
+    let source = original.decode()?;
+    let [l, t, r, b] = original.bounds;
+    let [fl, ft, fr, fb] = g.bounds;
+    let bounds = [
+        l.max(fl / px.width as f32).max(0.0),
+        t.max((ft - 0.25 * g.d) / px.height as f32).max(0.0),
+        r.min(fr / px.width as f32).min(1.0),
+        b.min(fb / px.height as f32).min(1.0),
+    ];
+    let rw = (bounds[2] - bounds[0]) * px.width as f32;
+    let rh = (bounds[3] - bounds[1]) * px.height as f32;
+    if rw <= 0.0 || rh <= 0.0 {
+        return None;
+    }
+    let scale = 512.0 / rw.max(rh);
+    let width = (rw * scale).round().clamp(1.0, 512.0) as usize;
+    let height = (rh * scale).round().clamp(1.0, 512.0) as usize;
+    let mut alpha = Vec::with_capacity(width * height);
+    for y in 0..height {
+        for x in 0..width {
+            let u = bounds[0] + (x as f32 + 0.5) / width as f32 * (bounds[2] - bounds[0]);
+            let v = bounds[1] + (y as f32 + 0.5) / height as f32 * (bounds[3] - bounds[1]);
+            let xx = ((u - l) / (r - l) * original.width as f32 - 0.5)
+                .clamp(0.0, original.width as f32 - 1.0);
+            let yy = ((v - t) / (b - t) * original.height as f32 - 0.5)
+                .clamp(0.0, original.height as f32 - 1.0);
+            let (x0, y0) = (xx.floor() as usize, yy.floor() as usize);
+            let (x1, y1) = (
+                (x0 + 1).min(original.width as usize - 1),
+                (y0 + 1).min(original.height as usize - 1),
+            );
+            let (fx, fy) = (xx - x0 as f32, yy - y0 as f32);
+            let at = |a, b| f32::from(source[b * original.width as usize + a]);
+            let a = at(x0, y0) * (1.0 - fx) + at(x1, y0) * fx;
+            let b = at(x0, y1) * (1.0 - fx) + at(x1, y1) * fx;
+            alpha.push((a * (1.0 - fy) + b * fy).round() as u8);
+        }
+    }
+    let grid = Matte::encode(bounds, width as u32, height as u32, &alpha);
+    Some((grid, alpha))
+}
+
 fn guarded(
     g: &Geometry,
     px: &Pixels<'_>,
     original: &Matte,
     settings: &super::Settings,
     mode: Guard,
+    ceremonial: &[super::ceremonial_marks::Region],
+    boundaries: &Boundaries,
 ) -> Option<Matte> {
-    let mut alpha = original.decode()?;
+    let (grid, mut alpha) = guard_grid(g, px, original)?;
+    let original = &grid;
     let [l, t, r, b] = original.bounds;
     let w = original.width as usize;
     // Expand the protected core by half a cell diagonal. Bilinear interpolation at export
@@ -207,13 +294,24 @@ fn guarded(
             .flat_map(|dy| {
                 [-margin, 0.0, margin].into_iter().map(move |dx| {
                     let at = [point[0] + dx, point[1] + dy];
-                    match mode {
+                    let feature = match mode {
                         Guard::DarkCircle => lid(g, at),
                         Guard::UpperCheek => cheek_weight(g, at, settings),
                         Guard::Compact => spot_weight(g, at, settings),
                         Guard::Blemish => blemish_weight(g, at, settings),
                         Guard::Finish => feature_weight(g, at, settings),
-                    }
+                    };
+                    // Semantic face masks can extend onto a neck. Body skin has
+                    // its own planner; no face operation may heal past this
+                    // detected face footprint into a jaw or neck shadow.
+                    let feature = feature.min(footprint(g, at)).min(boundaries.weight(
+                        at,
+                        margin,
+                        matches!(mode, Guard::Blemish | Guard::Compact | Guard::UpperCheek),
+                    ));
+                    ceremonial
+                        .iter()
+                        .fold(feature, |weight, region| weight.min(region.weight(at)))
                 })
             })
             .fold(1.0_f32, f32::min);
@@ -222,6 +320,7 @@ fn guarded(
     let mut matte = Matte::encode(original.bounds, original.width, original.height, &alpha);
     // A color-guided upsampler can expand a hole back into skin-colored eyelids.
     matte.refine_edges = false;
+    matte.refine_contour = true;
     Some(matte)
 }
 
@@ -243,6 +342,12 @@ pub(crate) fn protect<'a>(
         )
     };
     let g = Geometry::new(face, px).ok_or_else(invalid)?;
+    let boundaries = Boundaries::measure(&g, px);
+    let ceremonial = if settings.protect_ceremonial_marks {
+        super::ceremonial_marks::regions(&g, px)
+    } else {
+        Vec::new()
+    };
     let mut created = BTreeMap::new();
     for edit in edits {
         let dark_circle = is_dark_circle(edit);
@@ -299,7 +404,8 @@ pub(crate) fn protect<'a>(
             };
             created.insert(
                 id.clone(),
-                guarded(&g, px, source, settings, mode).ok_or_else(invalid)?,
+                guarded(&g, px, source, settings, mode, &ceremonial, &boundaries)
+                    .ok_or_else(invalid)?,
             );
         }
         edit.matte = Some(id);
@@ -326,6 +432,68 @@ pub(crate) fn is_dark_circle(edit: &Edit) -> bool {
     edit.tool == super::Tool::UnderEye && edit.source.is_some()
 }
 
+/// Body tools share measured anatomy protection with facial tools. Applying this
+/// after facial exclusions prevents a neck tool from bypassing a protected contour.
+pub(crate) fn protect_body_jaw(
+    face: &PortraitFace,
+    px: &Pixels<'_>,
+    edits: &mut [Edit],
+    mattes: &mut BTreeMap<String, Matte>,
+) -> AuraResult<()> {
+    let Some(g) = Geometry::new(face, px) else {
+        return Ok(());
+    };
+    let boundaries = Boundaries::measure(&g, px);
+    let invalid = || {
+        aura_core::errors::render::recipe_invalid(
+            "jaw protection",
+            "Cannot validate the body jaw exclusions",
+        )
+    };
+    let mut created = BTreeMap::new();
+    for edit in edits {
+        let healing = is_blemish(edit.tool);
+        if !boundaries.has_measured_edges() && !healing {
+            continue;
+        }
+        let id = format!(
+            "{}-anatomy-safe-{}",
+            edit.matte.as_ref().unwrap_or(&edit.id),
+            if healing { "heal" } else { "finish" }
+        );
+        if !created.contains_key(&id) {
+            let full;
+            let source = if let Some(id) = &edit.matte {
+                mattes.get(id).ok_or_else(invalid)?
+            } else {
+                full = Matte::encode([0.0, 0.0, 1.0, 1.0], 512, 512, &vec![255; 512 * 512]);
+                &full
+            };
+            let mut alpha = source.decode().ok_or_else(invalid)?;
+            let [l, t, r, b] = source.bounds;
+            let (w, h) = (source.width as usize, source.height as usize);
+            let cell_x = (r - l) * px.width as f32 / w as f32;
+            let cell_y = (b - t) * px.height as f32 / h as f32;
+            let margin = cell_x.hypot(cell_y) * 0.5;
+            for (i, value) in alpha.iter_mut().enumerate() {
+                let point = [
+                    l * px.width as f32 + (i % w) as f32 * cell_x + cell_x * 0.5,
+                    t * px.height as f32 + (i / w) as f32 * cell_y + cell_y * 0.5,
+                ];
+                *value =
+                    (f32::from(*value) * boundaries.weight(point, margin, healing)).round() as u8;
+            }
+            let mut mask = Matte::encode(source.bounds, source.width, source.height, &alpha);
+            mask.refine_edges = false;
+            mask.refine_contour = true;
+            created.insert(id.clone(), mask);
+        }
+        edit.matte = Some(id);
+    }
+    mattes.extend(created);
+    Ok(())
+}
+
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -335,6 +503,167 @@ pub(crate) fn is_dark_circle(edit: &Edit) -> bool {
 mod tests {
     use super::*;
     use aura_recipe::retouch_tools::Tool;
+
+    #[test]
+    fn refined_guard_keeps_skin_beside_bindi_and_detector_edges_available() {
+        let mut rgb = [150_u8, 100, 75].repeat(256 * 256);
+        for y in 63..=67 {
+            for x in 126..=130 {
+                rgb[(y * 256 + x) * 3..(y * 256 + x) * 3 + 3].copy_from_slice(&[125, 16, 60]);
+            }
+        }
+        let px = Pixels::new(&rgb, 256, 256).unwrap();
+        let settings = super::super::Settings {
+            protect_ceremonial_marks: true,
+            protect_eye_area: false,
+            protect_nose_detail: false,
+            ..Default::default()
+        };
+        let mut edits = [super::super::base_edit(
+            "skin".into(),
+            Tool::SkinSmooth,
+            1.,
+            &px,
+            [128., 128., 256., 256.],
+        )];
+        edits[0].matte = Some("semantic-skin".into());
+        let mut mattes = BTreeMap::from([(
+            "semantic-skin".into(),
+            Matte::encode([0., 0., 1., 1.], 64, 64, &vec![255; 64 * 64]),
+        )]);
+        protect(
+            &face(),
+            &px,
+            edits.iter_mut(),
+            &mut mattes,
+            "coverage",
+            &settings,
+        )
+        .unwrap();
+        for side in [256_usize, 1024] {
+            let image = [0.3_f32, 0.2, 0.15].repeat(side * side);
+            let mask = aura_render::retouch_tools::selection_mask_with_mattes(
+                &image, side, side, &edits[0], &mattes,
+            );
+            for (x, y) in [(128, 59), (120, 65), (29, 130), (128, 22)] {
+                assert!(
+                    mask[(y * side / 256) * side + x * side / 256] > 0.9,
+                    "skin coverage lost at {x},{y} on {side}"
+                );
+            }
+            assert_eq!(mask[(65 * side / 256) * side + 128 * side / 256], 0.0);
+            assert_eq!(
+                mask[(130 * side / 256) * side + 24 * side / 256],
+                0.0,
+                "jewellery/background outside the detected face must stay excluded"
+            );
+            assert_eq!(
+                mask[(248 * side / 256) * side + 128 * side / 256],
+                0.0,
+                "neck exclusion lost"
+            );
+        }
+    }
+
+    #[test]
+    fn face_operations_cannot_reach_body_shadows_even_with_optional_detail_guards_off() {
+        let rgb = [150_u8, 100, 75].repeat(256 * 256);
+        let px = Pixels::new(&rgb, 256, 256).unwrap();
+        let settings = super::super::Settings {
+            protect_eye_area: false,
+            protect_nose_detail: false,
+            protect_ceremonial_marks: false,
+            ..Default::default()
+        };
+        let mut edits = [super::super::base_edit(
+            "clear".into(),
+            Tool::FrequencyHeal,
+            1.,
+            &px,
+            [128., 128., 256., 256.],
+        )];
+        let mut mattes = BTreeMap::new();
+        protect(
+            &face(),
+            &px,
+            edits.iter_mut(),
+            &mut mattes,
+            "face-footprint",
+            &settings,
+        )
+        .unwrap();
+        for side in [256_usize, 1024] {
+            let image = [0.3_f32, 0.2, 0.15].repeat(side * side);
+            let mask = aura_render::retouch_tools::selection_mask_with_mattes(
+                &image, side, side, &edits[0], &mattes,
+            );
+            for y in (side as f32 * 0.95).ceil() as usize..side {
+                for x in 0..side {
+                    assert_eq!(
+                        mask[y * side + x],
+                        0.0,
+                        "neck below face was selected at {side}"
+                    );
+                }
+            }
+            assert!(mask[side * side * 3 / 4 + side / 3] > 0.5);
+        }
+    }
+
+    #[test]
+    fn wedding_pigment_stays_excluded_after_low_resolution_masks_are_upsampled() {
+        let mut rgb = [150_u8, 100, 75].repeat(256 * 256);
+        for y in 63..=67 {
+            for x in 126..=130 {
+                rgb[(y * 256 + x) * 3..(y * 256 + x) * 3 + 3].copy_from_slice(&[125, 16, 60]);
+            }
+        }
+        let px = Pixels::new(&rgb, 256, 256).unwrap();
+        let settings = super::super::Settings {
+            protect_ceremonial_marks: true,
+            ..Default::default()
+        };
+        let mut edits = [super::super::base_edit(
+            "wedding-spot".into(),
+            Tool::FrequencyHeal,
+            1.0,
+            &px,
+            [128., 128., 256., 256.],
+        )];
+        edits[0].matte = Some("coarse-face".into());
+        let mut mattes = BTreeMap::from([(
+            "coarse-face".into(),
+            Matte::encode([0., 0., 1., 1.], 64, 64, &vec![255; 64 * 64]),
+        )]);
+        protect(
+            &face(),
+            &px,
+            edits.iter_mut(),
+            &mut mattes,
+            "test-guard",
+            &settings,
+        )
+        .unwrap();
+        for side in [256_usize, 1024] {
+            let image = [0.3_f32, 0.2, 0.15].repeat(side * side);
+            let mask = aura_render::retouch_tools::selection_mask_with_mattes(
+                &image, side, side, &edits[0], &mattes,
+            );
+            for y in 63 * side / 256..=67 * side / 256 {
+                for x in 126 * side / 256..=130 * side / 256 {
+                    assert_eq!(
+                        mask[y * side + x],
+                        0.0,
+                        "ceremonial mark selected at {side}px"
+                    );
+                }
+            }
+            assert!(
+                mask[side * side * 3 / 4 + side / 3] > 0.5,
+                "unrelated skin lost coverage"
+            );
+        }
+    }
 
     #[test]
     fn actual_openings_are_protected_without_hiding_adjacent_nose_skin() {
@@ -419,16 +748,21 @@ mod tests {
         )
         .unwrap();
         let matte = &mattes[edits[0].matte.as_ref().unwrap()];
-        let alpha = matte.decode().unwrap();
-        for x in [0.35, 0.65] {
-            for y in [0.38, 0.40, 0.415] {
-                let index = (y * 256.) as usize * 256 + (x * 256.) as usize;
-                assert_eq!(alpha[index], 0, "lid or lashes were selected");
-            }
-            assert!(
-                alpha[(0.46 * 256.) as usize * 256 + (x * 256.) as usize] > 0,
-                "safe under-eye skin must remain available"
+        for side in [256_usize, 1024] {
+            let image = [0.3_f32, 0.2, 0.15].repeat(side * side);
+            let alpha = aura_render::retouch_tools::selection_mask_with_mattes(
+                &image, side, side, &edits[0], &mattes,
             );
+            for x in [0.35, 0.65] {
+                for y in [0.38, 0.40, 0.415] {
+                    let index = (y * side as f32) as usize * side + (x * side as f32) as usize;
+                    assert_eq!(alpha[index], 0.0, "lid or lashes were selected at {side}");
+                }
+                assert!(
+                    alpha[(0.46 * side as f32) as usize * side + (x * side as f32) as usize] > 0.0,
+                    "safe under-eye skin must remain available"
+                );
+            }
         }
         assert!(!matte.refine_edges);
     }

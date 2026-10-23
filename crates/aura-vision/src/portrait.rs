@@ -8,7 +8,7 @@ use aura_infer::{
 };
 use serde::{Deserialize, Serialize};
 
-pub const VERSION: &str = "yunet-2023mar-aura320-rotation-v2";
+pub const VERSION: &str = "yunet-2023mar-aura320-multiscale-v3";
 pub const MODEL_HASH: &str = "3d5938c4cd5a02dc416f1cd1f7fc1f662a22adc370477112c871954587e63431";
 const SIDE: usize = 320;
 const MODEL: &[u8] =
@@ -202,7 +202,9 @@ fn detect_view(
             let cy = ((i / grid) as f32 + by) * stride as f32;
             let fw = bw.exp() * stride as f32;
             let fh = bh.exp() * stride as f32;
-            if fw < 20.0 || fh < 24.0 || fw > rw as f32 || fh > rh as f32 {
+            // Confidence and landmark geometry decide whether this is a face. The old
+            // 20x24 cutoff discarded confident faces in full-length and group portraits.
+            if fw < 8.0 || fh < 10.0 || fw > rw as f32 || fh > rh as f32 {
                 continue;
             }
             let bounds = [
@@ -296,57 +298,66 @@ pub fn detect_small_faces(
     if largest > 0.06 || w.max(h) < 2 * SIDE {
         return Ok(faces);
     }
-    let grid = if w.max(h) >= 1600 { 3 } else { 2 };
-    let tile_w = ((w as f32 / grid as f32) * 1.35).ceil().min(w as f32) as usize;
-    let tile_h = ((h as f32 / grid as f32) * 1.35).ceil().min(h as f32) as usize;
-    for gy in 0..grid {
-        for gx in 0..grid {
-            let x0 = if grid == 1 {
-                0
-            } else {
-                (w - tile_w) * gx / (grid - 1)
-            };
-            let y0 = if grid == 1 {
-                0
-            } else {
-                (h - tile_h) * gy / (grid - 1)
-            };
-            let mut tile = Vec::with_capacity(tile_w * tile_h * 3);
-            for y in y0..y0 + tile_h {
-                let start = (y * w + x0) * 3;
-                tile.extend_from_slice(rgb.get(start..start + tile_w * 3).unwrap_or(&[]));
-            }
-            if tile.len() != tile_w * tile_h * 3 {
-                continue;
-            }
-            for mut face in detect_view(&tile, tile_w, tile_h, 0)? {
-                let map = |[x, y]: [f32; 2]| {
-                    [
-                        (x0 as f32 + x * tile_w as f32) / w as f32,
-                        (y0 as f32 + y * tile_h as f32) / h as f32,
-                    ]
+    let base_grid = if w.max(h) >= 1600 { 3 } else { 2 };
+    // If the first scale found nobody, inspect closer crops. This preserves the model's
+    // confidence threshold and landmark checks, including on difficult side profiles.
+    for grid in [base_grid, base_grid + 2] {
+        if grid != base_grid && !faces.is_empty() {
+            break;
+        }
+        let tile_w = ((w as f32 / grid as f32) * 1.35).ceil().min(w as f32) as usize;
+        let tile_h = ((h as f32 / grid as f32) * 1.35).ceil().min(h as f32) as usize;
+        for gy in 0..grid {
+            for gx in 0..grid {
+                let x0 = if grid == 1 {
+                    0
+                } else {
+                    (w - tile_w) * gx / (grid - 1)
                 };
-                let [l, t, r, b] = face.bounds;
-                let [l, t] = map([l, t]);
-                let [r, b] = map([r, b]);
-                face.bounds = [l, t, r, b];
-                face.landmarks = face.landmarks.map(map);
-                // A face cut by the tile edge is found whole by a neighbouring tile.
-                let touches_edge = (face.bounds[0] * w as f32 - x0 as f32) < 2.0 && x0 > 0
-                    || (face.bounds[1] * h as f32 - y0 as f32) < 2.0 && y0 > 0
-                    || ((x0 + tile_w) as f32 - face.bounds[2] * w as f32) < 2.0 && x0 + tile_w < w
-                    || ((y0 + tile_h) as f32 - face.bounds[3] * h as f32) < 2.0 && y0 + tile_h < h;
-                if touches_edge {
+                let y0 = if grid == 1 {
+                    0
+                } else {
+                    (h - tile_h) * gy / (grid - 1)
+                };
+                let mut tile = Vec::with_capacity(tile_w * tile_h * 3);
+                for y in y0..y0 + tile_h {
+                    let start = (y * w + x0) * 3;
+                    tile.extend_from_slice(rgb.get(start..start + tile_w * 3).unwrap_or(&[]));
+                }
+                if tile.len() != tile_w * tile_h * 3 {
                     continue;
                 }
-                if faces
-                    .iter()
-                    .any(|other| overlap(face.bounds, other.bounds) > 0.3)
-                {
-                    continue;
-                }
-                if faces.len() < 16 {
-                    faces.push(face);
+                for mut face in detect_view(&tile, tile_w, tile_h, 0)? {
+                    let map = |[x, y]: [f32; 2]| {
+                        [
+                            (x0 as f32 + x * tile_w as f32) / w as f32,
+                            (y0 as f32 + y * tile_h as f32) / h as f32,
+                        ]
+                    };
+                    let [l, t, r, b] = face.bounds;
+                    let [l, t] = map([l, t]);
+                    let [r, b] = map([r, b]);
+                    face.bounds = [l, t, r, b];
+                    face.landmarks = face.landmarks.map(map);
+                    // A face cut by the tile edge is found whole by a neighbouring tile.
+                    let touches_edge = (face.bounds[0] * w as f32 - x0 as f32) < 2.0 && x0 > 0
+                        || (face.bounds[1] * h as f32 - y0 as f32) < 2.0 && y0 > 0
+                        || ((x0 + tile_w) as f32 - face.bounds[2] * w as f32) < 2.0
+                            && x0 + tile_w < w
+                        || ((y0 + tile_h) as f32 - face.bounds[3] * h as f32) < 2.0
+                            && y0 + tile_h < h;
+                    if touches_edge {
+                        continue;
+                    }
+                    if faces
+                        .iter()
+                        .any(|other| overlap(face.bounds, other.bounds) > 0.3)
+                    {
+                        continue;
+                    }
+                    if faces.len() < 16 {
+                        faces.push(face);
+                    }
                 }
             }
         }

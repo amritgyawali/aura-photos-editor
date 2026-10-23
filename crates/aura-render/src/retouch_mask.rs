@@ -58,6 +58,36 @@ fn reach(stroke: &BrushStroke, w: usize, h: usize) -> [usize; 4] {
 }
 
 impl Coverage {
+    /// The same final support envelope is used by the renderer and selection overlay.
+    pub(crate) fn protect_boundary(mut self, edit: &Edit, w: usize, h: usize) -> Self {
+        if !matches!(
+            edit.tool,
+            aura_recipe::retouch_tools::Tool::SkinSmooth
+                | aura_recipe::retouch_tools::Tool::SkinUniformity
+                | aura_recipe::retouch_tools::Tool::PortraitDodgeBurn
+                | aura_recipe::retouch_tools::Tool::UnderEye
+        ) {
+            return self;
+        }
+        let [x0, y0, x1, y1] = self.bounds;
+        if x1 <= x0 || y1 <= y0 {
+            return self;
+        }
+        let mut pixels = (y0..y1)
+            .flat_map(|y| (x0..x1).map(move |x| (x, y)))
+            .map(|(x, y)| self.at(x, y, w, h))
+            .collect::<Vec<_>>();
+        crate::retouch_boundary::inward(
+            &mut pixels,
+            x1 - x0,
+            y1 - y0,
+            edit.radius * w.min(h) as f32 * 0.5,
+            [x0 > 0, y0 > 0, x1 < w, y1 < h],
+        );
+        self.pixels = Some(pixels);
+        self
+    }
+
     /// This coverage multiplied by a segmentation matte, over the rectangle both cover.
     pub(crate) fn with_matte(
         self,
@@ -93,7 +123,11 @@ impl Coverage {
         let Some(selection) = &edit.selection else {
             return base;
         };
-        if !selection.inverted && selection.gradient.is_none() && selection.luminance.is_none() {
+        if !selection.inverted
+            && selection.gradient.is_none()
+            && selection.luminance.is_none()
+            && selection.color.is_none()
+        {
             return base;
         }
         let bounds = if selection.inverted || selection.gradient.is_some() {
@@ -102,6 +136,10 @@ impl Coverage {
             base.bounds
         };
         let [x0, y0, x1, y1] = bounds;
+        let color = selection
+            .color
+            .as_ref()
+            .map(|range| crate::retouch_color_range::Prepared::new(range, rgb, w, h));
         let pixels: Vec<f32> = (y0..y1)
             .into_par_iter()
             .flat_map_iter(|y| (x0..x1).map(move |x| (x, y)))
@@ -141,6 +179,10 @@ impl Coverage {
                         (1.0 - distance / range.softness).clamp(0.0, 1.0)
                     };
                     weight *= t * t * (3.0 - 2.0 * t);
+                }
+                if let Some(color) = &color {
+                    let index = (y * w + x) * 3;
+                    weight *= color.weight(&rgb[index..index + 3]);
                 }
                 weight
             })

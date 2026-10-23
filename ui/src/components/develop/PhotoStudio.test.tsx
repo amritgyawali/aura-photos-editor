@@ -5,6 +5,7 @@ import { api, develop, editProfiles, pairedReference, pickPairedReference, pickW
 import type { RenderDto } from '../../ipc/types';
 import { nativeRetouch } from '../../ipc/nativeRetouch';
 import { forgetPreviews } from '../../state/previewCache';
+import { automaticStrength } from '../../ipc/automaticStrength';
 
 vi.mock('../../ipc/client', () => ({
   inTauri: () => true,
@@ -16,6 +17,11 @@ vi.mock('../../ipc/client', () => ({
 }));
 
 vi.mock('../../ipc/nativeRetouch', async () => ({ ...await vi.importActual('../../ipc/nativeRetouch'), nativeRetouch: { original: vi.fn() } }));
+vi.mock('../look/ColorMatchPanel', () => ({ ColorMatchPanel: () => null }));
+vi.mock('../../ipc/automaticStrength', () => ({
+  automaticStrength: { read: vi.fn(), apply: vi.fn() },
+  AUTOMATIC_CATEGORIES: { smoothing: 'Skin smoothing' },
+}));
 
 const pixels = { width: 1, height: 1, rgbBase64: btoa(String.fromCharCode(80, 100, 120)), notes: [] } as unknown as RenderDto;
 
@@ -28,6 +34,50 @@ beforeEach(() => {
   vi.mocked(develop.imageHistory).mockResolvedValue({ entries: [], canUndo: false, canRedo: false } as never);
   vi.mocked(develop.renderImage).mockResolvedValue(pixels);
   vi.mocked(editProfiles.list).mockResolvedValue([]);
+  vi.mocked(automaticStrength.read).mockResolvedValue({ recipeHash: 'saved', strengths: { overall: 1, categories: {} }, categories: [], newOperations: 0 });
+});
+
+it('focuses real editing panels while retaining the photo and unsaved reference name', async () => {
+  const busy = vi.fn();
+  render(<PhotoStudio projectId="project" photoId="portrait" disabled={false} onBusyChange={busy} />);
+  const preview = await screen.findByAltText('Edited photograph');
+  await waitFor(() => expect(busy).toHaveBeenLastCalledWith(false));
+  const renders = vi.mocked(develop.renderImage).mock.calls.length;
+  fireEvent.click(screen.getByRole('button', { name: 'Reference matching' }));
+  const referenceName = screen.getByRole('textbox', { name: 'Keep the matched look as' });
+  fireEvent.change(referenceName, { target: { value: 'Evening reception' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Color & light' }));
+  expect(screen.queryByRole('textbox', { name: 'Keep the matched look as' })).toBeNull();
+  expect(screen.getByRole('button', { name: 'Auto enhance photo' })).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Masks' }));
+  expect(screen.getByText('Masking').closest('details')?.open).toBe(true);
+  expect(screen.queryByRole('button', { name: 'Auto enhance photo' })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Portrait studio' }));
+  expect(screen.getByRole('tab', { name: 'Background' })).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Reference matching' }));
+  expect(screen.getByRole('textbox', { name: 'Keep the matched look as' })).toBe(referenceName);
+  expect((referenceName as HTMLInputElement).value).toBe('Evening reception');
+  expect(screen.getByAltText('Edited photograph')).toBe(preview);
+  expect(develop.renderImage).toHaveBeenCalledTimes(renders);
+  expect(develop.setParam).not.toHaveBeenCalled();
+});
+
+it('makes saved automatic strengths reachable directly in Develop and retains their draft across panels', async () => {
+  vi.mocked(automaticStrength.read).mockResolvedValue({
+    recipeHash: 'saved', strengths: { overall: 1, categories: {} },
+    categories: [{ category: 'smoothing', operations: 2 }], newOperations: 0,
+  });
+  render(<PhotoStudio projectId="project" photoId="portrait" disabled={false} onBusyChange={vi.fn()} />);
+  await screen.findByAltText('Edited photograph');
+  fireEvent.click(screen.getByRole('button', { name: 'Automatic finish' }));
+  fireEvent.click(screen.getByText('Adjust automatic finish'));
+  const smoothing = await screen.findByRole('slider', { name: 'Skin smoothing' });
+  fireEvent.change(smoothing, { target: { value: '35' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Color & light' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Automatic finish' }));
+  expect(screen.getByRole('slider', { name: 'Skin smoothing' })).toBe(smoothing);
+  expect((smoothing as HTMLInputElement).value).toBe('35');
+  expect(automaticStrength.apply).not.toHaveBeenCalled();
 });
 
 it('saves named snapshots and restores them through the persisted history command', async () => {
@@ -71,6 +121,7 @@ it('keeps native reference cancellation usable while adjustment controls are dis
   const stop = screen.getByRole('button', { name: 'Stop reference matching' }) as HTMLButtonElement;
   expect(stop.closest('fieldset')).toBeNull();
   expect(stop.disabled).toBe(false);
+  expect((screen.getByRole('button', { name: 'Reference matching' }) as HTMLButtonElement).disabled).toBe(true);
   expect((screen.getByRole('button', { name: 'Auto enhance photo' }) as HTMLButtonElement).disabled).toBe(true);
   fireEvent.click(stop);
   expect(api.cancelJob).toHaveBeenCalledWith(vi.mocked(pairedReference.match).mock.calls[0]?.[2]);
@@ -130,6 +181,24 @@ it('offers recovery when a renderer payload cannot be displayed', async () => {
   vi.mocked(develop.renderImage).mockResolvedValue(pixels);
   fireEvent.click(screen.getByRole('button', { name: 'Retry preview' }));
   expect(await screen.findByAltText('Edited photograph')).toBeTruthy();
+});
+
+it('recovers a rejected edit without requiring preview retry and allows the same value again', async () => {
+  const busy = vi.fn();
+  render(<PhotoStudio projectId="project" photoId="portrait" disabled={false} onBusyChange={busy} />);
+  await screen.findByAltText('Edited photograph');
+  await waitFor(() => expect(busy).toHaveBeenLastCalledWith(false));
+  vi.mocked(develop.setParam).mockRejectedValueOnce(new Error('The edit was refused')).mockResolvedValue({} as never);
+  const exposure = screen.getByLabelText('Exposure value');
+  fireEvent.change(exposure, { target: { value: '1.25' } });
+  fireEvent.blur(exposure);
+  expect((await screen.findByRole('alert')).textContent).toContain('The edit was refused');
+  await waitFor(() => expect(busy).toHaveBeenLastCalledWith(false));
+  expect(screen.queryByRole('button', { name: 'Retry preview' })).toBeNull();
+  expect((exposure as HTMLInputElement).disabled).toBe(false);
+  fireEvent.change(exposure, { target: { value: '1.25' } });
+  fireEvent.blur(exposure);
+  await waitFor(() => expect(develop.setParam).toHaveBeenCalledTimes(2));
 });
 
 it('jumps back to any saved automatic step and marks where the photo now is', async () => {

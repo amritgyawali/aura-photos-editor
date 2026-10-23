@@ -36,7 +36,11 @@ pub const ANALYSIS_EDGE: u32 = 1024;
 
 /// The arithmetic these regions were produced under. Bumping it re-parses every frame.
 /// 2: a tilted face at five windows needs both eyes confirmed (ADR-0133).
-pub const PARSE_VER: u16 = 2;
+/// 3: the mouth is the heaviest single blob, a blob at the window's side discounted (ADR-0150).
+/// 4: a white of the eye is paler than the skin around it and lies beside the iris; the mouth is
+/// centred on the line between the lips; a lip is more magenta than the skin and ends at the
+/// mouth's corners (ADR-0150).
+pub const PARSE_VER: u16 = 4;
 
 /// How sure the parse is of one region, and how much of the frame it covers.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -254,6 +258,16 @@ impl Person {
 
     fn skin_a(&self) -> f32 {
         self.model.map_or(12.0, |m| m.mean[1])
+    }
+
+    /// The skin's hue angle in degrees, `atan2(b, a)`.
+    fn skin_hue(&self) -> f32 {
+        self.model
+            .map_or(50.0, |m| m.mean[2].atan2(m.mean[1]).to_degrees())
+    }
+
+    fn skin_chroma(&self) -> f32 {
+        self.model.map_or(18.0, |m| m.mean[1].hypot(m.mean[2]))
     }
 }
 
@@ -683,6 +697,30 @@ fn oval_for(
     );
 }
 
+/// The chroma of the palest skin around an eye - the lid and under the eye - which a white of the
+/// eye must be paler than. Not the face's average: blush on the cheeks raises the average, and
+/// concealer under a bride's eyes read as white of the eye against it. Lashes are left out.
+fn palest_around(
+    canvas: &Canvas,
+    person: &Person,
+    bounds: (f32, f32, f32, f32),
+    opening: &Ellipse,
+) -> f32 {
+    let skin_l = person.skin_l();
+    let mut around: Vec<f32> = Vec::new();
+    for_box(canvas, &person.frame, bounds, |x, y, _, _, lab| {
+        if opening.weight(x as f32 + 0.5, y as f32 + 0.5, 0.0) <= 0.0 && lab[0] > skin_l - 20.0 {
+            around.push(lab[1].hypot(lab[2]));
+        }
+    });
+    around.sort_by(f32::total_cmp);
+    around
+        .get(around.len() / 4)
+        .copied()
+        .filter(|_| around.len() >= 16)
+        .map_or(person.skin_chroma(), |c| c.min(person.skin_chroma()))
+}
+
 /// One eye: the opening, the iris and the sclera.
 #[allow(clippy::too_many_arguments)]
 fn eye_for(
@@ -694,12 +732,15 @@ fn eye_for(
     iris: &mut Plane,
     sclera: &mut Plane,
 ) {
+    /// The height of one row of the opening, in face units, when finding what lies beside the iris.
+    const ROW: f32 = 0.02;
     let frame = &person.frame;
     let (ea, eb) = frame.local(eye[0], eye[1]);
     let opening = frame.ellipse(ea, eb, 0.29, 0.125);
     let skin_l = person.skin_l();
     let skin_a = person.skin_a();
     let bounds = (ea - 0.4, ea + 0.4, eb - 0.22, eb + 0.22);
+    let skin_c = palest_around(canvas, person, bounds, &opening);
 
     // The iris: the darkest compact blob in the opening.
     let mut dark: Vec<(f32, f32, f32)> = Vec::new();
@@ -736,8 +777,29 @@ fn eye_for(
         angle: 0.0,
     };
     let iris_l = darkest + (median - darkest) * 0.25;
+    // How dark each row of the opening gets. A white of the eye lies beside the iris, on rows
+    // that hold something as dark as it; shimmer on a closed lid lies above the lashes, with
+    // only eyeshadow beside it, and read as white.
+    let rows = ((bounds.3 - bounds.2) / ROW).ceil() as usize + 1;
+    let row_of = |b: f32| (((b - bounds.2) / ROW).max(0.0) as usize).min(rows - 1);
+    let mut row_dark = vec![f32::INFINITY; rows];
+    for (l, x, y) in &dark {
+        if let Some(row) = row_dark.get_mut(row_of(frame.local(*x, *y).1)) {
+            *row = row.min(*l);
+        }
+    }
+    let beside_iris = |b: f32| {
+        let r = row_of(b);
+        let near = row_dark
+            .get(r.saturating_sub(1)..=(r + 1).min(rows - 1))
+            .unwrap_or_default()
+            .iter()
+            .copied()
+            .fold(f32::INFINITY, f32::min);
+        ramp(iris_l + 14.0 - near, 0.0, 6.0)
+    };
 
-    for_box(canvas, frame, bounds, |x, y, _, _, lab| {
+    for_box(canvas, frame, bounds, |x, y, _, b, lab| {
         let (px, py) = (x as f32 + 0.5, y as f32 + 0.5);
         let shape = opening.weight(px, py, 0.35);
         if shape <= 0.0 {
@@ -760,7 +822,16 @@ fn eye_for(
         let disc = iris_disc.weight(px, py, 0.3);
         raise(iris, x, y, (disc * value).min(1.0));
         let bright = ramp(lab[0], iris_l + 10.0, iris_l + 25.0);
-        raise(sclera, x, y, (value * (1.0 - disc) * bright).min(1.0));
+        // A white of the eye is paler than this person's skin as well as brighter than the iris.
+        // A closed lid is just as bright, and it is skin or eyeshadow: whitening it greyed the
+        // lid, and every closed eye read as open. Without colour, brighter than the skin.
+        let pale = if colourful {
+            ramp(skin_c - lab[1].hypot(lab[2]), 2.0, 7.0)
+        } else {
+            ramp(lab[0] - skin_l, 2.0, 10.0)
+        };
+        let white = value * (1.0 - disc) * bright * pale * beside_iris(b);
+        raise(sclera, x, y, white.min(1.0));
     });
 }
 
@@ -838,24 +909,33 @@ fn mouth_for(
     let centre = person.face.mouth;
     let (ma, mb) = frame.local(centre[0], centre[1]);
     let width = (person.face.mouth_width / frame.unit).clamp(0.55, 1.3);
-    let outer = frame.ellipse(ma, mb, width * 0.6, width * 0.34);
+    // Lips end at the mouth's corners and the lower lip is the fuller one: an ellipse that ran a
+    // third of the width past each corner and as far below the line took the blush beside a
+    // corner and the chin under it for lips.
+    let outer = frame.ellipse(ma, mb + width * 0.03, width * 0.53, width * 0.25);
     let inner = frame.ellipse(ma, mb, width * 0.46, width * 0.2);
     let skin_l = person.skin_l();
-    let skin_a = person.skin_a();
     let bounds = (
         ma - width * 0.75,
         ma + width * 0.75,
         mb - width * 0.45,
         mb + width * 0.45,
     );
+    let skin_a = person.skin_a();
 
     // First pass: lip evidence, and the lips' own colour for the teeth test.
     let mut lip_samples: Vec<([f32; 3], f32)> = Vec::new();
+    // Lips are more magenta than the skin, not only redder: blush beside the mouth is as red as a
+    // lip in shadow and keeps the skin's hue, and a mouth window centred on the whole mouth took it.
+    let skin_hue = person.skin_hue();
     let lip_score = |lab: [f32; 3]| -> f32 {
         let darker = (skin_l - lab[0]).max(0.0);
         if colourful {
             let redder = lab[1] - skin_a;
-            ramp(redder + 0.25 * darker, 2.5, 8.0) * (1.0 - 0.7 * person.skin_like(lab, colourful))
+            let hue = lab[2].atan2(lab[1]).to_degrees();
+            ramp(redder + 0.25 * darker, 2.5, 8.0)
+                * ramp(skin_hue - hue, 3.0, 9.0)
+                * (1.0 - 0.7 * person.skin_like(lab, colourful))
         } else {
             0.7 * ramp(darker, 6.0, 18.0)
         }

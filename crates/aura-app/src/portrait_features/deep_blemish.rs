@@ -1251,6 +1251,8 @@ fn surface_selection(
         })
         .collect();
     grow(&mut selected, w, h, &in_face, (g.d * 0.35 / cell) as usize);
+    let outline = selected.clone();
+    let mut feature_safe = vec![true; w * h];
     // Creases are protected during spot replacement, but a continuous surface
     // finish must span them: otherwise they become conspicuous untreated strips.
     let mut exclusions = vec![super::Capsule::disk(
@@ -1324,7 +1326,32 @@ fn surface_selection(
                 })
         {
             selected[i] = false;
+            feature_safe[i] = false;
         }
+    }
+    if matches!(kind, SurfaceKind::Finish) {
+        // The skin silhouette needs a narrow transition; eyes, brows and lips
+        // retain their wider detail exclusion. One erosion radius for both
+        // creates an untreated band around the outside of a face.
+        let outer = clearance(&outline, w, h);
+        let features = clearance(&feature_safe, w, h);
+        let smooth = |distance: f32, feather: f32| {
+            let v = ((distance - 1.0) / feather).clamp(0.0, 1.0);
+            v * v * (3.0 - 2.0 * v)
+        };
+        return Some(
+            (0..w * h)
+                .map(|i| {
+                    if !selected[i] {
+                        return 0;
+                    }
+                    (255.0
+                        * smooth(outer[i], (g.d * 0.035 / cell).max(1.0))
+                            .min(smooth(features[i], (g.d * 0.08 / cell).max(2.0))))
+                    .round() as u8
+                })
+                .collect(),
+        );
     }
     let distance = clearance(&selected, w, h);
     // A broad finishing feather must not remove thin strips of safe skin from
@@ -1368,6 +1395,7 @@ pub(crate) fn surface_matte(
     );
     // Already protected and feathered: dark blemishes must not cut holes in their own repair.
     mask.refine_edges = false;
+    mask.refine_contour = true;
     Some(mask)
 }
 
@@ -1389,6 +1417,7 @@ pub(crate) fn blemish_surface_matte(
         &alpha,
     );
     mask.refine_edges = false;
+    mask.refine_contour = true;
     Some(mask)
 }
 

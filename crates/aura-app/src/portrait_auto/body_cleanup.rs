@@ -12,6 +12,17 @@ const MOST_SENSITIVE: f32 = 0.5;
 /// And the most find-and-rebuild passes: each further pass widens what the last one left.
 const MOST_PASSES: u8 = 2;
 
+/// Face cleanup depth must not override the body-specific safety limit when
+/// operations are finalized later by the shared planner.
+pub(super) fn set_repair_passes(edit: &mut Edit, requested: u8) {
+    let passes = if edit.id.ends_with("-body-spots") {
+        requested.clamp(1, MOST_PASSES)
+    } else {
+        requested.clamp(1, 4)
+    };
+    edit.repair_passes = (passes != 2).then_some(passes);
+}
+
 pub(super) fn spots(
     index: usize,
     matte: &MatteUse,
@@ -49,7 +60,7 @@ pub(super) fn spots(
             .then_some(settings.cleanup_passes),
         target_color: None,
         sensitivity: deep.then_some(settings.blemish_sensitivity.min(MOST_SENSITIVE)),
-        keep_dark_marks: deep && !settings.remove_dark_marks,
+        keep_dark_marks: deep && !settings.body_dark_marks,
         // A body has no landmarks to say what a dark patch is, and a navel has no edge:
         // every pigment-dark patch is kept, crisp or not.
         mole_edge: (deep && settings.keep_moles).then_some(0.0),
@@ -120,6 +131,59 @@ pub(super) fn stretch_marks(
 mod tests {
     use super::*;
     #[test]
+    fn facial_dark_spot_depth_cannot_remove_body_shadows_or_override_body_pass_limits() {
+        let (w, h) = (96, 96);
+        let matte = MatteUse {
+            id: "neck".into(),
+            matte: aura_vision::skin::Matte {
+                bounds: [0., 0., 1., 1.],
+                width: w,
+                height: h,
+                alpha: vec![255; w * h],
+            },
+        };
+        let settings = Settings {
+            deep_blemish_cleanup: true,
+            body_blemishes: 1.0,
+            remove_dark_marks: true,
+            cleanup_passes: 4,
+            ..Settings::default()
+        };
+        let mut edit = spots(0, &matte, [w as f32, h as f32], 100., &settings).unwrap();
+        set_repair_passes(&mut edit, settings.cleanup_passes);
+        assert_eq!(edit.repair_passes.unwrap_or(2), 2);
+        assert!(edit.keep_dark_marks);
+        let mut before = [0.3_f32, 0.2, 0.15].repeat(w * h);
+        for y in 45..=49 {
+            for x in 45..=49 {
+                for c in 0..3 {
+                    before[(y * w + x) * 3 + c] *= 0.5;
+                }
+            }
+        }
+        let encoded = aura_recipe::retouch_tools::Matte::encode(
+            matte.matte.bounds,
+            w as u32,
+            h as u32,
+            &matte.matte.alpha,
+        );
+        let mut after = before.clone();
+        aura_render::retouch_tools::apply_with_mattes(
+            &mut after,
+            w,
+            h,
+            &[edit.clone()],
+            &std::collections::BTreeMap::from([(matte.id, encoded)]),
+        );
+        assert_eq!(
+            &after[(47 * w + 47) * 3..(47 * w + 47) * 3 + 3],
+            &before[(47 * w + 47) * 3..(47 * w + 47) * 3 + 3]
+        );
+        edit.id = "auto-portrait-v1-0-clear".into();
+        set_repair_passes(&mut edit, 4);
+        assert_eq!(edit.repair_passes, Some(4));
+    }
+    #[test]
     fn disconnected_neck_hands_and_legs_receive_native_healing() {
         let (w, h) = (128, 256);
         let mut alpha = vec![0; w * h];
@@ -151,6 +215,7 @@ mod tests {
             deep_blemish_cleanup: true,
             body_blemishes: 1.0,
             remove_dark_marks: true,
+            body_dark_marks: true,
             blemish_sensitivity: 0.85,
             ..Settings::default()
         };

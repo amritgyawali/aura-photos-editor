@@ -69,6 +69,8 @@ time.workspace        = true
 tracing.workspace     = true
 parking_lot.workspace = true
 uuid.workspace        = true
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "tiff"] }
+moxcms = "0.8.1"
 
 [dev-dependencies]
 tempfile.workspace = true

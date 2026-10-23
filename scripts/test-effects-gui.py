@@ -1,4 +1,5 @@
-"""The 29 selected effects (ADR-0131) in the real desktop window, on a real photograph.
+"""The selected effects (ADR-0131 to ADR-0135) and the Effects screen in the real desktop window,
+on a real photograph.
 
 Starts the desktop app against an isolated catalogue with WebView2 CDP, imports one photograph,
 opens Retouch, and:
@@ -50,12 +51,55 @@ DEFAULTS = {
     'eye_glow_fix': (1, .6, 0, 0, 1, .01, .3), 'lip_gloss': (.6, .5, 0, 0, 1, .004, .5),
     'freckles': (.7, .5, 0, 0, 1, .004, .6), 'floor_reflection': (.5, .4, 0, 0, 1, .01, .1),
     'drop_shadow': (.6, .5, .4, .4, 1, .015, .2),
+    'split_tone': (0.8, 0.5, 0, 0, 1, 0.01, 0.4),
+    'film_fade': (0.8, 0.4, 0.3, 0, 1, 0.01, 0.4),
+    'bleach_bypass': (0.8, 0.5, 0, 0, 1, 0.01, 0.4),
+    'teal_orange': (0.8, 0.5, 0, 0, 1, 0.01, 0.4),
+    'colour_splash': (1, 0.3, 0, 0, 1, 0.01, 0.3),
+    'sky_blue': (0.8, 0.5, 0, 0, 1, 0.01, 0.6),
+    'spotlight': (0.9, 0.5, 0, 0, 1, 0.015, 0.5),
+    'rim_light': (0.8, 0.5, 0.7, -0.4, 1, 0.006, 0.2),
+    'chromatic_aberration': (1, 0.5, 0, 0, 1, 0.02, 0.4),
+    'fisheye': (0.6, 0.5, 0, 0, 1, 0.01, 0.4),
+    'anamorphic_streak': (0.8, 0.5, 0, 0, 1, 0.02, 0.4),
+    'kaleidoscope': (1, 0.5, 0, 0, 1, 0.01, 0.3),
+    'watercolor': (1, 0.5, 0, 0, 1, 0.004, 0.3),
+    'stained_glass': (1, 0.5, 0, 0, 1, 0.02, 0.2),
+    'cartoon': (1, 0.4, 0, 0, 1, 0.003, 0.2),
+    'neon_edges': (1, 0.6, 0, 0, 1, 0.01, 0.2),
+    'thermal': (1, 0.5, 0, 0, 1, 0.01, 0.2),
+    'clipped_highlight_repair': (1, 0.5, 0, 0, 1, 0.01, 0.4),
+    'local_dehaze': (0.8, 0.6, 0, 0, 1, 0.01, 0.5),
+    'limbal_ring': (0.6, 0.4, 0, 0, 1, 0.01, 0.2),
+    # ADR-0135.
+    'lash_darken': (0.6, 0.5, 0, 0, 1, 0.002, 0.3),
+    'hair_fill': (0.7, 0.6, 0, 0, 1, 0.01, 0.3),
+    'match_grain': (1, 0.5, 0, 0, 1, 0.01, 0.3),
+    'channel_swap': (1, 0.5, 0, 0, 1, 0.01, 0.3),
+    'sunset_glow': (0.8, 0.5, 0, 0, 1, 0.01, 0.4),
+    'day_to_night': (1, 0.5, 0, 0, 1, 0.01, 0.3),
+    'lomo': (0.8, 0.6, 0, 0, 1, 0.01, 0.3),
+    'instant_film': (0.8, 0.5, 0, 0, 1, 0.01, 0.3),
+    'pop_art': (1, 0.5, 0, 0, 1, 0.01, 0.1),
+    'iris_blur': (1, 0.3, 0, 0, 1, 0.006, 0.2),
+    'echo_double': (0.7, 0.5, 0.08, 0, 1, 0.01, 0.3),
+    'ripple': (0.6, 0.5, 0, 0, 1, 0.008, 0.3),
+    'frosted_glass': (1, 0.5, 0, 0, 1, 0.004, 0.3),
+    'pixel_sort': (1, 0.5, 0, 0, 1, 0.01, 0.1),
+    'vhs_retro': (0.9, 0.5, 0, 0, 1, 0.01, 0.2),
+    'emboss': (1, 0.2, 0, 0, 1, 0.01, 0.2),
+    'crosshatch': (1, 0.5, 0, 0, 1, 0.004, 0.2),
+    'sparkle': (0.8, 0.6, 0, 0, 1, 0.008, 0.2),
+    'fairy_lights': (0.8, 0.5, 0, 0, 1, 0.01, 0.3),
+    'rainbow_prism': (0.6, 0.5, 0.15, 0, 1, 0.02, 0.4),
 }
 COLOURS = {'chroma_key': [.2, .45, .85], 'light_leak': [1, .55, .25], 'haze': [.82, .84, .87],
            'starburst': [1, .97, .9], 'catchlight': [1, 1, 1]}
 # Tools whose change is subtle on a photograph that has nothing for them to fix: they only
 # have to leave everything outside their region alone.
-QUIET = {'eye_glow_fix', 'vein_reduce', 'local_white_balance', 'chroma_key', 'lip_gloss', 'halation'}
+QUIET = {'clipped_highlight_repair', 'sky_blue', 'anamorphic_streak', 'eye_glow_fix', 'vein_reduce', 'local_white_balance', 'chroma_key', 'lip_gloss', 'halation',
+         # Darken only what is darker than its surroundings, or star only real glints (ADR-0135).
+         'lash_darken', 'sparkle'}
 
 
 def launch(exe, port):
@@ -83,7 +127,7 @@ def pixels(dto):
 def operation(tool, region):
     amount, tone, warmth, tint, texture, radius, feather = DEFAULTS[tool]
     source = None
-    if tool in ('chroma_key', 'local_white_balance'):
+    if tool in ('chroma_key', 'local_white_balance', 'colour_splash'):
         source = [region[0], region[1]]
     return {'id': 'draft', 'tool': tool, 'enabled': True, 'region': region, 'source': source,
             'amount': amount, 'feather': feather, 'radius': radius, 'texture': texture, 'tone': tone,
@@ -230,6 +274,42 @@ def main():
             for i, tile in enumerate(tiles):
                 sheet.paste(tile, ((i % cols) * 244 + 2, (i // cols) * 184 + 2))
             sheet.save(OUT / 'contact-sheet.png')
+            stack('clear')
+
+            # The Effects screen (ADR-0135): find a tool by what it does and open it on this photo.
+            page.reload()
+            page.wait_for_function('() => !!window.__TAURI_INTERNALS__')
+            page.get_by_role('button', name=f'{name} 1', exact=True).click()
+            page.get_by_role('button', name='Auto edit One click, start to finish', exact=True).click()
+            expect(page.get_by_role('button', name='Retouch', exact=True)).to_be_enabled()
+            page.get_by_role('button', name='Effects Every retouch tool & creative look', exact=True).click()
+            library = page.get_by_role('region', name='Effects library')
+            expect(library).to_be_visible()
+            uses = library.get_by_role('button', name='Use on this photo', exact=True)
+            total = uses.count()
+            check('the Effects screen lists every tool', total == 119 and uses.first.is_enabled(),
+                  f'{total} tools')
+            page.screenshot(path=str(OUT / '02-effects-screen.png'), full_page=False)
+            page.get_by_label('Search tools', exact=True).fill('jewellery')
+            card = library.get_by_role('listitem').filter(has=page.get_by_role('heading', name='Sparkle', exact=True))
+            expect(card).to_have_count(1)
+            check('search finds a tool by what it is for', uses.count() < 10, f'{uses.count()} shown')
+            card.get_by_role('button', name='Use on this photo', exact=True).click()
+            tool = page.get_by_label('Tool', exact=True)
+            expect(tool).to_have_value('sparkle')
+            for label, value in [('Center X (%)', '50'), ('Center Y (%)', '42'),
+                                 ('Horizontal radius (%)', '16'), ('Vertical radius (%)', '12')]:
+                page.get_by_label(label, exact=True).fill(value)
+            apply = page.get_by_role('button', name='Apply retouch', exact=True)
+            expect(apply).to_be_enabled()
+            apply.click()
+            deadline, saved = time.monotonic() + 300, []
+            while not saved and time.monotonic() < deadline:
+                saved = stack('list')
+                time.sleep(1)
+            check('Use on this photo opens Retouch with that tool, and it saves',
+                  len(saved) == 1 and saved[0]['tool'] == 'sparkle', json.dumps(saved[0] if saved else None)[:160])
+            page.screenshot(path=str(OUT / '03-from-effects.png'), full_page=False)
             stack('clear')
             check('the page raised no errors', not report['pageErrors'], '; '.join(report['pageErrors']))
     finally:

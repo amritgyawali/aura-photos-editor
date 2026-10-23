@@ -739,61 +739,61 @@ fn locate_mouth(canvas: &Canvas, face: &FaceGeometry, colourful: bool) -> ([f32;
     // Sample a window around the expected mouth in the face's own frame.
     let cols = 40_usize;
     let rows = 28_usize;
-    let half_w = iod * 0.75;
-    let half_h = iod * 0.42;
+    let window = MouthWindow {
+        expected,
+        across,
+        down,
+        half_w: iod * 0.75,
+        half_h: iod * 0.42,
+    };
+    let half_w = window.half_w;
     let mut cells = Vec::with_capacity(cols * rows);
+    let mut skin_like = Vec::with_capacity(cols * rows);
     for j in 0..rows {
         let t = -1.0 + 2.0 * (j as f32 + 0.5) / rows as f32;
         for i in 0..cols {
             let r = -1.0 + 2.0 * (i as f32 + 0.5) / cols as f32;
-            let p = [
-                expected[0] + across[0] * r * half_w + down[0] * t * half_h,
-                expected[1] + across[1] * r * half_w + down[1] * t * half_h,
-            ];
+            let p = window.at(r, t);
             let index = canvas.index(p[0] as i64, p[1] as i64);
             cells.push((r, t, index));
+            skin_like.push(skin::prior(canvas.lab_at(p[0] as i64, p[1] as i64)));
         }
     }
 
-    let score: Vec<f32> = if colourful {
-        let maps: Vec<(f32, f32)> = cells
-            .iter()
-            .map(|(_, _, index)| {
-                let ycc = canvas.ycbcr(*index);
-                let cr = ycc[2] / 255.0;
-                let cb = (ycc[1] / 255.0).max(0.05);
-                (cr * cr, cr / cb)
-            })
-            .collect();
-        let n = maps.len().max(1) as f32;
-        let mean_sq: f32 = maps.iter().map(|m| m.0).sum::<f32>() / n;
-        let mean_ratio: f32 = maps.iter().map(|m| m.1).sum::<f32>() / n;
-        let eta = 0.95 * mean_sq / mean_ratio.max(1e-4);
-        maps.iter()
-            .map(|(sq, ratio)| sq * (sq - eta * ratio).powi(2))
-            .collect()
-    } else {
-        // Darkness, so the line between the lips scores highest.
-        cells
-            .iter()
-            .map(|(_, _, index)| 255.0 - f32::from(canvas.grey.get(*index).copied().unwrap_or(0)))
-            .collect()
-    };
-    let max = score.iter().copied().fold(0.0_f32, f32::max);
+    let score = mouth_score(canvas, &cells, colourful);
+    // The cut is set by the window's middle, where a mouth can be. Set by the whole window, a
+    // red veil far redder than any lipstick put every lip cell under it. ADR-0150.
+    let max = cells
+        .iter()
+        .zip(&score)
+        .filter(|((r, t, _), _)| r.abs() < 0.4 && (-0.6..0.4).contains(t))
+        .map(|(_, v)| *v)
+        .fold(0.0_f32, f32::max);
     let mean = score.iter().sum::<f32>() / score.len().max(1) as f32;
     if max <= 1e-9 || max < mean * 1.8 {
         return (expected, prior_width, false);
     }
     let cut = mean + (max - mean) * 0.45;
+    // No cell counts for more than the core's own reddest: the map grows so steeply with
+    // redness that one cell of red fabric outweighed a whole mouth.
+    let weight_of = |k: usize| match (cells.get(k), score.get(k)) {
+        (Some((r, t, _)), Some(s)) => {
+            (s.min(max) - cut).max(0.0) * (1.0 - 0.5 * r.abs()) * (1.0 - 0.4 * t.abs())
+        }
+        _ => 0.0,
+    };
+    let Some((label, chosen)) =
+        heaviest_blob(&cells, &score, &skin_like, (cols, rows), cut, &weight_of)
+    else {
+        return (expected, prior_width, false);
+    };
     let mut sr = 0.0;
     let mut st = 0.0;
     let mut total = 0.0;
     let mut spread: Vec<f32> = Vec::new();
-    for ((r, t, _), v) in cells.iter().zip(score.iter()) {
-        if *v >= cut {
-            // Distance from the expected position counts against a candidate, so a red scarf
-            // at the edge of the window does not pull the mouth sideways.
-            let weight = (v - cut) * (1.0 - 0.5 * r.abs()) * (1.0 - 0.4 * t.abs());
+    for (k, ((r, t, _), l)) in cells.iter().zip(&label).enumerate() {
+        if *l == chosen {
+            let weight = weight_of(k);
             sr += weight * r;
             st += weight * t;
             total += weight;
@@ -803,7 +803,7 @@ fn locate_mouth(canvas: &Canvas, face: &FaceGeometry, colourful: bool) -> ([f32;
     if total <= 1e-9 || spread.len() < 4 {
         return (expected, prior_width, false);
     }
-    let r = sr / total;
+    let red = sr / total;
     let t = st / total;
     spread.sort_by(f32::total_cmp);
     let lo = spread.get(spread.len() / 20).copied().unwrap_or(-0.5);
@@ -811,12 +811,235 @@ fn locate_mouth(canvas: &Canvas, face: &FaceGeometry, colourful: bool) -> ([f32;
         .get(spread.len() - 1 - spread.len() / 20)
         .copied()
         .unwrap_or(0.5);
-    let width = ((hi - lo) * half_w).clamp(iod * 0.55, iod * 1.3);
-    let centre = [
-        expected[0] + across[0] * r * half_w + down[0] * t * half_h,
-        expected[1] + across[1] * r * half_w + down[1] * t * half_h,
-    ];
-    (centre, if colourful { width } else { prior_width }, true)
+    let mut width = (hi - lo) * half_w;
+    let r = match centre_on_line(canvas, &window, cols, t, red, iod) {
+        Some((r, line_width)) => {
+            width = width.max(line_width);
+            r
+        }
+        None => red,
+    };
+    let width = width.clamp(iod * 0.55, iod * 1.3);
+    (
+        window.at(r, t),
+        if colourful { width } else { prior_width },
+        true,
+    )
+}
+
+/// How much each cell of the window looks like a mouth: the mouth map of Hsu et al. over the
+/// chroma, normalised by the window's own means; without colour, darkness, so the line between
+/// the lips scores highest.
+fn mouth_score(canvas: &Canvas, cells: &[(f32, f32, usize)], colourful: bool) -> Vec<f32> {
+    if !colourful {
+        return cells
+            .iter()
+            .map(|(_, _, index)| 255.0 - f32::from(canvas.grey.get(*index).copied().unwrap_or(0)))
+            .collect();
+    }
+    let maps: Vec<(f32, f32)> = cells
+        .iter()
+        .map(|(_, _, index)| {
+            let ycc = canvas.ycbcr(*index);
+            let cr = ycc[2] / 255.0;
+            let cb = (ycc[1] / 255.0).max(0.05);
+            (cr * cr, cr / cb)
+        })
+        .collect();
+    let n = maps.len().max(1) as f32;
+    let mean_sq: f32 = maps.iter().map(|m| m.0).sum::<f32>() / n;
+    let mean_ratio: f32 = maps.iter().map(|m| m.1).sum::<f32>() / n;
+    let eta = 0.95 * mean_sq / mean_ratio.max(1e-4);
+    maps.iter()
+        .map(|(sq, ratio)| sq * (sq - eta * ratio).powi(2))
+        .collect()
+}
+
+/// The window a mouth is looked for in: `r` across and `t` down, each `-1..1`, in the face's own
+/// frame around where a mouth is expected.
+struct MouthWindow {
+    expected: [f32; 2],
+    across: [f32; 2],
+    down: [f32; 2],
+    half_w: f32,
+    half_h: f32,
+}
+
+impl MouthWindow {
+    fn at(&self, r: f32, t: f32) -> [f32; 2] {
+        [
+            self.expected[0] + self.across[0] * r * self.half_w + self.down[0] * t * self.half_h,
+            self.expected[1] + self.across[1] * r * self.half_w + self.down[1] * t * self.half_h,
+        ]
+    }
+}
+
+/// Across, the line between the lips: it is dark the whole width of a mouth, the half in shadow
+/// included, where the redness centre `red` follows the lit half - on a bride lit from one side it
+/// put the lip tools on one side of the mouth. The line's span is taken when it is a mouth's width
+/// and stays inside the window. Its middle is trusted outright when it agrees with the face's own
+/// centre line, and otherwise moves the centre by at most a fifth of the mouth: a moustache darkens
+/// that line too. Returns the centre across and the width the line vouches for. ADR-0150.
+fn centre_on_line(
+    canvas: &Canvas,
+    window: &MouthWindow,
+    cols: usize,
+    t: f32,
+    red: f32,
+    iod: f32,
+) -> Option<(f32, f32)> {
+    let line = |r: f32| {
+        let mut values: Vec<f32> = (0..15)
+            .map(|j| {
+                let p = window.at(r, t - 0.3 + 0.6 * j as f32 / 14.0);
+                let index = canvas.index(p[0].round() as i64, p[1].round() as i64);
+                f32::from(canvas.grey.get(index).copied().unwrap_or(0))
+            })
+            .collect();
+        values.sort_by(f32::total_cmp);
+        let median = values.get(values.len() / 2).copied().unwrap_or(0.0);
+        let lowest = values.first().copied().unwrap_or(0.0);
+        (median - lowest) / median.max(1.0)
+    };
+    let contrast: Vec<f32> = (0..cols)
+        .map(|i| line(-1.0 + 2.0 * (i as f32 + 0.5) / cols as f32))
+        .collect();
+    let (a, b) = line_span(&contrast, red)?;
+    if !(0.6..=1.2).contains(&((b - a) * window.half_w / iod)) || a <= -0.9 || b >= 0.9 {
+        return None;
+    }
+    let middle = (a + b) * 0.5;
+    let r = if middle.abs() <= 0.12 {
+        middle
+    } else {
+        middle.clamp(red - 0.15, red + 0.15)
+    };
+    // The line runs a little past the lips into the corners' shadow.
+    Some((r, 0.85 * (b - a) * window.half_w))
+}
+
+/// The mouth is one blob. Cells over the cut are grouped into 4-connected blobs and the
+/// heaviest is taken - counting a third if it reaches the side of the window, and weighed by
+/// how much of its rim is skin and how near the face's centre line it sits, because a red
+/// veil or scarf beside the face reaches the side, borders veil and hair, and lies off to one
+/// side, and a mouth does none of these. A centroid over every cell was pulled onto a bride's
+/// veil, lips and nose landmark with it. ADR-0150.
+///
+/// Returns each cell's blob and the blob chosen, or nothing when no cell is over the cut.
+// Every index is a cell of the `cols` x `rows` window `locate_mouth` built, or one of its four
+// neighbours inside it.
+#[allow(clippy::indexing_slicing)]
+fn heaviest_blob(
+    cells: &[(f32, f32, usize)],
+    score: &[f32],
+    skin_like: &[f32],
+    (cols, rows): (usize, usize),
+    cut: f32,
+    weight_of: &dyn Fn(usize) -> f32,
+) -> Option<(Vec<usize>, usize)> {
+    let mut label = vec![usize::MAX; cells.len()];
+    let mut best: Option<(f32, usize)> = None;
+    let mut next = 0_usize;
+    for start in 0..cells.len() {
+        if score[start] < cut || label[start] != usize::MAX {
+            continue;
+        }
+        let mut stack = vec![start];
+        label[start] = next;
+        let (mut weight, mut side) = (0.0_f32, false);
+        while let Some(k) = stack.pop() {
+            weight += weight_of(k);
+            let (i, j) = (k % cols, k / cols);
+            side |= i == 0 || i == cols - 1;
+            let mut push = |n: usize| {
+                if score[n] >= cut && label[n] == usize::MAX {
+                    label[n] = next;
+                    stack.push(n);
+                }
+            };
+            if i > 0 {
+                push(k - 1);
+            }
+            if i + 1 < cols {
+                push(k + 1);
+            }
+            if j > 0 {
+                push(k - cols);
+            }
+            if j + 1 < rows {
+                push(k + cols);
+            }
+        }
+        let weight = if side { weight / 3.0 } else { weight };
+        // Lips are ringed by skin - the philtrum, the chin, the cheeks - and sit near the
+        // face's own centre line; a veil beside the face borders veil and hair, off to one side.
+        let (mut ring, mut skin_ring, mut sum_r, mut cells_in) =
+            (0.0_f32, 0.0_f32, 0.0_f32, 0.0_f32);
+        for k in 0..cells.len() {
+            if label[k] != next {
+                continue;
+            }
+            sum_r += cells[k].0;
+            cells_in += 1.0;
+            let (i, j) = (k % cols, k / cols);
+            let around = [
+                (i > 0).then(|| k - 1),
+                (i + 1 < cols).then(|| k + 1),
+                (j > 0).then(|| k - cols),
+                (j + 1 < rows).then(|| k + cols),
+            ];
+            for n in around.into_iter().flatten() {
+                if label[n] != next {
+                    ring += 1.0;
+                    skin_ring += skin_like[n];
+                }
+            }
+        }
+        let ringed = if ring > 0.0 { skin_ring / ring } else { 0.0 };
+        let centre = (sum_r / cells_in.max(1.0)).abs();
+        let central = 1.0 - ((centre - 0.3) / 0.3).clamp(0.0, 1.0);
+        let weight = weight * (0.15 + 0.85 * ringed * ringed) * (0.1 + 0.9 * central);
+        if best.is_none_or(|(w, _)| weight > w) {
+            best = Some((weight, next));
+        }
+        next += 1;
+    }
+    best.map(|(_, chosen)| (label, chosen))
+}
+
+/// The run of columns, in window units, whose line between the lips stands out: from the strong
+/// column nearest `centre` (within three) outward, over gaps of up to two columns.
+fn line_span(contrast: &[f32], centre: f32) -> Option<(f32, f32)> {
+    const STRONG: f32 = 0.15;
+    let cols = contrast.len();
+    if cols == 0 {
+        return None;
+    }
+    let to_r = |i: usize| -1.0 + 2.0 * (i as f32 + 0.5) / cols as f32;
+    let c = (((centre + 1.0) * cols as f32 / 2.0 - 0.5).round().max(0.0) as usize).min(cols - 1);
+    let start = (c.saturating_sub(3)..(c + 4).min(cols))
+        .filter(|i| contrast.get(*i).is_some_and(|v| *v >= STRONG))
+        .min_by_key(|i| i.abs_diff(c))?;
+    let reach = |step: fn(usize) -> Option<usize>| {
+        let (mut end, mut at, mut miss) = (start, start, 0);
+        while let Some(next) = step(at).filter(|n| *n < cols) {
+            at = next;
+            if contrast.get(at).is_some_and(|v| *v >= STRONG) {
+                end = at;
+                miss = 0;
+            } else {
+                miss += 1;
+                if miss > 2 {
+                    break;
+                }
+            }
+        }
+        end
+    };
+    Some((
+        to_r(reach(|i| i.checked_sub(1))),
+        to_r(reach(|i| i.checked_add(1))),
+    ))
 }
 
 /// A grey image turned by `angle` radians about its centre, edges replicated.

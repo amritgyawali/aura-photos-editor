@@ -13,12 +13,22 @@
     clippy::cast_sign_loss,
     clippy::cast_possible_wrap
 )]
+mod art;
 mod colour;
 mod creative;
+mod distort;
+mod engrave;
+mod evoto;
+mod grooming;
+mod lens;
 mod light;
+mod looks;
 mod optics;
 mod portrait;
 mod practical;
+mod repair;
+mod sparkle;
+mod stylise;
 mod warp;
 
 use crate::retouch_mask::Coverage;
@@ -35,6 +45,16 @@ pub(crate) fn supports(tool: Tool) -> bool {
         || portrait::supports(tool)
         || practical::supports(tool)
         || creative::supports(tool)
+        || looks::supports(tool)
+        || lens::supports(tool)
+        || art::supports(tool)
+        || repair::supports(tool)
+        || distort::supports(tool)
+        || engrave::supports(tool)
+        || grooming::supports(tool)
+        || sparkle::supports(tool)
+        || stylise::supports(tool)
+        || evoto::supports(tool)
 }
 
 /// Render one effect operation into `rgb`.
@@ -68,6 +88,26 @@ pub(crate) fn apply(
         practical::apply(rgb, frame, edit, coverage);
     } else if creative::supports(edit.tool) {
         creative::apply(rgb, frame, edit, coverage);
+    } else if looks::supports(edit.tool) {
+        looks::apply(rgb, frame, edit, coverage);
+    } else if lens::supports(edit.tool) {
+        lens::apply(rgb, frame, edit, coverage);
+    } else if art::supports(edit.tool) {
+        art::apply(rgb, frame, edit, coverage);
+    } else if repair::supports(edit.tool) {
+        repair::apply(rgb, frame, edit, coverage);
+    } else if distort::supports(edit.tool) {
+        distort::apply(rgb, frame, edit, coverage);
+    } else if engrave::supports(edit.tool) {
+        engrave::apply(rgb, frame, edit, coverage);
+    } else if grooming::supports(edit.tool) {
+        grooming::apply(rgb, frame, edit, coverage);
+    } else if sparkle::supports(edit.tool) {
+        sparkle::apply(rgb, frame, edit, coverage);
+    } else if stylise::supports(edit.tool) {
+        stylise::apply(rgb, frame, edit, coverage);
+    } else if evoto::supports(edit.tool) {
+        evoto::apply(rgb, frame, edit, coverage);
     }
 }
 
@@ -385,7 +425,7 @@ mod tests {
     use super::testing::*;
     use super::*;
 
-    const ALL: [Tool; 48] = [
+    const ALL: [Tool; 95] = [
         Tool::LiquifyPush,
         Tool::LiquifyBloat,
         Tool::LiquifyPucker,
@@ -434,6 +474,53 @@ mod tests {
         Tool::LensFlare,
         Tool::GodRays,
         Tool::Weather,
+        Tool::SplitTone,
+        Tool::FilmFade,
+        Tool::BleachBypass,
+        Tool::TealOrange,
+        Tool::ColourSplash,
+        Tool::SkyBlue,
+        Tool::Spotlight,
+        Tool::RimLight,
+        Tool::ChromaticAberration,
+        Tool::Fisheye,
+        Tool::AnamorphicStreak,
+        Tool::Kaleidoscope,
+        Tool::Watercolor,
+        Tool::StainedGlass,
+        Tool::Cartoon,
+        Tool::NeonEdges,
+        Tool::Thermal,
+        Tool::ClippedHighlightRepair,
+        Tool::LocalDehaze,
+        Tool::LimbalRing,
+        Tool::LashDarken,
+        Tool::HairFill,
+        Tool::MatchGrain,
+        Tool::ChannelSwap,
+        Tool::SunsetGlow,
+        Tool::DayToNight,
+        Tool::Lomo,
+        Tool::InstantFilm,
+        Tool::PopArt,
+        Tool::IrisBlur,
+        Tool::EchoDouble,
+        Tool::Ripple,
+        Tool::FrostedGlass,
+        Tool::PixelSort,
+        Tool::VhsRetro,
+        Tool::Emboss,
+        Tool::Crosshatch,
+        Tool::Sparkle,
+        Tool::FairyLights,
+        Tool::RainbowPrism,
+        Tool::BodyHairSoften,
+        Tool::Cellulite,
+        Tool::TanLine,
+        Tool::HandRejuvenate,
+        Tool::KnuckleEven,
+        Tool::LensReflection,
+        Tool::ShadowRemove,
     ];
 
     /// A busy, colourful frame every tool has something to do on.
@@ -467,11 +554,19 @@ mod tests {
         e.tone = 0.6;
         e.radius = 0.04;
         e.texture = 1.5;
-        if matches!(tool, Tool::ChromaKey | Tool::LocalWhiteBalance) {
+        if matches!(
+            tool,
+            Tool::ChromaKey | Tool::LocalWhiteBalance | Tool::ColourSplash
+        ) {
             e.source = Some([0.5, 0.5]);
         }
         if tool == Tool::DropShadow {
             e.region = [0.4, 0.4, 0.15, 0.15];
+        }
+        // The two-level tools measure one surface in two lights; the blocks are different
+        // materials and are refused, so they are tried on the smooth gradient.
+        if matches!(tool, Tool::TanLine | Tool::ShadowRemove) {
+            e.region = [0.85, 0.5, 0.12, 0.4];
         }
         e
     }

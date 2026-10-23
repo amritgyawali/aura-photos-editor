@@ -7,9 +7,17 @@
 //! read SOF3 cannot develop a CR2 or a compressed DNG at all.
 //!
 //! Layout note that trips everyone up once: a Bayer mosaic is normally stored as
-//! **two components of half width**, interleaved one sample at a time. Decoding
-//! therefore produces a plane `frame_width * components` wide, and that plane is
-//! the mosaic in sensor order.
+//! **two or four components of reduced width**, interleaved one sample at a
+//! time. Decoding therefore produces a plane `frame_width * components` wide,
+//! and that plane - read as one long run of samples - is the mosaic in sensor
+//! order. Canon additionally cuts the run into vertical slices; that is the
+//! caller's business, see [`crate::codecs::canon`].
+//!
+//! Speed matters here because one 30-megapixel CR2 is one scan of thirty
+//! million Huffman codes with no way to split it across threads. The stuffed
+//! bytes are removed once up front, and codes are resolved through a 12-bit
+//! lookup table with a canonical fallback for the rare longer code, instead of
+//! one bit at a time.
 //!
 //! Every read is bounds-checked and the decoder is a pure function of its input,
 //! so a hostile file can produce a wrong image or an error, never a panic and
@@ -20,6 +28,10 @@ use aura_core::AuraResult;
 
 /// Ceiling on samples in one lossless frame, checked before allocation.
 const MAX_SAMPLES: usize = 512 * 1024 * 1024 / 2;
+
+/// Bits resolved by one table lookup. Codes this long or shorter - almost all of
+/// them in a camera file - cost one lookup.
+const FAST_BITS: u32 = 12;
 
 /// One decoded lossless frame.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -36,44 +48,82 @@ pub struct LosslessImage {
     pub samples: Vec<u16>,
 }
 
-#[derive(Debug, Clone, Default)]
+/// The frame header alone, read without decoding the scan.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FrameHeader {
+    /// Samples per row per component.
+    pub width: u32,
+    /// Rows.
+    pub height: u32,
+    /// Components interleaved in the scan.
+    pub components: usize,
+    /// Sample precision in bits.
+    pub precision: u8,
+    /// True when the first component is subsampled - a Canon sRAW or mRAW frame,
+    /// which holds luma and chroma rather than a mosaic.
+    pub subsampled: bool,
+}
+
+#[derive(Debug, Clone)]
 struct HuffTable {
-    /// Smallest code of each length, indexed by length - 1.
-    min_code: [i32; 16],
+    /// `(code length, symbol)` for every `FAST_BITS`-bit prefix; length 0 means
+    /// the code is longer than the table and the slow path resolves it.
+    fast: Vec<(u8, u8)>,
     /// Largest code of each length, or -1 when the length is unused.
-    max_code: [i32; 16],
-    /// Index into `values` of the first symbol of each length.
-    val_ptr: [usize; 16],
+    max_code: [i32; 17],
+    /// Code minus this gives the index into `values`, per length.
+    offset: [i32; 17],
     /// The symbols, in canonical order.
     values: Vec<u8>,
+    /// True once a DHT segment defined this table.
+    defined: bool,
+}
+
+impl Default for HuffTable {
+    fn default() -> Self {
+        Self {
+            fast: Vec::new(),
+            max_code: [-1; 17],
+            offset: [0; 17],
+            values: Vec::new(),
+            defined: false,
+        }
+    }
 }
 
 impl HuffTable {
     fn build(counts: &[u8; 16], values: Vec<u8>) -> Self {
         let mut table = Self {
+            fast: vec![(0, 0); 1 << FAST_BITS],
             values,
+            defined: true,
             ..Self::default()
         };
         let mut code: i32 = 0;
-        let mut index: usize = 0;
-        for length in 0..16 {
-            let count = i32::from(counts.get(length).copied().unwrap_or(0));
-            if let Some(slot) = table.val_ptr.get_mut(length) {
-                *slot = index;
+        let mut index: i32 = 0;
+        for length in 1..=16usize {
+            let count = i32::from(counts.get(length - 1).copied().unwrap_or(0));
+            if let Some(slot) = table.offset.get_mut(length) {
+                *slot = index - code;
             }
-            if let Some(slot) = table.min_code.get_mut(length) {
-                *slot = code;
-            }
-            if count == 0 {
-                if let Some(slot) = table.max_code.get_mut(length) {
-                    *slot = -1;
+            if count > 0 {
+                for _ in 0..count {
+                    if length as u32 <= FAST_BITS {
+                        let symbol = table.values.get(index as usize).copied().unwrap_or(0);
+                        let shift = FAST_BITS - length as u32;
+                        let start = (code as usize) << shift;
+                        for prefix in start..start + (1usize << shift) {
+                            if let Some(slot) = table.fast.get_mut(prefix) {
+                                *slot = (length as u8, symbol);
+                            }
+                        }
+                    }
+                    code += 1;
+                    index += 1;
                 }
-            } else {
                 if let Some(slot) = table.max_code.get_mut(length) {
-                    *slot = code + count - 1;
+                    *slot = code - 1;
                 }
-                index += count as usize;
-                code += count;
             }
             code <<= 1;
         }
@@ -81,121 +131,156 @@ impl HuffTable {
     }
 }
 
-struct BitReader<'a> {
+/// An MSB-first reader over entropy data whose stuffing has already been removed.
+struct Bits<'a> {
     bytes: &'a [u8],
     at: usize,
-    bits: u32,
-    count: u32,
+    buffer: u64,
+    held: u32,
 }
 
-impl<'a> BitReader<'a> {
+impl<'a> Bits<'a> {
     const fn new(bytes: &'a [u8]) -> Self {
         Self {
             bytes,
             at: 0,
-            bits: 0,
-            count: 0,
+            buffer: 0,
+            held: 0,
         }
     }
 
-    /// Read one bit, feeding the buffer a byte at a time and honouring the
-    /// `FF00` stuffing rule. Past the end of the data the reader returns zero
-    /// bits, which lets a truncated stream finish as a wrong image rather than
-    /// as an error inside the innermost loop.
-    fn bit(&mut self) -> u32 {
-        if self.count == 0 {
-            let mut byte = self.bytes.get(self.at).copied().unwrap_or(0);
+    /// Top up to at least 32 bits. Past the end of the data the reader supplies
+    /// zero bits, which lets a truncated stream finish as a wrong image rather
+    /// than as an error inside the innermost loop.
+    #[inline]
+    fn fill(&mut self) {
+        while self.held <= 56 {
+            let byte = self.bytes.get(self.at).copied().unwrap_or(0);
             self.at += 1;
-            if byte == 0xFF {
-                let next = self.bytes.get(self.at).copied().unwrap_or(0);
-                if next == 0x00 {
-                    self.at += 1;
-                } else if (0xD0..=0xD7).contains(&next) {
-                    // Restart marker: skip it and carry on with the next byte.
-                    self.at += 1;
-                    byte = self.bytes.get(self.at).copied().unwrap_or(0);
-                    self.at += 1;
-                }
+            self.buffer |= u64::from(byte) << (56 - self.held);
+            self.held += 8;
+        }
+    }
+
+    #[inline]
+    fn peek(&mut self, count: u32) -> u32 {
+        if self.held < count {
+            self.fill();
+        }
+        (self.buffer >> (64 - count)) as u32
+    }
+
+    #[inline]
+    fn consume(&mut self, count: u32) {
+        self.buffer <<= count;
+        self.held -= count.min(self.held);
+    }
+
+    #[inline]
+    fn take(&mut self, count: u32) -> u32 {
+        if count == 0 {
+            return 0;
+        }
+        let value = self.peek(count);
+        self.consume(count);
+        value
+    }
+
+    #[inline]
+    fn symbol(&mut self, table: &HuffTable) -> AuraResult<u8> {
+        let prefix = self.peek(16);
+        if let Some((length, symbol)) = table.fast.get((prefix >> (16 - FAST_BITS)) as usize) {
+            if *length > 0 {
+                self.consume(u32::from(*length));
+                return Ok(*symbol);
             }
-            self.bits = u32::from(byte);
-            self.count = 8;
         }
-        self.count -= 1;
-        (self.bits >> self.count) & 1
-    }
-
-    fn bits(&mut self, n: u32) -> u32 {
-        let mut out = 0u32;
-        for _ in 0..n.min(32) {
-            out = (out << 1) | self.bit();
-        }
-        out
-    }
-
-    fn decode(&mut self, table: &HuffTable) -> AuraResult<u8> {
-        let mut code = self.bit() as i32;
-        for length in 0..16usize {
+        for length in (FAST_BITS as usize + 1)..=16 {
+            let code = (prefix >> (16 - length)) as i32;
             let max = table.max_code.get(length).copied().unwrap_or(-1);
             if max >= 0 && code <= max {
-                let min = table.min_code.get(length).copied().unwrap_or(0);
-                let base = table.val_ptr.get(length).copied().unwrap_or(0);
-                let index = base + (code - min).max(0) as usize;
+                self.consume(length as u32);
+                let index = code + table.offset.get(length).copied().unwrap_or(0);
                 return table
                     .values
-                    .get(index)
+                    .get(index.max(0) as usize)
                     .copied()
                     .ok_or_else(|| corrupt("lossless jpeg huffman symbol is out of range"));
             }
-            code = (code << 1) | self.bit() as i32;
         }
-        Err(corrupt("lossless jpeg huffman code is longer than 16 bits"))
+        Err(corrupt("lossless jpeg huffman code matches no table entry"))
     }
 }
 
 /// Sign-extend a Huffman magnitude, T.81 figure F.12.
+#[inline]
 fn extend(value: u32, magnitude: u32) -> i32 {
     if magnitude == 0 {
         return 0;
     }
-    let threshold = 1i32 << (magnitude - 1);
     let raw = value as i32;
-    if raw < threshold {
+    if raw < (1i32 << (magnitude - 1)) {
         raw - (1i32 << magnitude) + 1
     } else {
         raw
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-struct Component {
-    /// Which Huffman table this component's differences use.
-    table: usize,
+/// The entropy-coded data of a scan with its byte stuffing removed, cut at each
+/// restart marker. Scanning stops at the first marker that is not a restart.
+fn unstuff(bytes: &[u8]) -> Vec<Vec<u8>> {
+    let mut segments = vec![Vec::with_capacity(bytes.len())];
+    let mut at = 0usize;
+    while let Some(&byte) = bytes.get(at) {
+        if byte != 0xFF {
+            if let Some(current) = segments.last_mut() {
+                current.push(byte);
+            }
+            at += 1;
+            continue;
+        }
+        match bytes.get(at + 1).copied() {
+            Some(0x00) => {
+                if let Some(current) = segments.last_mut() {
+                    current.push(0xFF);
+                }
+                at += 2;
+            }
+            // Fill bytes before a marker.
+            Some(0xFF) => at += 1,
+            Some(0xD0..=0xD7) => {
+                segments.push(Vec::new());
+                at += 2;
+            }
+            _ => break,
+        }
+    }
+    segments
 }
 
-/// Decode a complete lossless JPEG stream.
-///
-/// # Errors
-///
-/// Returns `AURA-RAW-2002` when the stream is not a lossless frame, when a
-/// required header is missing, or when a Huffman code cannot be resolved, and
-/// `AURA-RAW-2005` when the declared frame exceeds the sample ceiling.
-// One function because it is one state machine: the marker walk, the frame
-// header and the scan all read the same cursor, and splitting them would mean
-// threading six mutable locals through three signatures for no gain.
-#[allow(clippy::too_many_lines)]
-pub fn decode(bytes: &[u8]) -> AuraResult<LosslessImage> {
+struct Parsed {
+    tables: Vec<HuffTable>,
+    header: FrameHeader,
+    component_tables: Vec<usize>,
+    predictor: u8,
+    point_transform: u8,
+    restart_interval: usize,
+    scan_at: usize,
+}
+
+/// Walk the markers up to the start of the scan.
+#[allow(clippy::too_many_lines)] // Keep ordered format decoding and its validation together.
+fn parse(bytes: &[u8], need_scan: bool) -> AuraResult<Parsed> {
     if !matches!(bytes.get(..2), Some([0xFF, 0xD8])) {
         return Err(corrupt("lossless jpeg does not start with FFD8"));
     }
-
     let mut tables: Vec<HuffTable> = vec![HuffTable::default(); 4];
-    let mut precision = 0u8;
-    let mut frame_width = 0u32;
-    let mut frame_height = 0u32;
-    let mut components: Vec<Component> = Vec::new();
+    let mut header: Option<FrameHeader> = None;
+    let mut component_tables: Vec<usize> = Vec::new();
     let mut predictor = 1u8;
     let mut point_transform = 0u8;
-    let mut scan_start: Option<usize> = None;
+    let mut restart_interval = 0usize;
+    let mut scan_at: Option<usize> = None;
 
     let mut at = 2usize;
     while at + 3 < bytes.len() {
@@ -225,8 +310,7 @@ pub fn decode(bytes: &[u8]) -> AuraResult<LosslessImage> {
             0xC4 => {
                 let mut cursor = 0usize;
                 while cursor + 17 <= payload.len() {
-                    let class_and_id = payload.get(cursor).copied().unwrap_or(0);
-                    let id = usize::from(class_and_id & 0x0F);
+                    let id = usize::from(payload.get(cursor).copied().unwrap_or(0) & 0x0F);
                     let mut counts = [0u8; 16];
                     let mut total = 0usize;
                     for (index, slot) in counts.iter_mut().enumerate() {
@@ -246,17 +330,22 @@ pub fn decode(bytes: &[u8]) -> AuraResult<LosslessImage> {
             }
             // SOF3 - the lossless frame header.
             0xC3 => {
-                precision = payload.first().copied().unwrap_or(0);
-                frame_height = u32::from(u16::from_be_bytes([
-                    payload.get(1).copied().unwrap_or(0),
-                    payload.get(2).copied().unwrap_or(0),
-                ]));
-                frame_width = u32::from(u16::from_be_bytes([
-                    payload.get(3).copied().unwrap_or(0),
-                    payload.get(4).copied().unwrap_or(0),
-                ]));
+                let read16 = |index: usize| {
+                    u32::from(u16::from_be_bytes([
+                        payload.get(index).copied().unwrap_or(0),
+                        payload.get(index + 1).copied().unwrap_or(0),
+                    ]))
+                };
                 let count = usize::from(payload.get(5).copied().unwrap_or(0));
-                components = (0..count).map(|_| Component { table: 0 }).collect();
+                let sampling = payload.get(7).copied().unwrap_or(0x11);
+                header = Some(FrameHeader {
+                    precision: payload.first().copied().unwrap_or(0),
+                    height: read16(1),
+                    width: read16(3),
+                    components: count,
+                    subsampled: (sampling >> 4) * (sampling & 0x0F) > 1,
+                });
+                component_tables = vec![0; count];
             }
             // Any other start-of-frame is a profile we do not decode here.
             0xC0..=0xCF if !matches!(marker, 0xC4 | 0xC8 | 0xCC) => {
@@ -264,102 +353,181 @@ pub fn decode(bytes: &[u8]) -> AuraResult<LosslessImage> {
                     "expected a lossless frame, found start-of-frame {marker:#04X}"
                 )));
             }
+            // DRI - restart interval in MCUs.
+            0xDD => {
+                restart_interval = usize::from(u16::from_be_bytes([
+                    payload.first().copied().unwrap_or(0),
+                    payload.get(1).copied().unwrap_or(0),
+                ]));
+            }
             // SOS - the scan header; entropy data follows immediately.
             0xDA => {
                 let count = usize::from(payload.first().copied().unwrap_or(0));
                 for index in 0..count {
                     let table = usize::from(payload.get(2 + index * 2).copied().unwrap_or(0) >> 4);
-                    if let Some(slot) = components.get_mut(index) {
-                        slot.table = table.min(3);
+                    if let Some(slot) = component_tables.get_mut(index) {
+                        *slot = table.min(3);
                     }
                 }
                 predictor = payload.get(1 + count * 2).copied().unwrap_or(1);
                 point_transform = payload.get(3 + count * 2).copied().unwrap_or(0) & 0x0F;
-                scan_start = Some(at + length);
+                scan_at = Some(at + length);
                 break;
             }
             _ => {}
         }
         at += length;
+        if !need_scan && header.is_some() {
+            break;
+        }
     }
 
-    let scan_at = scan_start.ok_or_else(|| corrupt("lossless jpeg has no scan"))?;
-    if components.is_empty() || frame_width == 0 || frame_height == 0 {
+    let header = header.ok_or_else(|| corrupt("lossless jpeg frame header is missing"))?;
+    if header.components == 0 || header.width == 0 || header.height == 0 {
         return Err(corrupt("lossless jpeg frame header is incomplete"));
     }
-    if !(2..=16).contains(&precision) {
+    if !(2..=16).contains(&header.precision) {
         return Err(corrupt(format!(
-            "lossless jpeg declares {precision}-bit samples"
+            "lossless jpeg declares {}-bit samples",
+            header.precision
         )));
     }
+    let scan_at = if need_scan {
+        scan_at.ok_or_else(|| corrupt("lossless jpeg has no scan"))?
+    } else {
+        0
+    };
+    Ok(Parsed {
+        tables,
+        header,
+        component_tables,
+        predictor,
+        point_transform,
+        restart_interval,
+        scan_at,
+    })
+}
 
-    let component_count = components.len();
-    let width = frame_width
-        .checked_mul(u32::try_from(component_count).unwrap_or(1))
+/// Read only the frame header, which is all a container walk needs to size the
+/// mosaic and tell a Bayer frame from a Canon sRAW one.
+///
+/// # Errors
+///
+/// `AURA-RAW-2002` when the stream carries no lossless frame header.
+pub fn frame_header(bytes: &[u8]) -> AuraResult<FrameHeader> {
+    parse(bytes, false).map(|parsed| parsed.header)
+}
+
+/// Decode a complete lossless JPEG stream.
+///
+/// # Errors
+///
+/// Returns `AURA-RAW-2002` when the stream is not a lossless frame, when a
+/// required header is missing, or when a Huffman code cannot be resolved, and
+/// `AURA-RAW-2005` when the declared frame exceeds the sample ceiling.
+#[allow(clippy::too_many_lines)] // Keep ordered format decoding and its validation together.
+pub fn decode(bytes: &[u8]) -> AuraResult<LosslessImage> {
+    let parsed = parse(bytes, true)?;
+    let header = parsed.header;
+    let components = header.components;
+    let width = header
+        .width
+        .checked_mul(u32::try_from(components).unwrap_or(1))
         .ok_or_else(|| corrupt("lossless jpeg width overflows"))?;
-    let total = (width as usize)
-        .checked_mul(frame_height as usize)
+    let stride = width as usize;
+    let total = stride
+        .checked_mul(header.height as usize)
         .ok_or_else(|| corrupt("lossless jpeg sample count overflows"))?;
     if total > MAX_SAMPLES {
         return Err(too_large(total as u64, MAX_SAMPLES as u64));
     }
 
-    let mut samples = vec![0u16; total];
-    let mut reader = BitReader::new(bytes.get(scan_at..).unwrap_or(&[]));
+    let mut component_tables: Vec<&HuffTable> = Vec::with_capacity(components);
+    for index in &parsed.component_tables {
+        let table = parsed
+            .tables
+            .get(*index)
+            .filter(|table| table.defined)
+            .ok_or_else(|| corrupt("scan names a huffman table that was never defined"))?;
+        component_tables.push(table);
+    }
+
+    let segments = unstuff(bytes.get(parsed.scan_at..).unwrap_or(&[]));
+    let mut segment = 0usize;
+    let mut reader = Bits::new(segments.first().map_or(&[][..], Vec::as_slice));
 
     // The value the first pixel of the image is predicted from, T.81 H.2.1.
-    let seed = 1i32 << (precision - 1 - point_transform.min(precision - 1));
+    let precision = header.precision;
+    let seed = 1i32 << (precision - 1 - parsed.point_transform.min(precision - 1));
+    let mut samples = vec![0u16; total];
+    let frame_width = header.width as usize;
+    let restart = parsed.restart_interval;
+    let mut mcus_left = restart;
 
-    for y in 0..frame_height as usize {
-        for x in 0..frame_width as usize {
-            for (index, component) in components.iter().enumerate() {
-                let position = y * width as usize + x * component_count + index;
-                let table = tables
-                    .get(component.table)
-                    .ok_or_else(|| corrupt("scan names a huffman table that was never defined"))?;
-                let magnitude = u32::from(reader.decode(table)?);
-                let difference = if magnitude == 16 {
+    for y in 0..header.height as usize {
+        // A restart interval that ends on a row boundary starts the next row
+        // afresh: new entropy segment, and prediction as if it were row zero.
+        let mut fresh = y == 0;
+        if restart > 0 && mcus_left == 0 {
+            segment += 1;
+            reader = Bits::new(segments.get(segment).map_or(&[][..], Vec::as_slice));
+            mcus_left = restart;
+            fresh = true;
+        }
+        let (done, rest) = samples.split_at_mut(y * stride);
+        let above_row = if fresh {
+            None
+        } else {
+            done.get(done.len().saturating_sub(stride)..)
+        };
+        let Some(row) = rest.get_mut(..stride) else {
+            break;
+        };
+        for x in 0..frame_width {
+            if restart > 0 {
+                if mcus_left == 0 {
+                    // Mid-row restart: realign on the next segment.
+                    segment += 1;
+                    reader = Bits::new(segments.get(segment).map_or(&[][..], Vec::as_slice));
+                    mcus_left = restart;
+                }
+                mcus_left -= 1;
+            }
+            for (index, table) in component_tables.iter().enumerate() {
+                let position = x * components + index;
+                let magnitude = u32::from(reader.symbol(table)?);
+                let difference = if magnitude >= 16 {
                     // T.81 H.1.2.2: SSSS = 16 codes a difference of 32768.
                     32_768i32
                 } else {
-                    let raw = reader.bits(magnitude);
-                    extend(raw, magnitude)
+                    extend(reader.take(magnitude), magnitude)
                 };
-
                 let left = if x > 0 {
-                    samples
-                        .get(position - component_count)
-                        .copied()
-                        .unwrap_or(0)
+                    i32::from(row.get(position - components).copied().unwrap_or(0))
                 } else {
                     0
                 };
-                let above = if y > 0 {
-                    samples.get(position - width as usize).copied().unwrap_or(0)
-                } else {
-                    0
+                let prediction = match above_row {
+                    None => {
+                        if x == 0 {
+                            seed
+                        } else {
+                            left
+                        }
+                    }
+                    Some(above) => {
+                        let rb = i32::from(above.get(position).copied().unwrap_or(0));
+                        if x == 0 {
+                            rb
+                        } else {
+                            let rc =
+                                i32::from(above.get(position - components).copied().unwrap_or(0));
+                            predict(parsed.predictor, left, rb, rc)
+                        }
+                    }
                 };
-                let above_left = if x > 0 && y > 0 {
-                    samples
-                        .get(position - width as usize - component_count)
-                        .copied()
-                        .unwrap_or(0)
-                } else {
-                    0
-                };
-
-                let prediction = predict(
-                    predictor,
-                    x,
-                    y,
-                    seed,
-                    i32::from(left),
-                    i32::from(above),
-                    i32::from(above_left),
-                );
-                let value = (prediction + difference) & 0xFFFF;
-                if let Some(slot) = samples.get_mut(position) {
-                    *slot = u16::try_from(value).unwrap_or(0);
+                if let Some(slot) = row.get_mut(position) {
+                    *slot = ((prediction + difference) & 0xFFFF) as u16;
                 }
             }
         }
@@ -367,32 +535,26 @@ pub fn decode(bytes: &[u8]) -> AuraResult<LosslessImage> {
 
     Ok(LosslessImage {
         width,
-        height: frame_height,
-        components: component_count,
+        height: header.height,
+        components,
         precision,
         samples,
     })
 }
 
-/// The seven predictors of T.81 table H.1, plus the edge rules.
-fn predict(selector: u8, x: usize, y: usize, seed: i32, ra: i32, rb: i32, rc: i32) -> i32 {
-    if x == 0 {
-        // First column: predict from the row above, or from the seed on row 0.
-        return if y == 0 { seed } else { rb };
-    }
-    if y == 0 {
-        // First row: only the left neighbour exists.
-        return ra;
-    }
+/// The seven predictors of T.81 table H.1, for a sample that is neither in the
+/// first row nor the first column.
+#[inline]
+fn predict(selector: u8, ra: i32, rb: i32, rc: i32) -> i32 {
     match selector {
-        1 => ra,
         2 => rb,
         3 => rc,
         4 => ra + rb - rc,
         5 => ra + ((rb - rc) >> 1),
         6 => rb + ((ra - rc) >> 1),
         7 => (ra + rb) >> 1,
-        // Selector 0 is "no prediction", used only in hierarchical mode.
-        _ => 0,
+        // Selector 1, and 0 ("no prediction", hierarchical mode only), predict
+        // from the left as the reference decoders do.
+        _ => ra,
     }
 }

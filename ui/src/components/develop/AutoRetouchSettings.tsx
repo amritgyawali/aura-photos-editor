@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { RecipeDto } from '../../ipc/types';
 import { readRetouchPreferences } from '../../ipc/retouchPreferences';
 import {
-  DEFAULT_RETOUCH_SETTINGS,
+  DEFAULT_RETOUCH_SETTINGS, BRIGHT_POLISHED_SETTINGS, POLISHED_WEDDING_SETTINGS,
   type AutoRetouchOptions, type RetouchScope, type RetouchSettings,
 } from '../../ipc/nativeRetouch';
 
@@ -26,6 +26,8 @@ export const SETTING_GROUPS: [string, Control[]][] = [
   ['Skin detection', [
     ['aiSkinDetection', 'AI skin detection', 'toggle', 'Find face and body skin with the bundled person segmenter. Off uses landmarks and sampled colour.'],
     ['mainSubjectOnly', 'Main subject only', 'toggle', 'Retouch only the largest face and its body.'],
+    ['portraitOnlyAdvanced', 'Advanced techniques only on single-person portraits', 'toggle', 'Use broad frequency healing, frequency separation and dodge and burn only when one confident face is detected. Group faces use compact donor repairs; under-eye and face/body skin correction remain available.'],
+    ['protectCeremonialMarks', 'Protect bindi and forehead pigment', 'toggle', 'Keep strongly red or magenta forehead decorations out of automatic skin cleanup. Review other decorative marks manually.'],
     ['maskPrecision', 'Skin mask precision', 'unit', 'Higher keeps beard, brows, lips and make-up further out of the skin selection.'],
     ['edgeSoftness', 'Mask edge softness', 'unit', 'How gradually the retouch fades out at the edge of the skin.'],
     ['protectFacialHair', 'Protect beard and stubble', 'toggle', 'Never smooth facial hair.'],
@@ -96,6 +98,7 @@ export const SETTING_GROUPS: [string, Control[]][] = [
     ['bodyShine', 'Body shine', 'unit', 'Shine on shoulders and arms softened.'],
     ['bodyRedness', 'Red hands & elbows', 'unit', 'Redness on hands, knuckles and elbows evened.'],
     ['bodyBlemishes', 'Body blemishes', 'unit', 'Small spots on body skin healed.'],
+    ['bodyDarkMarks', 'Include dark body spots', 'toggle', 'Separate from facial dark spots. Off keeps natural neck and body shadows; turn on only after inspecting body contours and decorative marks.'],
     ['stretchMarks', 'Stretch marks', 'unit', 'Long, faint marks evened out of body skin. Hands, a navel and every other contour are kept. Off at 0%.'],
   ]],
   ['Hair, clothes & backdrop', [
@@ -115,6 +118,8 @@ const PORTRAIT_FINISH: Partial<RetouchSettings> = { ...ACNE_ONLY, cleanupPasses:
 /** Starting points modelled on common retouching looks; every control stays adjustable. */
 export const PRESETS: Preset[] = [
   ['natural', 'Natural', {}],
+  ['polished_wedding', 'Polished wedding', POLISHED_WEDDING_SETTINGS, 1.25],
+  ['bright_polished', 'Bright and polished', BRIGHT_POLISHED_SETTINGS, 1.25],
   ['acne_only', 'Acne only · preserve detail', ACNE_ONLY],
   ['detailed_skin', 'Detailed skin repair and review', { ...ACNE_ONLY, cleanupPasses: 4, blemishSensitivity: 1, poreRefine: .4, smoothing: .25, bodySmoothing: .25, texture: .85 }],
   ['portrait_finish', 'Portrait skin finish', PORTRAIT_FINISH],
@@ -167,7 +172,7 @@ export function AutoRetouchSettings({ disabled, busy = false, onRun, onRunCollec
     setPreset(id);
     setOptions({ ...options, intensity: intensity ?? 1, settings: { ...DEFAULT_RETOUCH_SETTINGS, ...values },
       ...(['acne_only', 'skin_cleanup', 'detailed_skin'].includes(id) ? { eyes: false, teeth: false, refine: false, blemishes: true, scope: 'face_and_body' as const } : {}),
-      ...(['portrait_finish', 'smooth_finish', 'body_finish'].includes(id) ? { eyes: true, teeth: false, refine: true, blemishes: true, scope: 'face_and_body' as const } : {}),
+      ...(['polished_wedding', 'bright_polished', 'portrait_finish', 'smooth_finish', 'body_finish'].includes(id) ? { eyes: true, teeth: false, refine: true, blemishes: true, scope: 'face_and_body' as const } : {}),
     });
   };
   return <fieldset className="auto-retouch-settings" disabled={disabled}>
