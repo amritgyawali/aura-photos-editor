@@ -1,0 +1,20 @@
+.hot-features { margin-bottom: 24px; }
+.hot-feature-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; }
+.aura-studio .hot-feature-card { padding: 0; overflow: hidden; background: #232526; color: #f3f3f0; border: 1px solid #36393a; border-radius: 14px; text-align: left; min-width: 0; cursor: pointer; transition: border-color .18s, transform .18s; }
+.aura-studio .hot-feature-card:hover:not(:disabled) { border-color: #c1cdb4; transform: translateY(-3px); }
+.aura-studio .hot-feature-card[aria-pressed=true] { border-color: #d2dfb7; box-shadow: 0 0 0 1px #d2dfb7; }
+.hot-feature-card:focus-visible { outline: 3px solid #d2dfb7; outline-offset: 4px; }
+.hot-feature-image { display: block; position: relative; height: clamp(130px, 13vw, 190px); overflow: hidden; background: #485557; }
+.hot-feature-image img, .hot-art { width: 100%; height: 100%; object-fit: cover; display: block; }
+.hot-feature-icon { position: absolute; bottom: 9px; left: 9px; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 8px; background: #252a2ce8; }
+.hot-feature-icon svg { width: 23px; height: 23px; fill: none; stroke: #fff; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.hot-feature-copy { display: flex; flex-direction: column; gap: 7px; padding: 17px; min-height: 148px; }
+.hot-feature-copy strong { font-size: 13px; line-height: 1.4; }
+.hot-feature-copy > span { font-size: 12px; line-height: 1.5; color: #bbbebe; }
+.hot-feature-copy .hot-feature-open { margin-top: auto; padding-top: 8px; color: #d2dfb7; }
+.hot-feature-empty { padding: 24px; margin-top: 24px; border: 1px dashed var(--border, #6b6b65); border-radius: 12px; }
+.feature-instructions { padding: 15px 18px; background: #cbdca212; border-left: 3px solid #9ca982; line-height: 1.65; }
+.hot-training { margin-top: 28px; }
+@media (max-width: 1250px) { .hot-feature-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 800px) { .hot-feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } }
+@media (max-width: 480px) { .hot-feature-grid { grid-template-columns: minmax(0, 1fr); } .hot-feature-image { height: 180px; } }

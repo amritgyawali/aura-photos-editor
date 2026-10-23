@@ -316,6 +316,10 @@ pub struct StudioFinish {
     pub face: FaceShape,
     pub body: BodyShape,
     pub liquify: Vec<LiquifyStroke>,
+    /// Restore displacement on confidently segmented background, 0..=100.
+    /// Omitted at zero to preserve existing recipe hashes.
+    #[serde(skip_serializing_if = "is_zero")]
+    pub background_repair: f32,
     pub background: Option<Background>,
     pub colours: Colours,
     pub light: Light,
@@ -491,11 +495,17 @@ impl StudioFinish {
     pub fn needs_parse(&self) -> bool {
         !self.face.is_identity()
             || !self.body.is_identity()
+            || self.background_repair > 0.0
             || self.background.is_some_and(|b| b.amount > 0.0)
             || !self.colours.is_empty()
             || self.light.needs_faces()
             || self.has_measured()
     }
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)] // serde's skip predicate receives a reference.
+fn is_zero(value: &f32) -> bool {
+    *value == 0.0
 }
 
 fn slider(v: f32) -> bool {
@@ -515,6 +525,12 @@ fn colour(c: [f32; 3]) -> bool {
 /// # Errors
 /// A recipe error naming the first slider, colour or stroke out of range.
 pub fn validate(finish: &StudioFinish) -> AuraResult<()> {
+    if !amount(finish.background_repair) {
+        return Err(recipe_invalid(
+            &format!("{KEY}.backgroundRepair"),
+            "must be 0..=100",
+        ));
+    }
     for (name, value) in finish.face.sliders() {
         if !slider(value) {
             return Err(recipe_invalid(
@@ -689,6 +705,24 @@ mod tests {
         let finish = read(&recipe()).unwrap();
         assert!(finish.is_identity());
         assert!(!finish.needs_parse());
+    }
+
+    #[test]
+    fn background_repair_round_trips_and_old_recipes_omit_the_new_field() {
+        let mut finish = StudioFinish::default();
+        assert!(!serde_json::to_string(&finish)
+            .unwrap()
+            .contains("backgroundRepair"));
+        finish.face.slim = 20.0;
+        finish.background_repair = 75.0;
+        let mut r = recipe();
+        write(&mut r, &finish).unwrap();
+        assert_eq!(read(&r).unwrap(), finish);
+        assert!(finish.needs_parse());
+        for invalid in [-1.0, 101.0, f32::NAN, f32::INFINITY] {
+            finish.background_repair = invalid;
+            assert!(validate(&finish).is_err());
+        }
     }
 
     #[test]

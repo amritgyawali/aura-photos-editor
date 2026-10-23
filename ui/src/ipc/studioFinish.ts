@@ -64,7 +64,7 @@ export type SubjectFinish = {
   faceVignette: number; faceBrightness: number;
 };
 export type StudioFinish = {
-  face: FaceShape; body: BodyShape; liquify?: LiquifyStroke[]; background?: Background | null; colours: FeatureColours; light: PortraitLight;
+  face: FaceShape; body: BodyShape; liquify?: LiquifyStroke[]; backgroundRepair?: number; background?: Background | null; colours: FeatureColours; light: PortraitLight;
   skin: SkinFinish; makeup: MakeupFinish; hair: HairBodyFinish; attire: AttireFinish; scene: SceneFinish; subject: SubjectFinish;
   /** The faces the face, skin and makeup tools apply to, as normalised points; empty is every face. */
   faces: [number, number][];
@@ -234,7 +234,7 @@ export const NEUTRAL_ATTIRE: AttireFinish = zeroes(ATTIRE_SLIDERS);
 export const NEUTRAL_SCENE: SceneFinish = zeroes(SCENE_SLIDERS);
 export const NEUTRAL_SUBJECT: SubjectFinish = { ...zeroes(SUBJECT_SLIDERS), relightDirection: -45 };
 export const NEUTRAL_FINISH: StudioFinish = {
-  face: NEUTRAL_FACE, body: NEUTRAL_BODY, liquify: [], background: null,
+  face: NEUTRAL_FACE, body: NEUTRAL_BODY, liquify: [], backgroundRepair: 0, background: null,
   colours: { hair: null, eyes: null, lips: null, blush: null, eyeshadow: null, eyebrows: null },
   light: NEUTRAL_LIGHT,
   skin: NEUTRAL_SKIN, makeup: NEUTRAL_MAKEUP, hair: NEUTRAL_HAIR, attire: NEUTRAL_ATTIRE, scene: NEUTRAL_SCENE, subject: NEUTRAL_SUBJECT,
@@ -259,6 +259,7 @@ export function normaliseFinish(value: Partial<StudioFinish> | null | undefined)
     face: { ...NEUTRAL_FACE, ...(value?.face ?? {}) },
     body: { ...NEUTRAL_BODY, ...(value?.body ?? {}) },
     liquify: value?.liquify ?? [],
+    backgroundRepair: value?.backgroundRepair ?? 0,
     background: value?.background ?? null,
     colours: { ...NEUTRAL_FINISH.colours, ...(value?.colours ?? {}) },
     light: { ...NEUTRAL_LIGHT, ...(value?.light ?? {}) },

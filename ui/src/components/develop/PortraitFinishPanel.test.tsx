@@ -6,6 +6,14 @@ import { PortraitFinishPanel } from './PortraitFinishPanel';
 
 afterEach(cleanup);
 
+it('opens background repair directly and preserves existing shape edits when applied', () => {
+  const onSave = vi.fn();
+  const finish = { ...NEUTRAL_FINISH, face: { ...NEUTRAL_FINISH.face, slim: 20 } };
+  render(<PortraitFinishPanel finish={finish} initialTab="liquify" disabled={false} liquify={null} onSave={onSave} onLiquify={vi.fn()} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Repair background automatically' }));
+  expect(onSave).toHaveBeenCalledWith({ ...finish, backgroundRepair: 100 }, 'Liquify background repair');
+});
+
 it('a face slider commits one labelled save when released', () => {
   const onSave = vi.fn();
   render(<PortraitFinishPanel finish={NEUTRAL_FINISH} disabled={false} liquify={null} onSave={onSave} onLiquify={vi.fn()} />);

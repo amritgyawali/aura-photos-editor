@@ -22,6 +22,7 @@ export type PortraitFinishPanelProps = {
   subject?: string;
   /** The face picker: the faces in this photograph. Absent where it cannot run. */
   onFindFaces?: () => Promise<EvotoFace[]>;
+  initialTab?: Tab;
 };
 
 type Tab = 'face' | 'body' | 'skin' | 'light' | 'liquify' | 'background' | 'makeup' | 'hair' | 'people' | 'faces';
@@ -86,8 +87,9 @@ const BACKGROUND_MODES: ReadonlyArray<readonly [BackgroundMode, string]> = [
  * and makeup, each saved as one undoable step. Nothing here is applied automatically; Auto light
  * runs only when pressed. ADR-0108, ADR-0127.
  */
-export function PortraitFinishPanel({ finish, disabled, liquify, onSave, onLiquify, onSuggestLight, subject, onFindFaces }: PortraitFinishPanelProps): JSX.Element {
-  const [tab, setTab] = useState<Tab>('face');
+export function PortraitFinishPanel({ finish, disabled, liquify, onSave, onLiquify, onSuggestLight, subject, onFindFaces, initialTab = 'face' }: PortraitFinishPanelProps): JSX.Element {
+  const [tab, setTab] = useState<Tab>(initialTab);
+  useEffect(() => { setTab(initialTab); }, [initialTab]);
   const [faces, setFaces] = useState<EvotoFace[] | null>(null);
   const [findingFaces, setFindingFaces] = useState(false);
   useEffect(() => { setFaces(null); setFindingFaces(false); }, [subject]);
@@ -177,6 +179,11 @@ export function PortraitFinishPanel({ finish, disabled, liquify, onSave, onLiqui
     </div>}
 
     {tab === 'liquify' && <div role="tabpanel" aria-label="Liquify">
+      <p className="lr-hint">Background repair restores the backdrop distorted by AURA's saved shape and liquify edits. It keeps the detected subject and softens the boundary. For an imported flattened edit, use a clean original; its missing background cannot be recovered exactly.</p>
+      <ShapeSlider label="Background repair" min={0} max={100} value={finish.backgroundRepair ?? 0} disabled={disabled}
+        onCommit={backgroundRepair => onSave({ ...finish, backgroundRepair }, 'Liquify background repair')} />
+      <button type="button" disabled={disabled || (finish.backgroundRepair ?? 0) === 100}
+        onClick={() => onSave({ ...finish, backgroundRepair: 100 }, 'Liquify background repair')}>Repair background automatically</button>
       <div className="lr-crops">{LIQUIFY_MODES.map(([mode, label, hint]) =>
         <button type="button" key={mode} title={hint} aria-pressed={liquify?.mode === mode} disabled={disabled}
           onClick={() => onLiquify(liquify?.mode === mode ? null : { mode, size: liquify?.size ?? 0.06, strength: liquify?.strength ?? 0.7 })}>{label}</button>)}

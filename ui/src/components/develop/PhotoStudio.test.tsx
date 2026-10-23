@@ -6,6 +6,7 @@ import type { RenderDto } from '../../ipc/types';
 import { nativeRetouch } from '../../ipc/nativeRetouch';
 import { forgetPreviews } from '../../state/previewCache';
 import { automaticStrength } from '../../ipc/automaticStrength';
+import { useEffectRequest } from '../../state/effectRequest';
 
 vi.mock('../../ipc/client', () => ({
   inTauri: () => true,
@@ -18,6 +19,7 @@ vi.mock('../../ipc/client', () => ({
 
 vi.mock('../../ipc/nativeRetouch', async () => ({ ...await vi.importActual('../../ipc/nativeRetouch'), nativeRetouch: { original: vi.fn() } }));
 vi.mock('../look/ColorMatchPanel', () => ({ ColorMatchPanel: () => null }));
+vi.mock('./NativeRetouchWorkspace', () => ({ NativeRetouchWorkspace: () => <section aria-label="Opened precision retouch" /> }));
 vi.mock('../../ipc/automaticStrength', () => ({
   automaticStrength: { read: vi.fn(), apply: vi.fn() },
   AUTOMATIC_CATEGORIES: { smoothing: 'Skin smoothing' },
@@ -26,6 +28,7 @@ vi.mock('../../ipc/automaticStrength', () => ({
 const pixels = { width: 1, height: 1, rgbBase64: btoa(String.fromCharCode(80, 100, 120)), notes: [] } as unknown as RenderDto;
 
 beforeEach(() => {
+  useEffectRequest.setState({ request: null });
   vi.resetAllMocks();
   forgetPreviews();
   vi.mocked(nativeRetouch.original).mockResolvedValue({ width: 1, height: 1, rgbBase64: btoa(String.fromCharCode(70, 90, 110)), notes: [] } as never);
@@ -35,6 +38,17 @@ beforeEach(() => {
   vi.mocked(develop.renderImage).mockResolvedValue(pixels);
   vi.mocked(editProfiles.list).mockResolvedValue([]);
   vi.mocked(automaticStrength.read).mockResolvedValue({ recipeHash: 'saved', strengths: { overall: 1, categories: {} }, categories: [], newOperations: 0 });
+});
+
+it('opens a chosen Effects tool when leaving Hot Features without the feature reset closing retouch', async () => {
+  const props = { projectId: 'project', photoId: 'portrait', disabled: false, onBusyChange: vi.fn() };
+  const view = render(<PhotoStudio {...props} featureMode="liquify" />);
+  await screen.findByAltText('Edited photograph');
+  act(() => {
+    useEffectRequest.getState().ask('glare');
+    view.rerender(<PhotoStudio {...props} />);
+  });
+  expect(screen.getByRole('region', { name: 'Opened precision retouch' })).toBeTruthy();
 });
 
 it('focuses real editing panels while retaining the photo and unsaved reference name', async () => {

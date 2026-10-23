@@ -127,6 +127,14 @@ pub(crate) fn apply(
     for stroke in &finish.liquify {
         liquify(&mut field, stroke);
     }
+    if field.touched && finish.background_repair > 0.0 {
+        if let Some(map) = map.as_deref() {
+            field.repair_background(
+                &region(map, Region::Background, w, h),
+                finish.background_repair / 100.0,
+            );
+        }
+    }
     if field.touched {
         let source = rgb.to_vec();
         field.resample(&source, rgb);
@@ -693,6 +701,37 @@ fn falloff(r2: f32) -> f32 {
 }
 
 impl Field {
+    /// Restore only pixels classified as background at both ends of the warp. Checking the
+    /// source as well as the destination keeps an enlarged or moved subject from being cut off.
+    /// Uncertain boundary pixels retain their warp; the smooth ramp avoids a hard repair seam.
+    fn repair_background(&mut self, background: &[f32], amount: f32) {
+        if !self.touched || background.len() != self.w * self.h || amount <= 0.0 {
+            return;
+        }
+        let w = self.w;
+        let h = self.h;
+        self.dx
+            .par_iter_mut()
+            .zip(self.dy.par_iter_mut())
+            .enumerate()
+            .for_each(|(i, (dx, dy))| {
+                let x = (i % w) as f32;
+                let y = (i / w) as f32;
+                let sx = (x + *dx).clamp(0.0, (w - 1) as f32);
+                let sy = (y + *dy).clamp(0.0, (h - 1) as f32);
+                let (x0, y0) = (sx.floor() as usize, sy.floor() as usize);
+                let (x1, y1) = ((x0 + 1).min(w - 1), (y0 + 1).min(h - 1));
+                let (fx, fy) = (sx - x0 as f32, sy - y0 as f32);
+                let top = background[y0 * w + x0] * (1.0 - fx) + background[y0 * w + x1] * fx;
+                let bottom = background[y1 * w + x0] * (1.0 - fx) + background[y1 * w + x1] * fx;
+                let confidence = background[i].min(top * (1.0 - fy) + bottom * fy);
+                let t = ((confidence - 0.5) / 0.48).clamp(0.0, 1.0);
+                let keep = 1.0 - amount.clamp(0.0, 1.0) * t * t * (3.0 - 2.0 * t);
+                *dx *= keep;
+                *dy *= keep;
+            });
+    }
+
     fn new(w: usize, h: usize) -> Self {
         Self {
             w,
@@ -1788,6 +1827,45 @@ mod tests {
         // Far from the brush nothing moves.
         let j = (2 * w + 2) * 3;
         assert!((out[j] - src[j]).abs() < 1e-6);
+    }
+
+    #[test]
+    #[allow(clippy::float_cmp)] // Zero and foreground preservation must be exact.
+    fn background_repair_restores_lines_preserves_subject_and_respects_strength() {
+        let (w, h) = (80, 60);
+        let source = ramp(w, h);
+        let mut field = Field::new(w, h);
+        field.ensure();
+        field.touched = true;
+        field.dx.fill(3.0);
+        let background: Vec<f32> = (0..w * h)
+            .map(|i| {
+                if (30..50).contains(&(i % w)) {
+                    0.0
+                } else {
+                    1.0
+                }
+            })
+            .collect();
+        let mut full = source.clone();
+        field.resample(&source, &mut full);
+        let unchanged = field.dx.clone();
+        field.repair_background(&background, 0.0);
+        assert_eq!(field.dx, unchanged);
+        field.repair_background(&background, 0.5);
+        assert_eq!(field.dx[20 * w + 10], 1.5);
+        assert_eq!(field.dx[20 * w + 40], 3.0);
+        // A moved foreground pixel reaching the background must keep its displacement.
+        assert_eq!(field.dx[20 * w + 28], 3.0);
+        field.repair_background(&background, 1.0);
+        let mut repaired = source.clone();
+        field.resample(&source, &mut repaired);
+        for x in [5, 15, 65] {
+            let i = (20 * w + x) * 3;
+            assert_eq!(repaired[i], source[i]);
+            assert_ne!(full[i], source[i]);
+        }
+        assert_eq!(repaired[(20 * w + 40) * 3], full[(20 * w + 40) * 3]);
     }
 
     #[test]
