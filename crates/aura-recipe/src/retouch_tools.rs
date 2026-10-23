@@ -356,6 +356,28 @@ pub enum Tool {
     /// at its own luminance. A colour its calm surroundings share, or the glow of a coloured
     /// light, is kept. ADR-0125.
     Defringe,
+    // ---- ADR-0150: body, attire and background repairs placed by hand ----
+    /// Fine dark hair on arms or legs lifted to the level a closing of the skin fills it with;
+    /// `radius` is the hair's width and `tone` the sensitivity.
+    BodyHairSoften,
+    /// The light and shade at the size of a dimple (`radius`) taken out, finer texture and the
+    /// body's own shape kept.
+    Cellulite,
+    /// The selection's two levels of skin evened across a soft boundary of `radius`: the lighter
+    /// brought to the darker when `tone` is under one half, the darker to the lighter above.
+    TanLine,
+    /// Hands: fine wrinkles at `radius` softened, redder knuckles and bluer veins moved toward the
+    /// hand's own median colour by `tone`.
+    HandRejuvenate,
+    /// Darker knuckles or elbows lifted toward the selection's median level at the scale of
+    /// `radius`, their colour with them.
+    KnuckleEven,
+    /// A lens coating's coloured reflection taken to the colour around it (`radius` is its size)
+    /// and its extra brightness down by `tone`.
+    LensReflection,
+    /// A cast shadow inside the selection relit to the selection's lit level, colour included;
+    /// `tone` softens its edge.
+    ShadowRemove,
 }
 
 impl Tool {

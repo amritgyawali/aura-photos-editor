@@ -25,7 +25,9 @@ fn only_the_finishing_command_writes_the_finishing_extension() {
     let root = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/src"));
     let mut files = Vec::new();
     sources(root, &mut files);
-    let allowed = ["finish_commands.rs", "lib.rs"];
+    // `framing_workflows.rs` renders the colour-only preview from a copy of the recipe with the
+    // finishing extension removed, and never saves it: it names the extension to take it away.
+    let allowed = ["finish_commands.rs", "lib.rs", "framing_workflows.rs"];
     let mut offenders = Vec::new();
     for file in files {
         let name = file

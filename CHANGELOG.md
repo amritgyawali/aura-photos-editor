@@ -2,6 +2,31 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## A hundred measured portrait, attire, background and delivery tools - 2026-10-22
+
+- **Sliders that find what they act on** (ADR-0150), in the style of Evoto: twenty more face sliders
+  (eye height, tilt, corners and a measured eye symmetry; nose bridge, tip, lift and nostrils; each lip,
+  the brows, temples, chin and hair volume) and ten more body sliders (thighs, calves, a flat stomach on
+  the side the silhouette shows it, hips, shoulders, torso, height, neck, double chin, a level head).
+- **Skin and makeup on every face**: aegyo-sal, lip lines, glow, stubble shadow, rosy complexion, even
+  teeth, feature sharpening, beard definition, clothing colour on skin, pores; eyeliner and wing on the
+  measured lid line, lashes, lip liner, ombre lips, highlighter, bronzer, enhance worn makeup, fill brows.
+- **Hair, attire, background and people**: hair shine, parting, colour depth and edge; gold jewellery,
+  clipped red fabric, veil clarity, embroidery, garment edges, mehndi, white and dark garments, outfit
+  colour; background saturation, brightness, warmth, depth blur, noise, backdrop light, light wrap, a
+  colour that keeps shadows and a sky with clouds; people exposure, warmth, clarity, group face and skin
+  balance, relight, harsh shadows, backlight rescue, a face-aware vignette and face brightness.
+- **Seven tools you place yourself**: body hair, cellulite, tan lines, hands, knuckles and elbows, glasses
+  reflection colour, and a cast shadow.
+- **Framing, delivery and review**: ID photographs on white, measured crops, level eyes, a transparent PNG
+  cut-out, an Instagram grid in posting order, carousel slides, before and after, a 2x enlargement without
+  halos, a face picker and a list of faces showing no white of the eye (not a blink verdict: that needs
+  a trained eye-state model). See [the tool list](docs/evoto-hundred-tools.md).
+- **Fixed**: moving a Portrait studio slider back to zero, Reset all, Keep original background, Clear
+  liquify and turning the light off now take effect; the merge kept the old value of any field the
+  saved finish left out. The portrait parse (version 4) centres the mouth on the line between the lips,
+  keeps blush out of the lips and lid shimmer out of the whites of the eyes.
+
 ## Fifty studio capabilities - 2026-10-20
 
 - Update the workspace and desktop TLS locks to rustls 0.23.46 for four

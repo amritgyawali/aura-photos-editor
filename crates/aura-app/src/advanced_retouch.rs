@@ -322,7 +322,14 @@ pub fn stage_of(edit: &Edit) -> Option<Stage> {
         | Tool::Crosshatch
         | Tool::Sparkle
         | Tool::FairyLights
-        | Tool::RainbowPrism => return None,
+        | Tool::RainbowPrism
+        | Tool::BodyHairSoften
+        | Tool::Cellulite
+        | Tool::TanLine
+        | Tool::HandRejuvenate
+        | Tool::KnuckleEven
+        | Tool::LensReflection
+        | Tool::ShadowRemove => return None,
         Tool::AutoBlemish
         | Tool::PatchHeal
         | Tool::FrequencyHeal

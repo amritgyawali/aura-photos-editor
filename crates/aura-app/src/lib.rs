@@ -87,6 +87,7 @@ pub mod contract {
 pub mod activity;
 pub mod adaptive_look;
 pub mod emotion_commands;
+pub mod evoto_workflow;
 pub mod explain_commands;
 pub mod finish_commands;
 pub mod framing_workflows;

@@ -21,6 +21,8 @@ import { finishOf, studioFinish, type StudioFinish } from '../../ipc/studioFinis
 import { AutomaticFinishControls } from './AutomaticFinishControls';
 import { StudioColorPanel } from './StudioColorPanel';
 import { FramingPanel } from './FramingPanel';
+import { EvotoWorkflowPanel } from './EvotoWorkflowPanel';
+import { evotoWorkflow } from '../../ipc/evotoWorkflow';
 import { probePixel } from './framingMath';
 import { framingWorkflows } from '../../ipc/framingWorkflows';
 import { maskWorkflows } from '../../ipc/maskWorkflows';
@@ -360,7 +362,11 @@ export function PhotoStudio({ projectId, photoId, disabled, revision = 0, onBusy
           <PortraitFinishPanel finish={finish} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)}
             liquify={liquifyTool} onSave={saveFinish} subject={`${projectId}/${photoId}`}
             onSuggestLight={() => studioFinish.suggestLight(projectId, photoId)}
+            onFindFaces={() => evotoWorkflow.faces(projectId, photoId).then(found => found.faces)}
             onLiquify={tool => { setLiquifyTool(tool); if (tool) { setMaskTool(null); setView('edited'); setPicking(false); } }} />
+        </div></details>
+        <details className="lr-section" hidden={!shows('portrait')}><summary>Framing, delivery and review: ID photo, crops, cut-out, social</summary><div className="lr-section-body">
+          <EvotoWorkflowPanel projectId={projectId} photoId={photoId} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)} onWrite={write} />
         </div></details>
         {render && edited && <Histogram render={render} />}
         {notice && <p role="status" className="lr-notice">{notice}</p>}

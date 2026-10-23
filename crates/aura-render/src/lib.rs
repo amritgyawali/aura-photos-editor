@@ -145,6 +145,7 @@ mod retouch_undereye;
 pub mod shaders;
 pub mod spatial;
 pub mod studio_color;
+mod studio_evoto;
 pub mod studio_finish;
 pub mod tiles;
 pub mod tonemap;

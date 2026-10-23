@@ -18,6 +18,7 @@ mod colour;
 mod creative;
 mod distort;
 mod engrave;
+mod evoto;
 mod grooming;
 mod lens;
 mod light;
@@ -53,6 +54,7 @@ pub(crate) fn supports(tool: Tool) -> bool {
         || grooming::supports(tool)
         || sparkle::supports(tool)
         || stylise::supports(tool)
+        || evoto::supports(tool)
 }
 
 /// Render one effect operation into `rgb`.
@@ -104,6 +106,8 @@ pub(crate) fn apply(
         sparkle::apply(rgb, frame, edit, coverage);
     } else if stylise::supports(edit.tool) {
         stylise::apply(rgb, frame, edit, coverage);
+    } else if evoto::supports(edit.tool) {
+        evoto::apply(rgb, frame, edit, coverage);
     }
 }
 
@@ -421,7 +425,7 @@ mod tests {
     use super::testing::*;
     use super::*;
 
-    const ALL: [Tool; 88] = [
+    const ALL: [Tool; 95] = [
         Tool::LiquifyPush,
         Tool::LiquifyBloat,
         Tool::LiquifyPucker,
@@ -510,6 +514,13 @@ mod tests {
         Tool::Sparkle,
         Tool::FairyLights,
         Tool::RainbowPrism,
+        Tool::BodyHairSoften,
+        Tool::Cellulite,
+        Tool::TanLine,
+        Tool::HandRejuvenate,
+        Tool::KnuckleEven,
+        Tool::LensReflection,
+        Tool::ShadowRemove,
     ];
 
     /// A busy, colourful frame every tool has something to do on.
@@ -551,6 +562,11 @@ mod tests {
         }
         if tool == Tool::DropShadow {
             e.region = [0.4, 0.4, 0.15, 0.15];
+        }
+        // The two-level tools measure one surface in two lights; the blocks are different
+        // materials and are refused, so they are tried on the smooth gradient.
+        if matches!(tool, Tool::TanLine | Tool::ShadowRemove) {
+            e.region = [0.85, 0.5, 0.12, 0.4];
         }
         e
     }

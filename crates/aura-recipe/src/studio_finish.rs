@@ -11,6 +11,9 @@
 //! * **Feature colour and makeup** - hair, eye, lip, blush and eyeshadow colour.
 //! * **Portrait light** - a key light shaped by each head, a fill on the shadow side,
 //!   catchlights in eyes that have none, and a soft glow. ADR-0127.
+//! * **Measured beauty, attire, background and subject** - six groups of sliders that work on
+//!   what the parse finds, twenty more face sliders, ten more body sliders, two more
+//!   backgrounds, and a choice of which faces a finish applies to. ADR-0150, in [`evoto`].
 //!
 //! Every slider is `-100..=100` (or `0..=100` for an amount) and zero means untouched, so an
 //! absent block and a block of zeroes render the same photograph. Colours are stored as sRGB
@@ -19,9 +22,15 @@
 //!
 //! Carried by the extension map rather than a frozen field for ADR-0102's reason: the recipe's
 //! frozen shape has nowhere to put a displacement or a stroke, and widening it needs its own ADR.
-use crate::{errors::recipe_invalid, Recipe};
+use crate::{errors::recipe_invalid, retouch_tools::Matte, Recipe};
 use aura_core::AuraResult;
 use serde::{Deserialize, Serialize};
+
+pub mod evoto;
+pub use evoto::{
+    AttireFinish, HairBodyFinish, MakeupFinish, Range, SceneFinish, SkinFinish, SubjectFinish,
+    MAX_CHOSEN_FACES,
+};
 
 /// The extension key.
 pub const KEY: &str = "studio_finish_v1";
@@ -60,6 +69,47 @@ pub struct FaceShape {
     pub smile: f32,
     /// Positive enlarges the whole head, negative makes it smaller.
     pub head_size: f32,
+    // ---- ADR-0150 ----
+    /// Positive raises the eyes, negative lowers them.
+    pub eye_height: f32,
+    /// Positive lifts the outer corners of the eyes.
+    pub eye_tilt: f32,
+    /// Positive opens the inner corners of the eyes toward the nose.
+    pub inner_corner: f32,
+    /// Positive lengthens the outer corners of the eyes.
+    pub outer_corner: f32,
+    /// `0..=100`: the smaller eye opened toward the larger, measured on each face.
+    pub eye_symmetry: f32,
+    /// Positive narrows the bridge of the nose.
+    pub nose_bridge: f32,
+    /// Positive makes the tip of the nose smaller.
+    pub nose_tip: f32,
+    /// Positive lifts the tip of the nose.
+    pub nose_lift: f32,
+    /// Positive narrows the nostrils.
+    pub nostrils: f32,
+    /// Positive makes the apples of the cheeks fuller.
+    pub cheek_apples: f32,
+    /// Positive makes the upper lip fuller.
+    pub upper_lip: f32,
+    /// Positive makes the lower lip fuller.
+    pub lower_lip: f32,
+    /// Positive raises the mouth, shortening the space under the nose.
+    pub mouth_height: f32,
+    /// Positive raises the eyebrows.
+    pub brow_height: f32,
+    /// Positive lifts the tails of the eyebrows.
+    pub brow_tilt: f32,
+    /// Positive makes the eyebrows thicker.
+    pub brow_thickness: f32,
+    /// Positive fills out the temples.
+    pub temples: f32,
+    /// Positive lengthens the lower face.
+    pub face_length: f32,
+    /// Positive narrows the chin.
+    pub chin_width: f32,
+    /// Positive adds volume at the crown.
+    pub hair_volume: f32,
 }
 
 /// Body shape, applied to the largest person. Positive values slim or lengthen.
@@ -80,6 +130,27 @@ pub struct BodyShape {
     pub legs: f32,
     /// Positive lengthens the neck.
     pub neck: f32,
+    // ---- ADR-0150 ----
+    /// Positive slims the thighs.
+    pub thighs: f32,
+    /// Positive slims the calves.
+    pub calves: f32,
+    /// Positive flattens the stomach on the side the silhouette shows it.
+    pub belly: f32,
+    /// Positive lifts the hips.
+    pub hip_lift: f32,
+    /// Positive raises and squares the shoulders, negative lets them slope.
+    pub shoulder_slope: f32,
+    /// Positive lengthens the torso between the shoulders and the waist.
+    pub torso: f32,
+    /// Positive makes the whole figure below the shoulders taller.
+    pub height: f32,
+    /// Positive slims the neck.
+    pub neck_width: f32,
+    /// `0..=100`: a double chin lifted and its fold evened.
+    pub double_chin: f32,
+    /// `0..=100`: a tilted head turned toward level, measured from the eye line.
+    pub head_level: f32,
 }
 
 /// What a liquify stroke does.
@@ -121,6 +192,10 @@ pub enum BackgroundMode {
     Blur,
     /// Only the sky, replaced by a gradient from `colour` at the top to `colour2` at the horizon.
     Sky,
+    /// A flat colour that keeps the shadows the people cast on the backdrop. ADR-0150.
+    KeepShadows,
+    /// Only the sky, replaced by a gradient sky with soft clouds. ADR-0150.
+    CloudSky,
 }
 
 /// A background replacement.
@@ -240,21 +315,36 @@ impl Light {
 pub struct StudioFinish {
     pub face: FaceShape,
     pub body: BodyShape,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub liquify: Vec<LiquifyStroke>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub background: Option<Background>,
     pub colours: Colours,
-    /// Not stored while it is the default, so a recipe made before ADR-0127 serializes - and
-    /// hashes - exactly as it did.
-    #[serde(skip_serializing_if = "Light::is_default")]
     pub light: Light,
+    /// ADR-0150: measured skin finishing on each face.
+    pub skin: SkinFinish,
+    /// ADR-0150: makeup placed from each face's landmarks.
+    pub makeup: MakeupFinish,
+    /// ADR-0150: hair and body skin.
+    pub hair: HairBodyFinish,
+    /// ADR-0150: what people are wearing.
+    pub attire: AttireFinish,
+    /// ADR-0150: the background behind the people.
+    pub scene: SceneFinish,
+    /// ADR-0150: the people as a whole.
+    pub subject: SubjectFinish,
+    /// ADR-0150: the faces the face, skin, makeup and per-face light adjustments apply to, as
+    /// points in normalised frame coordinates; empty is every face.
+    pub faces: Vec<[f32; 2]>,
+    /// ADR-0150: the people, as the learned subject selection found them when a tool first
+    /// needed to tell them from their background, frozen here so the photograph renders the same
+    /// on every machine. Absent where the model is not installed; the parse is used then.
+    #[serde(default)]
+    pub subject_matte: Option<Matte>,
 }
 
 impl FaceShape {
     /// Every slider with its name, for validation and for the panel.
     #[must_use]
-    pub fn sliders(&self) -> [(&'static str, f32); 13] {
+    pub fn sliders(&self) -> [(&'static str, f32); 33] {
         [
             ("slim", self.slim),
             ("jaw", self.jaw),
@@ -269,6 +359,26 @@ impl FaceShape {
             ("lips", self.lips),
             ("smile", self.smile),
             ("headSize", self.head_size),
+            ("eyeHeight", self.eye_height),
+            ("eyeTilt", self.eye_tilt),
+            ("innerCorner", self.inner_corner),
+            ("outerCorner", self.outer_corner),
+            ("eyeSymmetry", self.eye_symmetry),
+            ("noseBridge", self.nose_bridge),
+            ("noseTip", self.nose_tip),
+            ("noseLift", self.nose_lift),
+            ("nostrils", self.nostrils),
+            ("cheekApples", self.cheek_apples),
+            ("upperLip", self.upper_lip),
+            ("lowerLip", self.lower_lip),
+            ("mouthHeight", self.mouth_height),
+            ("browHeight", self.brow_height),
+            ("browTilt", self.brow_tilt),
+            ("browThickness", self.brow_thickness),
+            ("temples", self.temples),
+            ("faceLength", self.face_length),
+            ("chinWidth", self.chin_width),
+            ("hairVolume", self.hair_volume),
         ]
     }
 
@@ -282,7 +392,7 @@ impl FaceShape {
 impl BodyShape {
     /// Every slider with its name.
     #[must_use]
-    pub fn sliders(&self) -> [(&'static str, f32); 7] {
+    pub fn sliders(&self) -> [(&'static str, f32); 17] {
         [
             ("slim", self.slim),
             ("waist", self.waist),
@@ -291,6 +401,16 @@ impl BodyShape {
             ("shoulders", self.shoulders),
             ("legs", self.legs),
             ("neck", self.neck),
+            ("thighs", self.thighs),
+            ("calves", self.calves),
+            ("belly", self.belly),
+            ("hipLift", self.hip_lift),
+            ("shoulderSlope", self.shoulder_slope),
+            ("torso", self.torso),
+            ("height", self.height),
+            ("neckWidth", self.neck_width),
+            ("doubleChin", self.double_chin),
+            ("headLevel", self.head_level),
         ]
     }
 
@@ -334,6 +454,36 @@ impl StudioFinish {
             && self.background.is_none_or(|b| b.amount <= 0.0)
             && self.colours.is_empty()
             && self.light.is_identity()
+            && !self.has_measured()
+    }
+
+    /// True when something here tells the people from their background, and so is better for a
+    /// learned subject selection than for the parse's colour models. ADR-0150.
+    #[must_use]
+    pub fn needs_subject(&self) -> bool {
+        let s = &self.subject;
+        self.background.is_some_and(|b| {
+            b.amount > 0.0 && !matches!(b.mode, BackgroundMode::Sky | BackgroundMode::CloudSky)
+        }) || !self.scene.is_identity()
+            || !self.body.is_identity()
+            || self.hair.edge > 0.0
+            || s.exposure != 0.0
+            || s.warmth != 0.0
+            || s.clarity != 0.0
+            || s.backlight > 0.0
+            || s.relight > 0.0
+            || s.face_vignette > 0.0
+    }
+
+    /// True when any ADR-0150 group changes pixels.
+    #[must_use]
+    pub fn has_measured(&self) -> bool {
+        !(self.skin.is_identity()
+            && self.makeup.is_identity()
+            && self.hair.is_identity()
+            && self.attire.is_identity()
+            && self.scene.is_identity()
+            && self.subject.is_identity())
     }
 
     /// True when the renderer needs the portrait parse for this.
@@ -344,6 +494,7 @@ impl StudioFinish {
             || self.background.is_some_and(|b| b.amount > 0.0)
             || !self.colours.is_empty()
             || self.light.needs_faces()
+            || self.has_measured()
     }
 }
 
@@ -428,6 +579,7 @@ pub fn validate(finish: &StudioFinish) -> AuraResult<()> {
             "amounts must be 0..=100, direction -180..=180 and height -30..=80",
         ));
     }
+    validate_measured(finish)?;
     for (name, tint) in finish.colours.all() {
         if let Some(t) = tint {
             if !colour(t.colour) || !amount(t.amount) {
@@ -437,6 +589,56 @@ pub fn validate(finish: &StudioFinish) -> AuraResult<()> {
                 ));
             }
         }
+    }
+    Ok(())
+}
+
+/// The ADR-0150 values: the three one-sided shape sliders, the six groups and the chosen faces.
+fn validate_measured(finish: &StudioFinish) -> AuraResult<()> {
+    for (name, value) in [
+        ("face.eyeSymmetry", finish.face.eye_symmetry),
+        ("body.doubleChin", finish.body.double_chin),
+        ("body.headLevel", finish.body.head_level),
+    ] {
+        if !amount(value) {
+            return Err(recipe_invalid(&format!("{KEY}.{name}"), "must be 0..=100"));
+        }
+    }
+    for (group, name, value, range) in evoto::all_values(
+        &finish.skin,
+        &finish.makeup,
+        &finish.hair,
+        &finish.attire,
+        &finish.scene,
+        &finish.subject,
+    ) {
+        if !range.holds(value) {
+            return Err(recipe_invalid(
+                &format!("{KEY}.{group}.{name}"),
+                "out of range",
+            ));
+        }
+    }
+    if finish
+        .subject_matte
+        .as_ref()
+        .is_some_and(|m| m.decode().is_none() || m.width == 0 || m.height == 0)
+    {
+        return Err(recipe_invalid(
+            &format!("{KEY}.subjectMatte"),
+            "an unreadable selection",
+        ));
+    }
+    if finish.faces.len() > MAX_CHOSEN_FACES
+        || !finish
+            .faces
+            .iter()
+            .all(|p| p.iter().all(|v| v.is_finite() && (0.0..=1.0).contains(v)))
+    {
+        return Err(recipe_invalid(
+            &format!("{KEY}.faces"),
+            "at most 32 points inside the frame",
+        ));
     }
     Ok(())
 }
@@ -455,16 +657,18 @@ pub fn read(recipe: &Recipe) -> AuraResult<StudioFinish> {
     Ok(finish)
 }
 
-/// Store the finish; the identity removes the key, so an untouched recipe stays byte-identical.
+/// Store the finish, every field written out - zeroes, an absent background as `null`, no
+/// strokes as `[]`, the identity included.
+///
+/// `schema::merge` writes the leaves a proposal carries and keeps every other leaf of the base,
+/// so a field left out of the stored finish is a field that can never go back: a reset, "Keep
+/// original background", "Clear liquify" and a slider returned to zero were all kept from the
+/// previous step while this omitted them. ADR-0150 section 5.
 ///
 /// # Errors
 /// A recipe error when validation or serialization fails.
 pub fn write(recipe: &mut Recipe, finish: &StudioFinish) -> AuraResult<()> {
     validate(finish)?;
-    if *finish == StudioFinish::default() {
-        recipe.extra.remove(KEY);
-        return Ok(());
-    }
     recipe.extra.insert(
         KEY.into(),
         serde_json::to_value(finish).map_err(|_| recipe_invalid(KEY, "cannot serialize"))?,
@@ -509,7 +713,7 @@ mod tests {
         assert_eq!(read(&r).unwrap(), finish);
         assert!(read(&r).unwrap().needs_parse());
         write(&mut r, &StudioFinish::default()).unwrap();
-        assert!(!r.extra.contains_key(KEY));
+        assert_eq!(read(&r).unwrap(), StudioFinish::default());
     }
 
     #[test]
@@ -528,15 +732,79 @@ mod tests {
         glow.light.glow = 30.0;
         assert!(!glow.is_identity());
         assert!(!glow.needs_parse());
-        // A finish without light serializes without the key, as it did before ADR-0127.
+        // Every field is written out, so the merge can always take it back to neutral.
         let mut shape = StudioFinish::default();
         shape.face.slim = 10.0;
         let json = serde_json::to_value(&shape).unwrap();
-        assert!(json.get("light").is_none(), "{json}");
+        assert!(json.get("light").is_some(), "{json}");
         // The direction alone changes nothing.
         let mut aimed = StudioFinish::default();
         aimed.light.direction = 90.0;
         assert!(aimed.is_identity());
+    }
+
+    #[test]
+    fn the_hundred_additions_round_trip_and_are_not_stored_untouched() {
+        let mut r = recipe();
+        let mut finish = StudioFinish::default();
+        finish.face.eye_tilt = 20.0;
+        finish.body.head_level = 60.0;
+        finish.skin.aegyo_sal = 40.0;
+        finish.makeup.eyeliner = 50.0;
+        finish.hair.gloss = 30.0;
+        finish.attire.gold = 70.0;
+        finish.scene.saturation = -40.0;
+        finish.subject.relight = 30.0;
+        finish.faces.push([0.4, 0.3]);
+        finish.background = Some(Background {
+            mode: BackgroundMode::CloudSky,
+            colour: [0.3, 0.5, 0.9],
+            colour2: [0.8, 0.9, 1.0],
+            amount: 100.0,
+            feather: 30.0,
+        });
+        write(&mut r, &finish).unwrap();
+        let back = read(&r).unwrap();
+        assert_eq!(back, finish);
+        assert!(back.needs_parse() && back.has_measured());
+        // A finish stored before ADR-0150 still reads, its new groups untouched.
+        let mut r2 = recipe();
+        r2.extra.insert(
+            KEY.into(),
+            serde_json::json!({ "face": { "slim": 10.0 }, "body": { "legs": 5.0 } }),
+        );
+        let old = read(&r2).unwrap();
+        assert!(
+            (old.face.slim - 10.0).abs() < 1e-6 && old.skin.is_identity() && old.faces.is_empty()
+        );
+        // An eyeliner wing alone, or a relight direction alone, changes nothing.
+        let mut nothing = StudioFinish::default();
+        nothing.makeup.eyeliner_wing = 80.0;
+        nothing.subject.relight_direction = 90.0;
+        assert!(nothing.is_identity());
+    }
+
+    #[test]
+    fn the_hundred_additions_refuse_values_out_of_range() {
+        let mut finish = StudioFinish::default();
+        finish.face.eye_symmetry = -10.0;
+        assert!(validate(&finish).is_err());
+        let mut finish = StudioFinish::default();
+        finish.scene.saturation = -120.0;
+        assert!(validate(&finish).is_err());
+        let mut finish = StudioFinish::default();
+        finish.subject.relight_direction = 200.0;
+        assert!(validate(&finish).is_err());
+        let finish = StudioFinish {
+            faces: vec![[0.5, 1.5]],
+            ..StudioFinish::default()
+        };
+        assert!(validate(&finish).is_err());
+        let finish = StudioFinish {
+            faces: vec![[0.5, 0.5]; MAX_CHOSEN_FACES + 1],
+            ..StudioFinish::default()
+        };
+        assert!(validate(&finish).is_err());
     }
 
     #[test]
@@ -575,5 +843,63 @@ mod tests {
         r.extra
             .insert(KEY.into(), serde_json::json!({ "face": { "nonsense": 1 } }));
         assert!(read(&r).is_err());
+    }
+}
+
+#[cfg(test)]
+mod through_merge {
+    use super::*;
+
+    fn merged(base: &Recipe, finish: &StudioFinish) -> StudioFinish {
+        let mut proposal = base.clone();
+        write(&mut proposal, finish).unwrap();
+        let (merged, _) = crate::schema::merge(base, &proposal, crate::EditSource::User).unwrap();
+        read(&merged).unwrap()
+    }
+
+    /// `schema::merge` keeps every leaf a proposal leaves out. Every way back to neutral has to
+    /// survive it: a reset, a background removed, strokes cleared, light and new sliders zeroed.
+    #[test]
+    fn every_reset_survives_the_merge() {
+        let mut finish = StudioFinish::default();
+        finish.face.slim = 20.0;
+        finish.face.eye_tilt = 30.0;
+        finish.skin.glow = 40.0;
+        finish.light.key = 50.0;
+        finish.faces = vec![[0.4, 0.4]];
+        finish.liquify.push(LiquifyStroke {
+            mode: LiquifyMode::Push,
+            radius: 0.05,
+            strength: 0.5,
+            points: vec![[0.4, 0.4], [0.45, 0.4]],
+        });
+        finish.background = Some(Background {
+            mode: BackgroundMode::Colour,
+            colour: [1.0; 3],
+            colour2: [1.0; 3],
+            amount: 100.0,
+            feather: 20.0,
+        });
+        let base = {
+            let r0 = crate::fixtures::reference();
+            let mut r = r0.clone();
+            write(&mut r, &finish).unwrap();
+            crate::schema::merge(&r0, &r, crate::EditSource::User)
+                .unwrap()
+                .0
+        };
+        assert_eq!(read(&base).unwrap(), finish);
+        assert_eq!(
+            merged(&base, &StudioFinish::default()),
+            StudioFinish::default()
+        );
+        let mut partly = finish.clone();
+        partly.face.eye_tilt = 0.0;
+        partly.skin.glow = 0.0;
+        partly.light.key = 0.0;
+        partly.background = None;
+        partly.liquify.clear();
+        partly.faces.clear();
+        assert_eq!(merged(&base, &partly), partly);
     }
 }

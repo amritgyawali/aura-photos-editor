@@ -95,6 +95,14 @@ export const EFFECT_TOOLS = [
   ['sparkle', 'Sparkle', 'Light & effects', 'A four-pointed star on every glint in the selection - jewellery, sequins, a ring, a glass.'],
   ['fairy_lights', 'Fairy lights', 'Light & effects', 'Scatters soft out-of-focus orbs of light, like string lights behind a couple. Moving the selection makes a different pattern.'],
   ['rainbow_prism', 'Rainbow prism', 'Light & effects', 'A soft band of spectrum light, as a prism held to the lens throws across a frame.'],
+  // Body, attire and background repairs (ADR-0150).
+  ['body_hair_soften', 'Soften body hair', 'Skin', 'Select an arm or a leg: fine dark hairs are lifted to the skin level around them. Wider shade, freckles and tattoos are left alone.'],
+  ['cellulite', 'Smooth cellulite', 'Skin', 'Takes out the light and shade at the size of a dimple, keeping the skin\'s finer texture and the body\'s own shape. Set the size to the dimples.'],
+  ['tan_line', 'Even tan lines', 'Skin', 'Select across a tan line: the selection\'s two levels of skin are evened across a soft boundary - the pale side darkened, or the tanned side lightened.'],
+  ['hand_rejuvenate', 'Rejuvenate hands', 'Skin', 'Softens fine wrinkles on the back of a hand and moves redder knuckles and bluer veins toward the hand\'s own colour.'],
+  ['knuckle_even', 'Even dark knuckles & elbows', 'Skin', 'Lifts darker knuckles, elbows or knees toward the level and colour of the skin around them.'],
+  ['lens_reflection', 'Remove glasses reflection colour', 'Details', 'Draw over a lens: the green, purple or blue reflection of its coating takes the colour of what is behind it, and its extra brightness is reduced.'],
+  ['shadow_remove', 'Remove a cast shadow', 'Fix & clean up', 'Select a shadow with some lit surface around it: the shadow is relit to the lit level, its colour included, across a soft edge.'],
 ] as const;
 
 export type EffectTool = typeof EFFECT_TOOLS[number][0];
@@ -199,6 +207,13 @@ export const EFFECT_PARAMS: Record<EffectTool, EffectParam[]> = {
   sparkle: [radius('Star size'), unit('tone', 'Reaches dimmer glints')],
   fairy_lights: [radius('Light size'), unit('tone', 'Density')],
   rainbow_prism: [both('warmth', 'Band angle', deg(180)), radius('Band width'), unit('tone', 'Strength')],
+  body_hair_soften: [radius('Hair width'), unit('tone', 'Sensitivity')],
+  cellulite: [radius('Dimple size')],
+  tan_line: [radius('Boundary softness'), { ...unit('tone', 'Direction'), show: v => v < .5 ? 'pale side darker' : 'tanned side lighter' }],
+  hand_rejuvenate: [radius('Wrinkle size'), unit('tone', 'Even redness and veins')],
+  knuckle_even: [radius('Patch size')],
+  lens_reflection: [radius('Reflection size'), unit('tone', 'Reduce brightness too')],
+  shadow_remove: [unit('tone', 'Edge softness')],
 };
 
 /** Tools that read a point on the photo: required for the first two, optional for the rest. */
@@ -323,6 +338,13 @@ export const EFFECT_DEFAULTS: Record<EffectTool, { amount: number; tone: number;
   sparkle: { amount: .8, tone: .6, warmth: 0, tint: 0, texture: 1, radius: .008, feather: .2 },
   fairy_lights: { amount: .8, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .3 },
   rainbow_prism: { amount: .6, tone: .5, warmth: .15, tint: 0, texture: 1, radius: .02, feather: .4 },
+  body_hair_soften: { amount: .9, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .0015, feather: .3 },
+  cellulite: { amount: .7, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .012, feather: .4 },
+  tan_line: { amount: .8, tone: .2, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .4 },
+  hand_rejuvenate: { amount: .7, tone: .6, warmth: 0, tint: 0, texture: 1, radius: .003, feather: .4 },
+  knuckle_even: { amount: .8, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .004, feather: .5 },
+  lens_reflection: { amount: .9, tone: .5, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .2 },
+  shadow_remove: { amount: .9, tone: .4, warmth: 0, tint: 0, texture: 1, radius: .01, feather: .3 },
 };
 
 /** Named starting points for common jobs; each one is just one of the tools above, set up. */
