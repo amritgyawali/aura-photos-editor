@@ -844,7 +844,11 @@ pub fn status(state: &AppState, photo_id: &str) -> IpcResult<Option<MatchReport>
     let photo = PhotoId::from_db(photo_id).map_err(|_| invalid("Invalid photo."))?;
     let hash =
         aura_recipe::hash::recipe_hash(&crate::develop_commands::load_or_neutral(state, photo)?)?;
-    let checked = session.checked_hash.as_deref() == Some(hash.as_str());
+    let measurements_current = session
+        .transfer
+        .as_ref()
+        .is_none_or(|saved| saved.reference.usable());
+    let checked = measurements_current && session.checked_hash.as_deref() == Some(hash.as_str());
     let mut result = report(
         &session,
         0,
@@ -855,7 +859,9 @@ pub fn status(state: &AppState, photo_id: &str) -> IpcResult<Option<MatchReport>
             session.fitted_distance
         },
         checked,
-        session.engine == ENGINE && (hash == session.last_hash || hash == session.baseline_hash),
+        measurements_current
+            && session.engine == ENGINE
+            && (hash == session.last_hash || hash == session.baseline_hash),
     );
     if checked {
         result.before_distance = session.measured_before.unwrap_or(session.before_distance);

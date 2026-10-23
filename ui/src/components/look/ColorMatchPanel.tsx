@@ -198,7 +198,7 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
       referenceAvailable={libraryReference} revision={revision} disabled={disabled || busy || !inTauri()}
       onApply={onApply} onBusyChange={setRegionalBusy}/>
     {report && <>
-      {!report.current && <p role="status">This photo changed after analysis. Analyse again to keep your newer edits.</p>}
+      {!report.current && <p role="status">This analysis is no longer current. Analyse again to keep your saved edits.</p>}
       <p className="lr-hint">Each change starts from the edit saved at analysis. New edits require a fresh analysis. Reference images without an ICC profile are treated as sRGB.</p>
       <p>Measured regions: {report.matchedRegions.join(', ')}.</p>
       {report.matchedRegions.length < 2 && <p>Only overall colour could be compared. Similar lighting and subject matter will give a more useful reference.</p>}

@@ -15,11 +15,11 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     appearance, check_cancel, content, fitting_frame, invalid, rendered, report, session_key,
-    store, transfer, AppState, ApplyInput, Controls, FitDiagnostics, MatchReport, PrepareInput,
-    Reference, Session, ENGINE,
+    skin_guard, store, transfer, AppState, ApplyInput, Controls, FitDiagnostics, MatchReport,
+    PrepareInput, Reference, Session, ENGINE,
 };
 
-const ENGINE_NAME: &str = "reference-grade-transfer-v2";
+const ENGINE_NAME: &str = "reference-grade-transfer-v3";
 
 /// What a transfer session keeps between analysis and every later strength change.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -203,6 +203,51 @@ fn candidate(
     Ok(candidate)
 }
 
+/// Native quality checks use the exact candidate, including extrapolated strength controls.
+fn verified_distances(
+    state: &AppState,
+    cancel: &CancelToken,
+    session: &Session,
+    reference: &transfer::GradeStats,
+    photo: &PhotoId,
+    candidate: &Recipe,
+) -> AuraResult<(transfer::Distance, transfer::Distance)> {
+    let frame =
+        crate::photo_frames::CatalogFrames::new(state.clone()).frame(photo, RenderLevel::Full)?;
+    check_cancel(cancel)?;
+    let baseline = rendered(state, &frame, &session.baseline)?;
+    let before = measured(reference, &baseline);
+    let before_regions = appearance::readings(&baseline, &session.target_regions);
+    let before_clip = appearance::clipped(&baseline);
+    drop(baseline);
+    check_cancel(cancel)?;
+    let image = rendered(state, &frame, candidate)?;
+    let after = measured(reference, &image);
+    if appearance::clipped(&image) > before_clip + 0.01
+        || !skin_guard(
+            &before_regions,
+            &appearance::readings(&image, &session.target_regions),
+            session.reference_monochrome,
+        )
+    {
+        return Err(invalid(
+            "This strength failed the full-resolution highlight or skin-colour check. Reduce the strengths and apply again. No edit was saved.",
+        ));
+    }
+    drop(image);
+    if !before.total.is_finite() || !after.total.is_finite() {
+        return Err(invalid(
+            "The final colour measurement was unavailable. No edit was saved.",
+        ));
+    }
+    if after.total > before.total + 0.0001 {
+        return Err(invalid(
+            "These strengths moved the native-resolution colour farther from the reference. Reduce the strengths or analyse again. No edit was saved.",
+        ));
+    }
+    Ok((before, after))
+}
+
 /// Apply explicit strengths from the saved baseline and measure the full-resolution result.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn apply(
@@ -216,26 +261,20 @@ pub(super) fn apply(
     current: &Recipe,
     hash: String,
 ) -> AuraResult<MatchReport> {
+    if !transfer.reference.usable() {
+        return Err(invalid(
+            "This analysis needs fresh colour measurements. Upload its edited photo again, then analyse the match. No edit was saved.",
+        ));
+    }
     let candidate = candidate(&session, &transfer, &input.controls)?;
-    let frame =
-        crate::photo_frames::CatalogFrames::new(state.clone()).frame(&photo, RenderLevel::Full)?;
-    check_cancel(cancel)?;
-    let before = measured(
+    let (before, after) = verified_distances(
+        state,
+        cancel,
+        &session,
         &transfer.reference,
-        &rendered(state, &frame, &session.baseline)?,
-    );
-    check_cancel(cancel)?;
-    let after = measured(&transfer.reference, &rendered(state, &frame, &candidate)?);
-    if !before.total.is_finite() || !after.total.is_finite() {
-        return Err(invalid(
-            "The final colour measurement was unavailable. No edit was saved.",
-        ));
-    }
-    if after.total > before.total + 0.0001 {
-        return Err(invalid(
-            "These strengths moved the native-resolution colour farther from the reference. Reduce the strengths or analyse again. No edit was saved.",
-        ));
-    }
+        &photo,
+        &candidate,
+    )?;
     let mut merged = current.clone();
     match candidate.extra.get(grade_model::KEY) {
         Some(value) => {

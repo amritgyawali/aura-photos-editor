@@ -43,37 +43,23 @@ fn cluster(members: &[WeightedChroma], prior: [f32; 2]) -> (f32, [f32; 2]) {
 
 /// A compact majority cluster alone is ambiguous. Prefer a well-separated low-chroma
 /// cluster when it has enough samples, instead of interpreting a coloured subject as a cast.
-fn interval(members: &[WeightedChroma], n: f32) -> ([f32; 2], f32) {
-    let all: Vec<_> = members.iter().collect();
-    let mut c = centre(&all);
-    let mut radius = 0.0;
-    for _ in 0..2 {
-        let mut radii: Vec<_> = members
-            .iter()
-            .map(|(p, w)| ((p[0] - c[0]).hypot(p[1] - c[1]), *w))
-            .collect();
-        radius = weighted_quantile(&mut radii, 0.3).unwrap_or(0.0);
-        let near: Vec<_> = members
-            .iter()
-            .filter(|(p, _)| (p[0] - c[0]).hypot(p[1] - c[1]) <= radius + 1e-6)
-            .collect();
-        if near.len() >= 4 {
-            c = centre(&near);
-        }
+fn interval(members: &[WeightedChroma], n: f32, ceiling: f32) -> ([f32; 2], f32) {
+    // A dominant object is not a fallback illuminant. A supported minority can be a better
+    // neutral anchor even when this lightness interval covers only a small part of the image.
+    let (mass, c) = cluster(members, [0.0; 2]);
+    if mass < 0.001 * n || c[0].hypot(c[1]) > ceiling {
+        return ([0.0; 2], 0.0);
     }
-    let (neutral_mass, neutral) = cluster(members, [0.0; 2]);
-    let chroma = |p: [f32; 2]| p[0].hypot(p[1]);
-    let mass: f32 = members.iter().map(|m| m.1).sum();
-    let adjust = mass >= 0.6 * n
-        && neutral_mass >= 0.004 * n
-        && chroma(neutral) < 0.035
-        && chroma(neutral) + 0.025 < 0.65 * chroma(c);
-    if adjust {
-        c = neutral;
-        radius = 0.0;
-    }
-    let weight =
-        (mass / (0.02 * n)).clamp(0.0, 1.0) * (1.0 - (radius - 0.015) / 0.05).clamp(0.15, 1.0);
+    let mut radii: Vec<_> = members
+        .iter()
+        .filter_map(|(p, w)| {
+            let radius = (p[0] - c[0]).hypot(p[1] - c[1]);
+            (radius <= CLUSTER_RADIUS).then_some((radius, *w))
+        })
+        .collect();
+    let radius = weighted_quantile(&mut radii, 0.5).unwrap_or(CLUSTER_RADIUS);
+    let weight = (mass / (0.004 * n)).clamp(0.0, 1.0)
+        * (1.0 - (radius - 0.005) / CLUSTER_RADIUS).clamp(0.0, 1.0);
     (c.map(|v| v.clamp(-MAX_CAST, MAX_CAST)), weight)
 }
 
@@ -82,6 +68,8 @@ pub(super) fn neutral_axis(labs: &[[f32; 3]]) -> (Vec<[f32; 2]>, Vec<f32>) {
         return (vec![[0.0; 2]; AXIS_NODES], vec![0.0; AXIS_NODES]);
     }
     let n = labs.len().max(1) as f32;
+    let mut chromas: Vec<_> = labs.iter().map(|l| (l[1].hypot(l[2]), 1.0)).collect();
+    let neutral_ceiling = (weighted_quantile(&mut chromas, 0.05).unwrap_or(0.0) + 0.025).min(0.085);
     let mut raw = vec![[0.0_f32; 2]; AXIS_NODES];
     let mut evidence = vec![0.0_f32; AXIS_NODES];
     for (k, (slot, weight)) in raw.iter_mut().zip(evidence.iter_mut()).enumerate() {
@@ -94,49 +82,55 @@ pub(super) fn neutral_axis(labs: &[[f32; 3]]) -> (Vec<[f32; 2]>, Vec<f32>) {
             })
             .collect();
         if members.len() >= 8 && members.iter().map(|m| m.1).sum::<f32>() >= 1e-3 * n {
-            (*slot, *weight) = interval(&members, n);
+            let highlight = super::smoothstep(0.7, 0.9, lightness);
+            (*slot, *weight) = interval(&members, n, neutral_ceiling + 0.04 * highlight);
+        }
+    }
+    // A near-grey coloured wall can occupy a whole interval. Prefer evidence consistent
+    // with the bright neutral anchor; allow larger shadow residuals for split toning.
+    if let Some((anchor, (&white, _))) = raw
+        .iter()
+        .zip(&evidence)
+        .enumerate()
+        .rev()
+        .find(|(i, (_, w))| *i >= AXIS_NODES / 2 && **w > 0.05)
+    {
+        for (k, (&c, w)) in raw.iter().zip(&mut evidence).enumerate() {
+            let lightness = k as f32 / (AXIS_NODES - 1) as f32;
+            let scale = k as f32 / anchor as f32;
+            let residual = (c[0] - white[0] * scale).hypot(c[1] - white[1] * scale);
+            if residual > 0.005 + 0.07 * (1.0 - lightness).powi(2) {
+                *w = 0.0;
+            }
         }
     }
     (fill(&raw, &evidence), evidence)
 }
 
 fn fill(raw: &[[f32; 2]], evidence: &[f32]) -> Vec<[f32; 2]> {
-    let total: f32 = evidence.iter().sum();
-    let mut global = [0.0; 2];
-    if total > 1e-6 {
-        for (c, w) in raw.iter().zip(evidence) {
-            global[0] += c[0] * w / total;
-            global[1] += c[1] * w / total;
-        }
-    }
-    let mut filled: Vec<_> = raw
+    let anchors: Vec<_> = raw
         .iter()
         .zip(evidence)
-        .map(|(c, w)| {
-            [
-                c[0] * w + global[0] * (1.0 - w),
-                c[1] * w + global[1] * (1.0 - w),
-            ]
-        })
+        .enumerate()
+        .filter_map(|(i, (&c, &w))| (w > 0.05).then_some((i as f32, c)))
         .collect();
-    for _ in 0..3 {
-        let previous = filled.clone();
-        for (k, slot) in filled.iter_mut().enumerate() {
-            let neighbours: Vec<_> = [k.checked_sub(1), Some(k + 1)]
-                .into_iter()
-                .flatten()
-                .filter_map(|i| previous.get(i).copied())
-                .collect();
-            let nb = neighbours.iter().fold([0.0; 2], |s, v| {
-                [
-                    s[0] + v[0] / neighbours.len() as f32,
-                    s[1] + v[1] / neighbours.len() as f32,
-                ]
-            });
-            let w = evidence.get(k).copied().unwrap_or(0.0);
-            let c = raw.get(k).copied().unwrap_or([0.0; 2]);
-            *slot = [c[0] * w + nb[0] * (1.0 - w), c[1] * w + nb[1] * (1.0 - w)];
-        }
-    }
-    filled
+    (0..AXIS_NODES)
+        .map(|k| {
+            let x = k as f32;
+            let left = anchors.iter().rev().find(|(i, _)| *i <= x);
+            let right = anchors.iter().find(|(i, _)| *i >= x);
+            match (left, right) {
+                (Some(&(a, ca)), Some(&(b, cb))) if b > a => {
+                    let t = (x - a) / (b - a);
+                    [ca[0] + t * (cb[0] - ca[0]), ca[1] + t * (cb[1] - ca[1])]
+                }
+                (Some(&(_, c)), Some(_)) => c,
+                (Some(&(i, c)), None) | (None, Some(&(i, c))) => {
+                    let scale = if i > 0.0 { (x / i).min(2.0) } else { 1.0 };
+                    c.map(|v| (v * scale).clamp(-MAX_CAST, MAX_CAST))
+                }
+                _ => [0.0; 2],
+            }
+        })
+        .collect()
 }

@@ -47,9 +47,11 @@ answer unless a real-render score improves; duplicate canonical recipes share
 scores. It continues to use native skin/highlight checks and conservative
 different-scene regularisation.
 
-The independent experimental distribution matcher remains separate. Its known
-accuracy failures in the earlier reliability report are not resolved or hidden
-by this calibrated workflow. Synthetic recovery and held-out pair residuals do
+The independent experimental distribution matcher remains separate. Its
+[later refinement report](reports/AURA-reference-transfer-refinement-2026-10-23.md)
+records improvements to neutral estimation and conservative cross-scene fitting,
+alongside remaining failures. This calibrated workflow does not qualify that
+separate engine. Synthetic recovery and held-out pair residuals do
 not establish universal photographic accuracy. Broad real-photo, camera/profile
 and human visual evaluations remain necessary.
 

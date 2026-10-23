@@ -53,6 +53,77 @@ fn split_tone_evidence_is_kept_separate_at_different_lightnesses() {
 }
 
 #[test]
+fn a_small_lightness_interval_can_supply_a_neutral_minority() {
+    // Only 5% of the image occupies this interval, and 1% is neutral. The rest of the
+    // photograph must not determine whether those neutral samples can provide evidence.
+    let cast = [0.008, -0.015];
+    let labs: Vec<_> = (0..10_000)
+        .map(|i| {
+            if i < 100 {
+                [0.625, cast[0], cast[1]]
+            } else if i < 500 {
+                [0.625, 0.15, 0.06]
+            } else {
+                [0.2, -0.12, 0.08]
+            }
+        })
+        .collect();
+    let (axis, evidence) = neutral_axis(&labs);
+    assert!(evidence[5] > 0.9);
+    assert!((axis[5][0] - cast[0]).hypot(axis[5][1] - cast[1]) < 1e-5);
+}
+
+#[test]
+fn a_near_grey_wall_does_not_override_supported_white_and_shadow_anchors() {
+    let labs: Vec<_> = (0..10_000)
+        .map(|i| {
+            if i < 1000 {
+                [0.875, 0.001, 0.003]
+            } else if i < 2000 {
+                [0.25, -0.008, -0.02]
+            } else {
+                [0.5, 0.01, 0.025]
+            }
+        })
+        .collect();
+    let (axis, evidence) = neutral_axis(&labs);
+    assert!(evidence[7] > 0.9 && evidence[2] > 0.9);
+    assert!(evidence[4].abs() < 1e-6, "wall evidence {}", evidence[4]);
+    assert!(
+        axis[4][1] < 0.0,
+        "unsupported node interpolates between anchors: {:?}",
+        axis[4]
+    );
+}
+
+#[test]
+fn unrelated_colour_scenes_keep_their_tone_and_object_brightness() {
+    let pixels = samples(&super::tests::outdoor(), TARGET_SAMPLES);
+    let mut reference = measure(&pixels.iter().map(|p| p.lab).collect::<Vec<_>>());
+    // Change scene statistics without providing corresponding pixels or a neutral cast.
+    reference.lightness.iter_mut().for_each(|v| *v *= 0.65);
+    reference.sector_light.iter_mut().for_each(|v| *v *= 0.6);
+    reference.zone_chroma.iter_mut().for_each(|v| *v *= 0.5);
+    let fitted = fit(&reference, &pixels, None);
+    let worst = transformed(&fitted.grade, &pixels)
+        .iter()
+        .zip(&pixels)
+        .map(|(output, input)| {
+            output
+                .iter()
+                .zip(input.lab)
+                .map(|(a, b)| (a - b).powi(2))
+                .sum::<f32>()
+                .sqrt()
+        })
+        .fold(0.0_f32, f32::max);
+    assert!(
+        worst < 1e-5,
+        "unrelated object proportions changed target pixels: {worst}"
+    );
+}
+
+#[test]
 fn a_small_selective_colour_detail_is_not_turned_monochrome() {
     let mut labs = vec![[0.5, 0.0, 0.0]; 4000];
     assert!(measure(&labs).achromatic);

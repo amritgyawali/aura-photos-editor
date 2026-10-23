@@ -243,7 +243,7 @@ fn a_new_photograph_takes_an_edited_references_look_through_the_renderer() {
     )
     .expect("transfer fit");
     let fitting = prepared.fitting.clone().expect("diagnostics");
-    assert_eq!(fitting.engine, "reference-grade-transfer-v2");
+    assert_eq!(fitting.engine, "reference-grade-transfer-v3");
     let transfer = fitting.transfer.expect("transfer diagnostics");
     assert!(
         transfer.rendered_after.total < transfer.rendered_before.total,
@@ -267,7 +267,6 @@ fn a_new_photograph_takes_an_edited_references_look_through_the_renderer() {
     let before = error(&baseline_pixels, &truth);
     let after = error(&matched_pixels, &truth);
     println!("split tone on a new photograph through the renderer: {before:.2} -> {after:.2}");
-    assert!(after < 0.6 * before, "{before:.2} -> {after:.2}");
 
     let half = color_match::apply(
         &state,
@@ -379,10 +378,6 @@ fn a_new_photograph_takes_an_edited_references_look_through_the_renderer() {
     let warm_before = error(&baseline_pixels, &warm_truth);
     let warm_after = error(&replaced, &warm_truth);
     println!("warm matte replacing the split tone: {warm_before:.2} -> {warm_after:.2}");
-    assert!(
-        warm_after < 0.6 * warm_before,
-        "{warm_before:.2} -> {warm_after:.2}"
-    );
 
     // The saved session survives a restart and the original file was never written.
     drop(state);
@@ -396,6 +391,12 @@ fn a_new_photograph_takes_an_edited_references_look_through_the_renderer() {
     assert_eq!(
         std::fs::read(&target_path).expect("read original"),
         original
+    );
+    // Retain both photographic accuracy gates, after the independent history, replacement,
+    // restart and source-preservation checks so a fidelity failure cannot hide those results.
+    assert!(
+        after < 0.6 * before && warm_after < 0.6 * warm_before,
+        "known grade: split {before:.2} -> {after:.2}; warm matte {warm_before:.2} -> {warm_after:.2}"
     );
 }
 
@@ -465,18 +466,42 @@ fn a_native_regression_is_refused_and_stale_measurements_can_be_refreshed() {
     assert_eq!(history(), history_before);
 
     let stats_key = format!("colour_reference_grade_v1:{}", reference.id);
+    let session_key = format!("colour_match_v1:{}", photo.to_db());
     state
         .catalog()
         .writer()
         .with(move |conn| {
             conn.execute(
-                "UPDATE setting SET value_json=json_set(value_json, '$.version', 1) WHERE key=?1",
+                "UPDATE setting SET value_json=json_set(value_json, '$.version', 2) WHERE key=?1",
                 [stats_key],
             )
             .map_err(|e| aura_core::errors::db::statement_failed("stale measurement", &e))?;
+            conn.execute(
+                "UPDATE setting SET value_json=json_set(value_json, '$.transfer.reference.version', 2) WHERE key=?1",
+                [session_key],
+            )
+            .map_err(|e| aura_core::errors::db::statement_failed("stale session", &e))?;
             Ok(())
         })
         .expect("stale cache");
+    let saved = color_match::status(&state, &photo.to_db())
+        .expect("old analysis")
+        .expect("session");
+    assert!(!saved.current && !saved.full_resolution_checked);
+    let stale = color_match::apply(
+        &state,
+        &color_match::ApplyInput {
+            photo_id: photo.to_db(),
+            session_id: saved.session_id,
+            controls: color_match::Controls::default(),
+            cancel_id: job(),
+        },
+    )
+    .expect_err("an old analysis must not compare different measurement versions");
+    assert!(
+        stale.message.contains("fresh colour measurements"),
+        "{stale:?}"
+    );
     let stale = color_match::prepare(&state, &prepare).expect_err("refresh required");
     assert!(
         stale.message.contains("Upload its edited photo again"),
@@ -493,7 +518,83 @@ fn a_native_regression_is_refused_and_stale_measurements_can_be_refreshed() {
             .fitting
             .expect("diagnostics")
             .engine,
-        "reference-grade-transfer-v2"
+        "reference-grade-transfer-v3"
     );
     assert_eq!(history(), history_before);
+}
+
+#[test]
+fn clipping_is_refused_even_when_it_would_match_reference_statistics() {
+    let directory = tempfile::tempdir().expect("isolated clipping guard");
+    let target_path = directory.path().join("target.png");
+    let reference_path = directory.path().join("white.png");
+    outdoor().save(&target_path).expect("target");
+    image::RgbImage::from_pixel(96, 96, image::Rgb([255; 3]))
+        .save(&reference_path)
+        .expect("white reference");
+    let (state, _, photo) = setup(&target_path, directory.path());
+    let baseline = state.recipe_store().load(&photo).expect("baseline");
+    let reference = color_match::import_reference(
+        &state,
+        &color_match::ImportInput {
+            path: reference_path.to_string_lossy().into_owned(),
+            cancel_id: job(),
+        },
+    )
+    .expect("reference");
+    let session = color_match::prepare(
+        &state,
+        &color_match::PrepareInput {
+            photo_id: photo.to_db(),
+            reference_id: reference.id,
+            cancel_id: job(),
+        },
+    )
+    .expect("analysis");
+    let key = format!("colour_match_v1:{}", photo.to_db());
+    let white = serde_json::to_string(&vec![1.0; aura_recipe::reference_grade::TONE_NODES])
+        .expect("white curve");
+    let before_history = state
+        .catalog()
+        .read(|conn| {
+            conn.query_row("SELECT COUNT(*) FROM edit_history", [], |row| {
+                row.get::<_, i64>(0)
+            })
+            .map_err(|e| aura_core::errors::db::statement_failed("history", &e))
+        })
+        .expect("history");
+    state.catalog().writer().with(move |conn| {
+        conn.execute("UPDATE setting SET value_json=json_set(value_json, '$.transfer.fitted.tone', json(?1)) WHERE key=?2",
+            rusqlite::params![white, key])
+            .map_err(|e| aura_core::errors::db::statement_failed("inject clipped fit", &e))?;
+        Ok(())
+    }).expect("clipped fit");
+    let refused = color_match::apply(
+        &state,
+        &color_match::ApplyInput {
+            photo_id: photo.to_db(),
+            session_id: session.session_id,
+            controls: color_match::Controls::default(),
+            cancel_id: job(),
+        },
+    )
+    .expect_err("a perfect white histogram cannot justify destroying target detail");
+    assert!(
+        refused.message.contains("full-resolution highlight"),
+        "{refused:?}"
+    );
+    assert_eq!(
+        state.recipe_store().load(&photo).expect("unchanged"),
+        baseline
+    );
+    let after_history = state
+        .catalog()
+        .read(|conn| {
+            conn.query_row("SELECT COUNT(*) FROM edit_history", [], |row| {
+                row.get::<_, i64>(0)
+            })
+            .map_err(|e| aura_core::errors::db::statement_failed("history", &e))
+        })
+        .expect("history");
+    assert_eq!(before_history, after_history);
 }
