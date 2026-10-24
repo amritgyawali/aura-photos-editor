@@ -234,9 +234,7 @@ impl Review {
         }
         let after = super::measured(&self.reference, &image);
         check_cancel(cancel)?;
-        let checked = self.before.total.is_finite()
-            && after.total.is_finite()
-            && after.total <= self.before.total + 0.0001;
+        let checked = native_checks::non_regressing(self.before, after);
         if checked {
             state
                 .color_match_checks()

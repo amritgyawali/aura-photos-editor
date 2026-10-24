@@ -8,6 +8,18 @@ use std::{collections::VecDeque, sync::Arc};
 use super::{appearance::Region, invalid, transfer, AuraResult};
 
 const CAPACITY: usize = 64;
+
+/// A tone improvement must not conceal a chromatic regression. Natural matching
+/// does not measure the palette term (both values are zero), retaining its policy.
+pub(super) fn non_regressing(before: transfer::Distance, after: transfer::Distance) -> bool {
+    before.total.is_finite()
+        && after.total.is_finite()
+        && before.palette.is_finite()
+        && after.palette.is_finite()
+        && after.total <= before.total + 0.0001
+        && after.palette <= before.palette + 0.0001
+}
+
 pub(super) type Digest = [u8; 32];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -66,10 +78,7 @@ impl NativeChecks {
         after: transfer::Distance,
         guard: Arc<Guard>,
     ) {
-        if !before.total.is_finite()
-            || !after.total.is_finite()
-            || after.total > before.total + 0.0001
-        {
+        if !non_regressing(before, after) {
             return;
         }
         let mut proofs = self.proofs.lock();
@@ -133,6 +142,58 @@ mod tests {
             palette: total,
             total,
         }
+    }
+
+    #[test]
+    fn better_tone_cannot_hide_worse_colour_in_a_native_proof() {
+        // Observed on the dim studio target against the edited fruit reference.
+        let before = transfer::Distance {
+            palette: 5.125_721,
+            ..distance(11.517_659)
+        };
+        let after = transfer::Distance {
+            palette: 5.451_486,
+            ..distance(7.942_120_6)
+        };
+        assert!(!non_regressing(before, after));
+        let checks = NativeChecks::default();
+        let key = Key {
+            before: [1; 32],
+            after: [2; 32],
+            context: [3; 32],
+        };
+        checks.remember(
+            key,
+            before,
+            after,
+            Arc::new(Guard {
+                regions: Vec::new(),
+                clipped: 0.0,
+            }),
+        );
+        assert!(checks.checked(key).is_none());
+        let improved = transfer::Distance {
+            palette: 4.9,
+            ..after
+        };
+        assert!(non_regressing(before, improved));
+        assert!(non_regressing(
+            transfer::Distance {
+                palette: 0.0,
+                ..before
+            },
+            transfer::Distance {
+                palette: 0.0,
+                ..after
+            }
+        ));
+        assert!(!non_regressing(
+            before,
+            transfer::Distance {
+                palette: f32::NAN,
+                ..after
+            }
+        ));
     }
 
     #[test]

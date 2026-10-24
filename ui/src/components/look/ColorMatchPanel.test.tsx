@@ -127,7 +127,7 @@ it('does not import or fit when the reference picker is cancelled', async () => 
 it('requires a new analysis when changing from natural look to reference palette and tone', async () => {
   vi.mocked(colorMatch.status).mockResolvedValue(analysis);
   vi.mocked(colorMatch.prepare).mockResolvedValue({ ...analysis, fitting: {
-    engine: 'reference-palette-transport-v4', quality: 'precise', intent: 'palette',
+    engine: 'reference-palette-transport-v5', quality: 'precise', intent: 'palette',
     refinementCandidates: 4, uniqueRenders: 3, cachedProposals: 0,
   } });
   render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
@@ -138,6 +138,21 @@ it('requires a new analysis when changing from natural look to reference palette
   fireEvent.click(screen.getByRole('button', { name: 'Analyse reference match' }));
   await waitFor(() => expect(colorMatch.prepare).toHaveBeenCalledWith('photo', 'ref', expect.any(String), 'precise', 'palette'));
   await waitFor(() => expect((screen.getByRole('button', { name: 'Apply colour strengths' }) as HTMLButtonElement).disabled).toBe(false));
+});
+
+it('refits saved v4 palette sessions before applying live strengths under the colour guard', async () => {
+  const legacy = { ...analysis, fitting: {
+    engine: 'reference-palette-transport-v4', quality: 'precise' as const, intent: 'palette' as const,
+    refinementCandidates: 4, uniqueRenders: 3, cachedProposals: 0,
+  } };
+  vi.mocked(colorMatch.status).mockResolvedValue(legacy);
+  vi.mocked(colorMatch.prepare).mockResolvedValue({ ...legacy, sessionId: 'guarded',
+    fitting: { ...legacy.fitting, engine: 'reference-palette-transport-v5' } });
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
+  await screen.findByTestId('colour-match-measurement');
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Real-Time Color Adjustments' }));
+  await waitFor(() => expect(colorMatch.apply).toHaveBeenCalledWith('photo', 'guarded', analysis.controls, expect.any(String)));
+  expect(colorMatch.prepare).toHaveBeenCalledWith('photo', 'ref', expect.any(String), 'precise', 'palette');
 });
 
 it('applies fine exposure, temperature and tint strengths independently', async () => {

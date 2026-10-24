@@ -28,6 +28,7 @@ def main():
     parser.add_argument('--port', type=int, default=9377)
     parser.add_argument('--intent', choices=['natural', 'palette'], default='natural')
     parser.add_argument('--second-reference', type=Path, help='Also verify switching to a different reference and matching it in one click.')
+    parser.add_argument('--allow-switch-refusal', action='store_true', help='Also accept an explicit native refusal only when the prior recipe/session remain unchanged. Record refusal separately from matching.')
     args = parser.parse_args()
     out = ROOT / '.work-checks' / ('reference-workspace-' + uuid.uuid4().hex[:8])
     out.mkdir(parents=True)
@@ -49,7 +50,8 @@ def main():
     env = dict(os.environ, AURA_TEST_CATALOG=str(out / 'catalog.sqlite'),
                WEBVIEW2_USER_DATA_FOLDER=str(out / 'webview'),
                WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=f'--remote-debugging-port={args.port}')
-    process = subprocess.Popen([str(args.exe.resolve())], cwd=ROOT, env=env)
+    desktop_log = (out / 'desktop.log').open('w', encoding='utf-8')
+    process = subprocess.Popen([str(args.exe.resolve())], cwd=ROOT, env=env, stdout=desktop_log, stderr=subprocess.STDOUT)
     report = {'checks': {}, 'pageErrors': [], 'fixtureHashes': hashes, 'uniqueInputs': fingerprints, 'intent': args.intent}
     try:
         for _ in range(120):
@@ -61,6 +63,9 @@ def main():
         with sync_playwright() as pw:
             browser = pw.chromium.connect_over_cdp(f'http://127.0.0.1:{args.port}')
             page = next(p for c in browser.contexts for p in c.pages)
+            page.on('close', lambda: report.setdefault('runtimeEvents', []).append('page closed'))
+            page.on('crash', lambda: report.setdefault('runtimeEvents', []).append('page crashed'))
+            browser.on('disconnected', lambda: report.setdefault('runtimeEvents', []).append('CDP browser disconnected'))
             page.set_viewport_size({'width': 1920, 'height': 1080})
             page.set_default_timeout(180000)
             expect.set_options(timeout=180000)
@@ -114,6 +119,9 @@ def main():
                     value = status(photo)
                     if value and predicate(value):
                         return value
+                    alerts = page.get_by_role('alert').all_text_contents()
+                    if alerts:
+                        raise RuntimeError('Native UI refusal: ' + ' '.join(alerts))
                     time.sleep(.3)
                 raise AssertionError('Timed out waiting for saved colour match')
 
@@ -156,6 +164,7 @@ def main():
             if args.second_reference:
                 replacement = call('import_color_reference', path=str(sources[3]), cancelId=str(uuid.uuid4()))
                 before_switch = call('image_recipe', photoId=photo)['recipeHash']
+                session_before_switch = status(photo)['sessionId']
                 page.reload()
                 page.get_by_role('button', name=f'{name} 2', exact=True).click()
                 page.get_by_role('button', name='Match a look Your reference, your photos', exact=True).click()
@@ -163,10 +172,21 @@ def main():
                 expect(panel.get_by_text('The selected reference has not been applied', exact=False)).to_be_visible()
                 assert call('image_recipe', photoId=photo)['recipeHash'] == before_switch
                 panel.get_by_role('button', name='Match reference to this photo', exact=True).click()
-                saved = wait_status(lambda value: value['reference']['id'] == replacement['id'] and value['fullResolutionChecked'])
-                if args.intent == 'palette':
-                    assert saved['fitting']['engine'] == 'reference-palette-transport-v4'
-                report['checks']['changedReferenceIsActuallyApplied'] = saved['current']
+                try:
+                    saved = wait_status(lambda value: value['reference']['id'] == replacement['id'] and value['fullResolutionChecked'])
+                    if args.intent == 'palette':
+                        assert saved['fitting']['engine'] == 'reference-palette-transport-v5'
+                    report['checks']['changedReferenceIsActuallyApplied'] = saved['current']
+                    report['referenceSwitchOutcome'] = 'matched'
+                except RuntimeError as error:
+                    if not args.allow_switch_refusal or not str(error).startswith('Native UI refusal:'):
+                        raise
+                    assert call('image_recipe', photoId=photo)['recipeHash'] == before_switch
+                    assert status(photo)['sessionId'] == session_before_switch
+                    expect(panel.get_by_text('The selected reference has not been applied', exact=False)).to_be_visible()
+                    report['referenceSwitchOutcome'] = 'refused without changing the saved edit or prior session'
+                    report['referenceSwitchRefusal'] = str(error)
+                    report['checks']['refusedReferenceSwitchPreservesEditAndSession'] = True
             gaps = sorted(frame_probe['gaps'])
             report['responsiveness'] = {'visibleFrameSamples': len(gaps), 'visibilityAtEnd': frame_probe['visibility'],
                 'medianGapMilliseconds': gaps[len(gaps) // 2] if gaps else None,
@@ -190,6 +210,7 @@ def main():
             process.wait(timeout=15)
         except subprocess.TimeoutExpired:
             process.kill()
+        desktop_log.close()
 
 
 if __name__ == '__main__':

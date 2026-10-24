@@ -146,7 +146,7 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
         }
         if (!analysis || analysis.reference.id !== referenceId || (analysis.fitting?.quality ?? 'precise') !== mode ||
             (analysis.fitting?.intent ?? 'natural') !== purpose ||
-            (purpose === 'palette' && analysis.fitting?.engine !== 'reference-palette-transport-v4')) {
+            (purpose === 'palette' && analysis.fitting?.engine !== 'reference-palette-transport-v5')) {
           analysis = purpose === 'natural' ? await colorMatch.prepare(photoId, referenceId, id, mode)
             : await colorMatch.prepare(photoId, referenceId, id, mode, purpose);
           if (!current()) return;
@@ -298,7 +298,7 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
   const removedSession = !libraryReference && report?.reference.id === selected;
   const ready = Boolean(report?.current && report.photoId === photoId && report.reference.id === selected &&
     (report.fitting?.quality ?? 'precise') === quality && (report.fitting?.intent ?? 'natural') === matchIntent &&
-    (matchIntent !== 'palette' || report.fitting?.engine === 'reference-palette-transport-v4'));
+    (matchIntent !== 'palette' || report.fitting?.engine === 'reference-palette-transport-v5'));
   return <section className="lr-panel color-match-panel" aria-label="Reference colour matching" aria-busy={busy || regionalBusy}>
     <header className="color-match-heading"><span>AI STYLE</span><h3>Color Match</h3></header>
     <p className="lr-hint">Choose an edited JPEG, PNG or TIFF to guide the colour of a different photo. Tone and colour are matched; facial retouching stays with this photo.</p>
