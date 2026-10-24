@@ -60,6 +60,18 @@ it('sends independent slider strengths and uses an explicit native application',
   fireEvent.click(screen.getByRole('button', { name: 'Remove matched treatment' }));
   await waitFor(() => expect(colorMatch.apply).toHaveBeenLastCalledWith('photo', 'session', { amount: 0, tone: 0.2, color: 0.8, whiteBalance: 0 }, expect.any(String)));
 });
+
+it('shows separately verified tone and palette differences for the saved strengths', async () => {
+  const distance = (tone: number, palette: number) => ({ tone, palette, cast: 1, chroma: 1, hue: 1, total: 3 });
+  vi.mocked(colorMatch.status).mockResolvedValue({ ...analysis, fullResolutionChecked: true, fitting: {
+    engine: 'reference-palette-transport-v6', intent: 'palette', refinementCandidates: 4, uniqueRenders: 3, cachedProposals: 0,
+    transfer: { renderedBefore: distance(8, 6), renderedAfter: distance(4, 2) },
+  } });
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
+  const components = await screen.findByTestId('colour-match-components');
+  expect(components.textContent).toContain('Tone difference: 8.00 → 4.00');
+  expect(components.textContent).toContain('Colour palette difference: 6.00 → 2.00');
+});
 it('matches the newly selected reference with a fresh analysis and native apply in one click', async () => {
   const warm = { ...reference, id: 'warm', name: 'Warm portrait.jpg' };
   vi.mocked(colorMatch.list).mockResolvedValue([reference, warm]);
@@ -85,6 +97,16 @@ it('never applies a one-click analysis returned for another reference', async ()
   await screen.findByRole('option', { name: reference.name });
   fireEvent.click(screen.getByRole('button', { name: 'Match reference to this photo' }));
   await screen.findByText('The reference or photo changed. Match this photo again.');
+  expect(colorMatch.apply).not.toHaveBeenCalled();
+});
+it('ends the matching status when the selected reference is refused', async () => {
+  vi.mocked(colorMatch.prepare).mockRejectedValue(new Error('No safe colour fit. Your edit was kept.'));
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
+  await screen.findByRole('option', { name: reference.name });
+  fireEvent.click(screen.getByRole('button', { name: 'Match reference to this photo' }));
+  expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'No safe colour fit. Your edit was kept.');
+  expect(screen.queryByText(/Matching the selected reference/)).toBeNull();
+  expect((screen.getByRole('button', { name: 'Match reference to this photo' }) as HTMLButtonElement).disabled).toBe(false);
   expect(colorMatch.apply).not.toHaveBeenCalled();
 });
 it('does not report a closer match when native safety retained an unchanged endpoint', async () => {
@@ -127,7 +149,7 @@ it('does not import or fit when the reference picker is cancelled', async () => 
 it('requires a new analysis when changing from natural look to reference palette and tone', async () => {
   vi.mocked(colorMatch.status).mockResolvedValue(analysis);
   vi.mocked(colorMatch.prepare).mockResolvedValue({ ...analysis, fitting: {
-    engine: 'reference-palette-transport-v5', quality: 'precise', intent: 'palette',
+    engine: 'reference-palette-transport-v6', quality: 'precise', intent: 'palette',
     refinementCandidates: 4, uniqueRenders: 3, cachedProposals: 0,
   } });
   render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
@@ -140,14 +162,14 @@ it('requires a new analysis when changing from natural look to reference palette
   await waitFor(() => expect((screen.getByRole('button', { name: 'Apply colour strengths' }) as HTMLButtonElement).disabled).toBe(false));
 });
 
-it('refits saved v4 palette sessions before applying live strengths under the colour guard', async () => {
+it.each(['reference-palette-transport-v4', 'reference-palette-transport-v5'])('refits saved %s sessions with continuous palette transport', async engine => {
   const legacy = { ...analysis, fitting: {
-    engine: 'reference-palette-transport-v4', quality: 'precise' as const, intent: 'palette' as const,
+    engine, quality: 'precise' as const, intent: 'palette' as const,
     refinementCandidates: 4, uniqueRenders: 3, cachedProposals: 0,
   } };
   vi.mocked(colorMatch.status).mockResolvedValue(legacy);
   vi.mocked(colorMatch.prepare).mockResolvedValue({ ...legacy, sessionId: 'guarded',
-    fitting: { ...legacy.fitting, engine: 'reference-palette-transport-v5' } });
+    fitting: { ...legacy.fitting, engine: 'reference-palette-transport-v6' } });
   render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
   await screen.findByTestId('colour-match-measurement');
   fireEvent.click(screen.getByRole('checkbox', { name: 'Real-Time Color Adjustments' }));

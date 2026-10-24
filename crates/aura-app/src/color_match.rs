@@ -30,6 +30,7 @@ mod fine;
 pub use fine::FineControls;
 mod quality;
 pub use quality::{MatchIntent, MatchQuality};
+mod contours;
 pub(crate) mod gallery_fit;
 mod grade;
 mod library;

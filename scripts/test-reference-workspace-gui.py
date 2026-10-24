@@ -126,6 +126,18 @@ def main():
                 raise AssertionError('Timed out waiting for saved colour match')
 
             saved = wait_status(lambda value: value['fullResolutionChecked'])
+            def verify_components(value):
+                transfer = value['fitting']['transfer']
+                assert abs(transfer['renderedAfter']['total'] - value['afterDistance']) < .001
+                components = panel.get_by_test_id('colour-match-components')
+                expect(components).to_contain_text(f"Tone difference: {transfer['renderedBefore']['tone']:.2f} \u2192 {transfer['renderedAfter']['tone']:.2f}.")
+                if args.intent == 'palette':
+                    expect(components).to_contain_text(f"Colour palette difference: {transfer['renderedBefore']['palette']:.2f} \u2192 {transfer['renderedAfter']['palette']:.2f}.")
+                report.setdefault('componentReadouts', []).append(dict(amount=value['controls']['amount'],
+                    renderedAfter=transfer['renderedAfter'], text=components.inner_text()))
+
+            verify_components(saved)
+            report['checks']['nativeComponentReadouts'] = True
             assert saved['fitting']['quality'] == 'quick'
             assert saved['fitting'].get('intent', 'natural') == args.intent
             assert saved['fitting']['targetSamples'] <= 10000 and saved['fitting']['maxIterations'] == 2
@@ -134,7 +146,9 @@ def main():
             print('Quick fitting and native apply passed', flush=True)
             panel.get_by_role('checkbox', name='Real-Time Color Adjustments').check()
             panel.get_by_role('slider', name='Match amount', exact=True).evaluate("el => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, '75'); el.dispatchEvent(new Event('input', {bubbles:true})); }")
-            wait_status(lambda value: abs(value['controls']['amount'] - .75) < .001)
+            live = wait_status(lambda value: abs(value['controls']['amount'] - .75) < .001)
+            verify_components(live)
+            report['checks']['componentReadoutsFollowSavedStrength'] = True
             report['checks']['liveStrengthSaved'] = True
             expect(panel.get_by_role('button', name='Save Preset', exact=True)).to_be_enabled()
             panel.get_by_role('button', name='Save Preset', exact=True).click()
@@ -175,7 +189,7 @@ def main():
                 try:
                     saved = wait_status(lambda value: value['reference']['id'] == replacement['id'] and value['fullResolutionChecked'])
                     if args.intent == 'palette':
-                        assert saved['fitting']['engine'] == 'reference-palette-transport-v5'
+                        assert saved['fitting']['engine'] == 'reference-palette-transport-v6'
                     report['checks']['changedReferenceIsActuallyApplied'] = saved['current']
                     report['referenceSwitchOutcome'] = 'matched'
                 except RuntimeError as error:
@@ -184,9 +198,11 @@ def main():
                     assert call('image_recipe', photoId=photo)['recipeHash'] == before_switch
                     assert status(photo)['sessionId'] == session_before_switch
                     expect(panel.get_by_text('The selected reference has not been applied', exact=False)).to_be_visible()
+                    expect(panel.get_by_text('Matching the selected reference to this photo', exact=False)).to_have_count(0)
                     report['referenceSwitchOutcome'] = 'refused without changing the saved edit or prior session'
                     report['referenceSwitchRefusal'] = str(error)
                     report['checks']['refusedReferenceSwitchPreservesEditAndSession'] = True
+                    report['checks']['refusalClearsMatchingProgress'] = True
             gaps = sorted(frame_probe['gaps'])
             report['responsiveness'] = {'visibleFrameSamples': len(gaps), 'visibilityAtEnd': frame_probe['visibility'],
                 'medianGapMilliseconds': gaps[len(gaps) // 2] if gaps else None,

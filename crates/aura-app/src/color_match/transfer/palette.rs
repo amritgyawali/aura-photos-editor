@@ -52,16 +52,13 @@ pub(super) fn distance(reference: &[[f32; 3]], actual: &[[f32; 3]]) -> f32 {
 
 struct Slice {
     dir: [f32; 2],
-    from: Vec<f32>,
-    to: Vec<f32>,
+    map: super::QuantileMap,
 }
 
 impl Slice {
     fn apply(&self, p: &mut [f32; 2]) {
         let x = p[0] * self.dir[0] + p[1] * self.dir[1] + 0.6;
-        let shift = 0.75
-            * (super::quantile_map(&self.from, &self.to, x, 1.2, (0.25, 2.0)) - x)
-                .clamp(-0.15, 0.15);
+        let shift = 0.75 * (self.map.apply(x) - x).clamp(-0.15, 0.15);
         p[0] += shift * self.dir[0];
         p[1] += shift * self.dir[1];
     }
@@ -104,8 +101,12 @@ pub(super) fn refine(
         let dir = direction(step);
         let slice = Slice {
             dir,
-            from: projection(&actual, dir),
-            to: projection(&reference.palette_samples, dir),
+            map: super::QuantileMap::bounded(
+                &projection(&actual, dir),
+                &projection(&reference.palette_samples, dir),
+                1.2,
+                (0.25, 2.0),
+            ),
         };
         for p in &mut actual {
             let mut ab = [p[1], p[2]];

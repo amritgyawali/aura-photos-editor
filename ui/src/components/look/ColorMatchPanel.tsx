@@ -121,7 +121,7 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
     const id = crypto.randomUUID(); job.current = id;
     const current = () => mounted.current && visible.current && activePhoto.current === photoId && !stopped.current;
     try { await action(id, current); }
-    catch (cause) { if (current()) setError(asIpcError(cause).message); }
+    catch (cause) { if (current()) { setMessage(null); setError(asIpcError(cause).message); } }
     finally { job.current = null; running.current = false; if (mounted.current) {
       setBusy(false);
       if (stopped.current && activePhoto.current === photoId) setMessage('Stopped. Completed changes remain saved.');
@@ -146,7 +146,7 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
         }
         if (!analysis || analysis.reference.id !== referenceId || (analysis.fitting?.quality ?? 'precise') !== mode ||
             (analysis.fitting?.intent ?? 'natural') !== purpose ||
-            (purpose === 'palette' && analysis.fitting?.engine !== 'reference-palette-transport-v5')) {
+            (purpose === 'palette' && analysis.fitting?.engine !== 'reference-palette-transport-v6')) {
           analysis = purpose === 'natural' ? await colorMatch.prepare(photoId, referenceId, id, mode)
             : await colorMatch.prepare(photoId, referenceId, id, mode, purpose);
           if (!current()) return;
@@ -298,7 +298,7 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
   const removedSession = !libraryReference && report?.reference.id === selected;
   const ready = Boolean(report?.current && report.photoId === photoId && report.reference.id === selected &&
     (report.fitting?.quality ?? 'precise') === quality && (report.fitting?.intent ?? 'natural') === matchIntent &&
-    (matchIntent !== 'palette' || report.fitting?.engine === 'reference-palette-transport-v5'));
+    (matchIntent !== 'palette' || report.fitting?.engine === 'reference-palette-transport-v6'));
   return <section className="lr-panel color-match-panel" aria-label="Reference colour matching" aria-busy={busy || regionalBusy}>
     <header className="color-match-heading"><span>AI STYLE</span><h3>Color Match</h3></header>
     <p className="lr-hint">Choose an edited JPEG, PNG or TIFF to guide the colour of a different photo. Tone and colour are matched; facial retouching stays with this photo.</p>
@@ -412,8 +412,12 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
         {' '}{report.fullResolutionChecked ? 'Checked on native-resolution renders.' : report.fitting?.nativeCandidateChecked
           ? 'Fitted endpoint checked at native resolution. Apply to save and verify chosen strengths.' : 'Analysis preview; apply to check native-resolution renders.'}
         {report.protectedFields > 0 && ` ${report.protectedFields} manual fields protected.`}</p>
+      {report.fullResolutionChecked && report.fitting?.transfer &&
+        <p data-testid="colour-match-components">Tone difference: {report.fitting.transfer.renderedBefore.tone.toFixed(2)} → {report.fitting.transfer.renderedAfter.tone.toFixed(2)}.
+          {report.fitting.intent === 'palette' && <> Colour palette difference: {report.fitting.transfer.renderedBefore.palette.toFixed(2)} → {report.fitting.transfer.renderedAfter.palette.toFixed(2)}.</>}
+          {' '}Lower means closer to the reference.</p>}
       {report.fitting?.intent === 'palette' && (report.fitting.nativeBacktrackFactor ?? 1) < 1 &&
-        <p className="lr-hint">Skin and highlight protection limited the fitted palette to {Math.round((report.fitting.nativeBacktrackFactor ?? 1) * 100)}% of the unconstrained fit. Your strengths adjust this protected endpoint.</p>}
+        <p className="lr-hint">Colour, smoothness, skin and highlight checks limited the fitted palette to {Math.round((report.fitting.nativeBacktrackFactor ?? 1) * 100)}% of the unconstrained fit. Your strengths adjust this protected endpoint.</p>}
     </>}
     {busy && <><p role="status">{message ?? 'Measuring colour and checking the image…'}</p>
       <button type="button" onClick={stop}>Stop colour matching</button></>}

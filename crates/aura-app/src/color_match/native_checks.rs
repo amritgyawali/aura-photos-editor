@@ -5,7 +5,7 @@ use aura_raw::codec::Rgb8;
 use parking_lot::Mutex;
 use std::{collections::VecDeque, sync::Arc};
 
-use super::{appearance::Region, invalid, transfer, AuraResult};
+use super::{appearance::Region, contours::Contours, invalid, transfer, AuraResult};
 
 const CAPACITY: usize = 64;
 
@@ -33,6 +33,7 @@ pub(super) struct Key {
 pub(super) struct Guard {
     pub regions: Vec<Region>,
     pub clipped: f32,
+    pub contours: Contours,
 }
 
 #[derive(Debug, Clone)]
@@ -169,6 +170,7 @@ mod tests {
             Arc::new(Guard {
                 regions: Vec::new(),
                 clipped: 0.0,
+                contours: Contours::default(),
             }),
         );
         assert!(checks.checked(key).is_none());
@@ -263,6 +265,7 @@ mod tests {
             Arc::new(Guard {
                 regions: Vec::new(),
                 clipped: 0.0,
+                contours: Contours::default(),
             }),
         );
         assert_eq!(
@@ -310,6 +313,7 @@ mod tests {
         let guard = Arc::new(Guard {
             regions: Vec::new(),
             clipped: 0.0,
+            contours: Contours::default(),
         });
         checks.remember(key, distance(1.0), distance(2.0), Arc::clone(&guard));
         assert!(checks.checked(key).is_none());

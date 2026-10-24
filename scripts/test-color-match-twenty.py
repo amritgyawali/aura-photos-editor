@@ -130,6 +130,8 @@ def main():
     parser.add_argument('--port', type=int, default=9385)
     parser.add_argument('--target-limit', type=int, default=20)
     parser.add_argument('--style-limit', type=int, default=6)
+    parser.add_argument('--target-indices', type=int, choices=range(1, 21), nargs='+', help='Reproduce specific assessed targets without substituting other photos.')
+    parser.add_argument('--styles', choices=STYLES, nargs='+', help='Reproduce specific graded references, preserving their original source photos.')
     parser.add_argument('--intent', choices=['palette', 'natural'], default='palette')
     parser.add_argument('--paired-calibration', action='store_true', help='Separately test the existing original + edited reference calibration workflow. Training source is never a target.')
     parser.add_argument('--resume', type=Path, help='Resume only this assessment script\'s disposable run; completed pairs remain unchanged.')
@@ -138,8 +140,11 @@ def main():
     manifest = json.loads((dataset / 'manifest.json').read_text(encoding='utf-8'))
     assert manifest['duplicateChecks']['visualInspection']['status'] == 'reviewed'
     assert manifest['duplicateChecks']['exactDuplicates'] == 0
-    targets = [x for x in manifest['images'] if x['role'] == 'target'][:args.target_limit]
+    targets = [x for x in manifest['images'] if x['role'] == 'target' and (not args.target_indices or x['index'] in args.target_indices)][:args.target_limit]
     refs = [x for x in manifest['images'] if x['role'] == 'reference'][:args.style_limit]
+    style_pairs = [(style, entry) for style, entry in zip(STYLES, refs) if not args.styles or style in args.styles]
+    refs = [entry for _, entry in style_pairs]
+    assert targets and refs, 'Select at least one target and reference'
     assert len({x['input']['pixelSha256'] for x in manifest['images']}) == 26
     hashes = {str(dataset / x[k]['path']): x[k]['sha256'] for x in manifest['images'] for k in ('source', 'input')}
     assert all(hashlib.sha256(Path(p).read_bytes()).hexdigest() == h for p, h in hashes.items())
@@ -159,7 +164,7 @@ def main():
         report['previousRunFailure'] = report.pop('failure', None)
         assert not args.paired_calibration, 'Paired preparation resume is not supported'
     else:
-        for style, entry in zip(STYLES, refs):
+        for style, entry in style_pairs:
             edited = grade(Image.open(dataset / entry['input']['path']).convert('RGB'), style)
             path = out / 'references' / f'{style}.png'
             edited.save(path)

@@ -82,6 +82,8 @@ pub(super) use sampling::samples;
 mod neutral;
 use neutral::neutral_axis;
 mod palette;
+mod quantile;
+use quantile::QuantileMap;
 
 /// What a photograph's colour and tone are, as the fit compares them.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -372,48 +374,7 @@ pub(super) fn distance(reference: &GradeStats, actual: &GradeStats) -> Distance 
 /// Map `x` through the quantile function: where `x` sits among `from`, the same place in `to`.
 /// Runs of equal quantiles - a clipped sky, a black border - map to the mean of their run.
 fn quantile_map(from: &[f32], to: &[f32], x: f32, ceiling: f32, slopes: (f32, f32)) -> f32 {
-    let last = from.len().min(to.len()).saturating_sub(1);
-    if last == 0 {
-        return x;
-    }
-    let edge = (from.len() / 16).clamp(1, last);
-    let slope = |df: f32, dt: f32| {
-        if df > 1e-4 {
-            (dt / df).clamp(slopes.0, slopes.1)
-        } else {
-            1.0
-        }
-    };
-    let (f0, fl) = (at(from, 0), at(from, last));
-    if x <= f0 {
-        let s = slope(at(from, edge) - f0, at(to, edge) - at(to, 0));
-        return (at(to, 0) - (f0 - x) * s).max(0.0);
-    }
-    if x >= fl {
-        let s = slope(
-            fl - at(from, last - edge),
-            at(to, last) - at(to, last - edge),
-        );
-        return (at(to, last) + (x - fl) * s).min(ceiling);
-    }
-    let run_mean = |index: usize| {
-        let value = at(from, index);
-        let start = from.partition_point(|v| *v < value);
-        let end = from.partition_point(|v| *v <= value).max(start + 1);
-        let span = start..end.min(last + 1);
-        let count = span.len().max(1) as f32;
-        span.map(|i| at(to, i)).sum::<f32>() / count
-    };
-    let j = from
-        .partition_point(|v| *v <= x)
-        .saturating_sub(1)
-        .min(last - 1);
-    let (fa, fb) = (at(from, j), at(from, j + 1));
-    let (ta, tb) = (run_mean(j), run_mean(j + 1));
-    if fb - fa <= 1e-7 {
-        return ta;
-    }
-    ta + (tb - ta) * ((x - fa) / (fb - fa)).clamp(0.0, 1.0)
+    QuantileMap::new(from, to, ceiling, slopes).apply(x)
 }
 
 /// Evaluate a curve stored as evenly spaced nodes over `0..=span`, linearly.

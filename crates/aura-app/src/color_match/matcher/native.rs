@@ -56,7 +56,7 @@ pub(super) fn fit(
         input.monochrome,
     )?;
     let endpoint = review.fit(state, cancel, input.ungraded, input.grade)?
-        .ok_or_else(|| super::invalid("No reference palette fit preserved this photo's native skin tones, highlights and measured colour distance. Try Natural look or a different reference. No edit was saved."))?;
+        .ok_or_else(|| super::invalid("No reference palette fit preserved this photo's smooth gradients, skin tones, highlights and measured colour distance. Try Natural look or a different reference. No edit was saved."))?;
     *input.grade = endpoint.grade;
     Ok((
         review.before,
@@ -187,6 +187,7 @@ impl Review {
                     Arc::new(Guard {
                         regions: readings,
                         clipped: appearance::clipped(&image),
+                        contours: super::super::contours::Contours::new(&image),
                     }),
                 )
             });
@@ -223,7 +224,8 @@ impl Review {
             }));
         }
         // Cheap rejection first: do not sort colour distributions for a failed safety check.
-        if appearance::clipped(&image) > self.guard.clipped + 0.01
+        if !self.guard.contours.accepts(&image)
+            || appearance::clipped(&image) > self.guard.clipped + 0.01
             || !skin_guard(
                 &self.guard.regions,
                 &appearance::readings(&image, &self.points),

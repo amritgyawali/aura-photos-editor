@@ -147,11 +147,22 @@ fn palette_matching_checks_the_native_endpoint_without_writing_until_apply() {
             .changed,
         0
     );
-    apply(color_match::Controls {
+    let zero = apply(color_match::Controls {
         amount: 0.0,
         ..Default::default()
     })
     .expect("zero");
+    let verified = zero
+        .fitting
+        .as_ref()
+        .expect("zero diagnostics")
+        .transfer
+        .as_ref()
+        .expect("zero component measurements");
+    assert!((verified.rendered_before.total - zero.before_distance).abs() < 1e-6);
+    assert!((verified.rendered_after.total - zero.after_distance).abs() < 1e-6);
+    assert!((verified.rendered_after.tone - verified.rendered_before.tone).abs() < 1e-6);
+    assert!((verified.rendered_after.palette - verified.rendered_before.palette).abs() < 1e-6);
     apply(color_match::Controls::default()).expect("restore fitted endpoint");
     assert_eq!(
         state.recipe_store().load(&photo).expect("restored"),

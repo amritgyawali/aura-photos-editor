@@ -33,7 +33,7 @@ export async function matchColorCollection(projectId: string, referenceId: strin
       // Reuse the immutable baseline when changing strengths on a previous match.
       const sameQuality = (saved?.fitting?.quality ?? 'precise') === (options.quality ?? 'precise');
       const sameIntent = (saved?.fitting?.intent ?? 'natural') === (options.intent ?? 'natural');
-      const currentEngine = options.intent !== 'palette' || saved?.fitting?.engine === 'reference-palette-transport-v5';
+      const currentEngine = options.intent !== 'palette' || saved?.fitting?.engine === 'reference-palette-transport-v6';
       const analysis = saved?.current && saved.reference.id === referenceId && sameQuality && sameIntent && currentEngine ? saved
         : options.intent ? await colorMatch.prepare(photo.id, referenceId, cancelId, options.quality, options.intent)
           : options.quality ? await colorMatch.prepare(photo.id, referenceId, cancelId, options.quality)

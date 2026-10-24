@@ -10,6 +10,7 @@ export type ColorReference = {
   group?: string; favorite?: boolean; defaultControls?: ColorMatchControls; thumbnail?: string; preview?: string;
 };
 export type ReferenceMetadata = { name?: string; group?: string; favorite?: boolean; defaultControls?: ColorMatchControls };
+export type ColorMatchDistance = { tone: number; cast: number; chroma: number; hue: number; palette: number; total: number };
 export type ColorMatchReport = {
   sessionId: string; photoId: string; reference: ColorReference; controls: ColorMatchControls;
   matchedRegions: string[]; beforeDistance: number; afterDistance: number; changed: number;
@@ -17,7 +18,8 @@ export type ColorMatchReport = {
   fitting?: { engine: string; refinementCandidates: number; uniqueRenders: number; cachedProposals: number;
     quality?: ColorMatchQuality; intent?: ColorMatchIntent; targetSamples?: number; maxIterations?: number;
     gradeCandidates?: number; nativeCandidateChecked?: boolean; nativeBacktrackFactor?: number;
-    structureSimilarity?: number | null; regularizationWeight?: number };
+    structureSimilarity?: number | null; regularizationWeight?: number;
+    transfer?: { renderedBefore: ColorMatchDistance; renderedAfter: ColorMatchDistance } };
   referenceMonochrome?: boolean;
 };
 export const colorMatch = {

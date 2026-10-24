@@ -95,7 +95,7 @@ fn diagnostics(
 ) -> FitDiagnostics {
     FitDiagnostics {
         engine: if input.intent == MatchIntent::Palette {
-            "reference-palette-transport-v5"
+            "reference-palette-transport-v6"
         } else {
             ENGINE_NAME
         }
@@ -342,7 +342,7 @@ fn verified_distances(
         session.reference_monochrome,
     )?;
     let checked = review.check(state, cancel, candidate)?.ok_or_else(|| invalid(
-        "This strength failed the full-resolution highlight or skin-colour check, or moved colour farther from the reference. Reduce the strengths and apply again. No edit was saved."))?;
+        "This strength failed the full-resolution smoothness, highlight or skin-colour check, or moved colour farther from the reference. Reduce the strengths and apply again. No edit was saved."))?;
     Ok((review.before, checked.after, checked.reused))
 }
 
@@ -377,6 +377,10 @@ pub(super) fn apply(
     if let Some(fitting) = session.fitting.as_mut() {
         fitting.native_candidate_checked = true;
         fitting.cached_proposals += usize::from(reused);
+        if let Some(transfer) = fitting.transfer.as_mut() {
+            transfer.rendered_before = before;
+            transfer.rendered_after = after;
+        }
     }
     let mut merged = current.clone();
     match candidate.extra.get(grade_model::KEY) {
