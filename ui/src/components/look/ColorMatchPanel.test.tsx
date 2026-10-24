@@ -89,6 +89,22 @@ it('does not import or fit when the reference picker is cancelled', async () => 
   expect(colorMatch.prepare).not.toHaveBeenCalled();
 });
 
+it('requires a new analysis when changing from natural look to reference palette and tone', async () => {
+  vi.mocked(colorMatch.status).mockResolvedValue(analysis);
+  vi.mocked(colorMatch.prepare).mockResolvedValue({ ...analysis, fitting: {
+    engine: 'reference-grade-transfer-v3', quality: 'precise', intent: 'palette',
+    refinementCandidates: 4, uniqueRenders: 3, cachedProposals: 0,
+  } });
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
+  await screen.findByTestId('colour-match-measurement');
+  fireEvent.change(screen.getByRole('combobox', { name: 'Matching goal' }), { target: { value: 'palette' } });
+  expect((screen.getByRole('button', { name: 'Apply colour strengths' }) as HTMLButtonElement).disabled).toBe(true);
+  expect(colorMatch.apply).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Analyse reference match' }));
+  await waitFor(() => expect(colorMatch.prepare).toHaveBeenCalledWith('photo', 'ref', expect.any(String), 'precise', 'palette'));
+  await waitFor(() => expect((screen.getByRole('button', { name: 'Apply colour strengths' }) as HTMLButtonElement).disabled).toBe(false));
+});
+
 it('applies fine exposure, temperature and tint strengths independently', async () => {
   render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
   await screen.findByRole('option', { name:reference.name });

@@ -1,5 +1,5 @@
 import { api, asIpcError } from '../../ipc/client';
-import { colorMatch, type ColorMatchControls } from '../../ipc/colorMatch';
+import { colorMatch, type ColorMatchControls, type ColorMatchIntent } from '../../ipc/colorMatch';
 
 export type ColorMatchOutcome = { photoId: string; name: string; outcome: 'matched' | 'unchanged' | 'failed' | 'stopped'; detail: string };
 
@@ -7,7 +7,7 @@ export type ColorMatchOutcome = { photoId: string; name: string; outcome: 'match
 export async function matchColorCollection(projectId: string, referenceId: string, controls: ColorMatchControls,
   cancelId: string, stopped: () => boolean, progress: (message: string) => void,
   completed: (result: ColorMatchOutcome) => void,
-  options: { photoIds?: readonly string[]; quality?: 'quick' | 'precise' } = {}): Promise<ColorMatchOutcome[]> {
+  options: { photoIds?: readonly string[]; quality?: 'quick' | 'precise'; intent?: ColorMatchIntent } = {}): Promise<ColorMatchOutcome[]> {
   const photos = [];
   const seen = new Set<string>();
   // Resolve membership from the collection, including photos beyond the loaded filmstrip.
@@ -32,8 +32,10 @@ export async function matchColorCollection(projectId: string, referenceId: strin
       if (stopped()) break;
       // Reuse the immutable baseline when changing strengths on a previous match.
       const sameQuality = (saved?.fitting?.quality ?? 'precise') === (options.quality ?? 'precise');
-      const analysis = saved?.current && saved.reference.id === referenceId && sameQuality ? saved
-        : options.quality ? await colorMatch.prepare(photo.id, referenceId, cancelId, options.quality)
+      const sameIntent = (saved?.fitting?.intent ?? 'natural') === (options.intent ?? 'natural');
+      const analysis = saved?.current && saved.reference.id === referenceId && sameQuality && sameIntent ? saved
+        : options.intent ? await colorMatch.prepare(photo.id, referenceId, cancelId, options.quality, options.intent)
+          : options.quality ? await colorMatch.prepare(photo.id, referenceId, cancelId, options.quality)
           : await colorMatch.prepare(photo.id, referenceId, cancelId);
       if (stopped()) break;
       const applied = await colorMatch.apply(photo.id, analysis.sessionId, controls, cancelId);

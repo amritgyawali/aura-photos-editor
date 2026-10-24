@@ -8,12 +8,15 @@ cannot establish recovery of an unknown proprietary edit or photographic intent.
 import argparse
 import base64
 from collections import Counter
+from datetime import datetime, timezone
 import hashlib
 import html
 import json
 import os
+import platform
 from pathlib import Path
 import subprocess
+import statistics
 import time
 import urllib.request
 import uuid
@@ -77,14 +80,20 @@ def artifacts(out, report, manifest):
         rows.append(f'<article><h2>{item["index"]}. {html.escape(item["description"])} · {html.escape(item["verdict"])}</h2><p><a href="{html.escape(item["sourcePage"])}">Photo {item["photoId"]} by {html.escape(item["author"])}</a></p><div class="pictures">{pictures}</div><p>Standard: {metrics(standard)}</p><p>Extreme: {metrics(extreme)}</p></article>')
     counts = report.get('summary', {})
     summary_text = f'{counts.get("strong statistical match", 0)} strong statistical matches; {counts.get("partial statistical match", 0)} partial matches; {counts.get("refused", 0)} refused.'
-    summary = html.escape(summary_text)
+    summary = html.escape(summary_text + f' Goal: {report.get("intent", "natural")}; mode: {report.get("quality", "precise")}.')
+    analysis_times = [item['analysisMilliseconds'] for item in report['photos'] if 'analysisMilliseconds' in item]
+    apply_times = [item['attempts']['standard']['applyMilliseconds'] for item in report['photos'] if 'applyMilliseconds' in item['attempts'].get('standard', {})]
+    timing_html = f'<p>Median analysis: {statistics.median(analysis_times):.0f} ms; median Standard apply: {statistics.median(apply_times):.0f} ms. Local debug-build observations, not a throughput guarantee.</p>' if analysis_times and apply_times else ''
     document = f'''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>AURA · ten unique photo assessment</title><style>body{{background:#141418;color:#eee;font:16px system-ui;margin:0;padding:32px}}main{{max-width:1500px;margin:auto}}a{{color:#d6baff}}header{{display:grid;grid-template-columns:240px 1fr;gap:28px}}header img{{width:100%;max-height:340px;object-fit:contain}}article{{border-top:1px solid #555;padding:24px 0}}.pictures{{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}}figure{{margin:0}}figure img{{width:100%;height:420px;object-fit:contain;background:#08080a}}figcaption{{text-align:center}}p{{line-height:1.6}}@media(max-width:800px){{header,.pictures{{grid-template-columns:1fr}}}}</style><main><header><figure><img src="../dataset/reference.jpg"><figcaption>Reference · different from every target</figcaption></figure><div><h1>One reference. Ten different photographs.</h1><p>{summary}</p><p>Native full-resolution application and export renders, with an independent CIE Lab distribution comparison. Positive percentages mean closer to the reference. A strong statistical match requires at least 20% native-distance improvement and 10% independent palette improvement; this is a declared assessment rule, not proof of an identical editing algorithm.</p><p>All eleven source photos passed byte, normalized-pixel and perceptual duplicate screening, plus visual review. No before/after pair is used as a target/reference pair. Source images are unchanged.</p><p>Reference: <a href="{html.escape(reference['sourcePage'])}">{html.escape(reference['author'])}, Pexels {reference['photoId']}</a>. <a href="../dataset/ATTRIBUTION.md">All photo credits</a> · <a href="results.json">Raw results</a> · <a href="../dataset/manifest.json">Uniqueness evidence</a></p></div></header>{''.join(rows)}</main></html>'''
+    document = document.replace('<h1>One reference. Ten different photographs.</h1>', '<h1>One reference. Ten different photographs.</h1>' + timing_html)
+    document = document.replace('src="../dataset/reference.jpg"', f'src="../dataset/{html.escape(reference["input"]["path"], quote=True)}"')
+    document = document.replace('href="../dataset/manifest.json"', 'href="assessment-manifest.json"')
     (out / 'index.html').write_text(document, encoding='utf-8')
     if report['photos']:
         font = ImageFont.truetype('C:/Windows/Fonts/segoeui.ttf', 18)
         sheet = Image.new('RGB', (1160, 360 + len(report['photos']) * 315), '#18181c')
         draw = ImageDraw.Draw(sheet)
-        with Image.open(out.parent / 'dataset/reference.jpg') as source:
+        with Image.open(out.parent / 'dataset' / reference['input']['path']) as source:
             source.thumbnail((250, 280)); sheet.paste(source, (20, 45))
         draw.text((290, 60), 'AURA: one distinct reference + ten unique targets', font=font, fill='white')
         draw.text((290, 100), 'Before | Standard 100% | Extreme 200%', font=font, fill='white')
@@ -105,11 +114,21 @@ def main():
     parser.add_argument('--dataset', type=Path, default=ROOT / 'output/aura-unique-color-match-2026-10-24/dataset')
     parser.add_argument('--exe', type=Path, default=ROOT / 'target/desktop-launch/debug/aura-desktop.exe')
     parser.add_argument('--port', type=int, default=9378)
+    parser.add_argument('--intent', choices=['natural', 'palette'], default='natural')
+    parser.add_argument('--quality', choices=['quick', 'precise'], default='precise')
+    parser.add_argument('--reference-photo-id', help='Use another existing photo as reference; the former reference becomes a target. Source files remain unchanged.')
+    parser.add_argument('--verify-delivery', action='store_true', help='Write and verify ten actual lossless sRGB PNG exports in the disposable assessment directory.')
     args = parser.parse_args()
     dataset = args.dataset.resolve()
     manifest = json.loads((dataset / 'manifest.json').read_text(encoding='utf-8'))
     entries = manifest['images']
-    targets = [item for item in entries if item['role'] == 'target']
+    if args.reference_photo_id:
+        replacement = next(item for item in entries if item['photoId'] == args.reference_photo_id)
+        previous = next(item for item in entries if item['role'] == 'reference')
+        if replacement is not previous:
+            previous['role'], previous['index'] = 'target', replacement['index']
+            replacement['role'], replacement['index'] = 'reference', 0
+    targets = sorted([item for item in entries if item['role'] == 'target'], key=lambda item: item['index'])
     assert len(entries) == 11 and len(targets) == 10
     assert manifest['duplicateChecks']['exactDuplicates'] == 0 and not manifest['duplicateChecks']['flaggedPairs']
     assert manifest['duplicateChecks']['visualInspection']['status'] == 'reviewed'
@@ -118,8 +137,14 @@ def main():
     assert all(hashlib.sha256(Path(path).read_bytes()).hexdigest() == digest for path, digest in hashes.items())
     out = dataset.parent / ('run-' + uuid.uuid4().hex[:8])
     out.mkdir()
-    report = {'photos': [], 'checks': {}, 'pageErrors': [], 'manifest': str(dataset / 'manifest.json'), 'exe': str(args.exe.resolve())}
+    (out / 'assessment-manifest.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
+    report = {'photos': [], 'checks': {}, 'pageErrors': [], 'timings': [], 'intent': args.intent, 'quality': args.quality,
+              'manifest': str(dataset / 'manifest.json'), 'exe': str(args.exe.resolve()), 'createdUtc': datetime.now(timezone.utc).isoformat(),
+              'platform': platform.platform(), 'logicalProcessors': os.cpu_count()}
+    with args.exe.open('rb') as executable:
+        report['exeSha256'] = hashlib.file_digest(executable, 'sha256').hexdigest()
     reference_entry = next(item for item in entries if item['role'] == 'reference')
+    report['referencePhotoId'] = reference_entry['photoId']
     reference_palette = lab_distribution(Image.open(dataset / reference_entry['input']['path']).convert('RGB'))
     env = dict(os.environ, AURA_TEST_CATALOG=str(out / 'catalog.sqlite'), WEBVIEW2_USER_DATA_FOLDER=str(out / 'webview'),
                WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=f'--remote-debugging-port={args.port}')
@@ -138,13 +163,34 @@ def main():
             page.on('pageerror', lambda error: report['pageErrors'].append(str(error)))
 
             def call(command, **kwargs):
-                return page.evaluate('async ([c,a])=>{try{return await window.__TAURI_INTERNALS__.invoke(c,{input:a})}catch(e){throw new Error(JSON.stringify(e))}}', [command, kwargs])
+                started = time.perf_counter()
+                browser_timing = {}
+                succeeded = False
+                try:
+                    response = page.evaluate('''async ([c,a])=>{
+                        let frameCount=0,last=performance.now(),maxFrameGap=0,frame;
+                        const tick=t=>{maxFrameGap=Math.max(maxFrameGap,t-last);last=t;frameCount++;frame=requestAnimationFrame(tick)};
+                        frame=requestAnimationFrame(tick);
+                        try{
+                            const value=await window.__TAURI_INTERNALS__.invoke(c,{input:a});
+                            maxFrameGap=Math.max(maxFrameGap,performance.now()-last);
+                            return {value,browserTiming:{frameCount,maxFrameGapMilliseconds:maxFrameGap,visibility:document.visibilityState}};
+                        }catch(e){throw new Error(JSON.stringify(e))}
+                        finally{cancelAnimationFrame(frame)}
+                    }''', [command, kwargs])
+                    browser_timing = response['browserTiming']
+                    succeeded = True
+                    return response['value']
+                finally:
+                    report['timings'].append({'command': command, 'photoId': kwargs.get('photoId'), 'milliseconds': (time.perf_counter() - started) * 1000,
+                                              'success': succeeded, **browser_timing})
 
             def raw(command, **kwargs):
                 return page.evaluate('async ([c,a])=>{try{return await window.__TAURI_INTERNALS__.invoke(c,a)}catch(e){throw new Error(JSON.stringify(e))}}', [command, kwargs])
 
             project_name = 'Ten unique photos ' + uuid.uuid4().hex[:6]
             project = call('create_project', name=project_name, coupleNames=None, eventDate=None)['id']
+            report['projectId'], report['projectName'] = project, project_name
             call('start_ingest', projectId=project, roots=[str(dataset / item['input']['path']) for item in targets])
             photos = []
             for _ in range(180):
@@ -163,21 +209,37 @@ def main():
                 item.update(stem=stem, auraPhotoId=photo, attempts={}, labBefore=palette_distance(before, reference_palette), clippingBefore=clipping(before))
                 report['photos'].append(item)
                 try:
-                    analysis = call('prepare_color_match', photoId=photo, referenceId=reference['id'], cancelId=str(uuid.uuid4()), quality='precise')
+                    analysis = call('prepare_color_match', photoId=photo, referenceId=reference['id'], cancelId=str(uuid.uuid4()), quality=args.quality, intent=args.intent)
+                    item['analysisMilliseconds'] = report['timings'][-1]['milliseconds']
+                    assert analysis['fitting'].get('intent', 'natural') == args.intent
                     for name, amount in [('standard', 1), ('extreme', 2)]:
                         prior_hash = call('image_recipe', photoId=photo)['recipeHash']
                         try:
                             result = call('apply_color_match', photoId=photo, sessionId=analysis['sessionId'], cancelId=str(uuid.uuid4()),
                                           controls={'amount': amount, 'tone': 1, 'color': 1, 'whiteBalance': 1})
+                            apply_milliseconds = report['timings'][-1]['milliseconds']
                             assert result['current'] and result['fullResolutionChecked'] and result['reference']['id'] == reference['id']
                             after = image_from_render(call('render_image', photoId=photo, level='full', purpose='export'))
                             preview = image_from_render(raw('native_retouch_preview', projectId=project, photoId=photo, before=False, quality='full'))
                             assert after.size == before.size == preview.size
                             parity = change(preview, after)
                             palette = palette_distance(after, reference_palette)
-                            item['attempts'][name] = dict(report=compact(result), nativeReductionPercent=reduction(result['beforeDistance'], result['afterDistance']),
+                            item['attempts'][name] = dict(report=compact(result), applyMilliseconds=apply_milliseconds, nativeReductionPercent=reduction(result['beforeDistance'], result['afterDistance']),
                                                          labAfter=palette, labReductionPercent=reduction(item['labBefore'], palette), meanPixelChange=change(before, after),
                                                          previewExportMeanDifference=parity, previewExportMatches=parity <= 1, clippingAfter=clipping(after))
+                            if name == 'standard' and not report['checks'].get('zeroAndRepeatedStrengths'):
+                                matched_hash = call('image_recipe', photoId=photo)['recipeHash']
+                                repeat = call('apply_color_match', photoId=photo, sessionId=analysis['sessionId'], cancelId=str(uuid.uuid4()),
+                                              controls={'amount': 1, 'tone': 1, 'color': 1, 'whiteBalance': 1})
+                                assert repeat['changed'] == 0
+                                call('apply_color_match', photoId=photo, sessionId=analysis['sessionId'], cancelId=str(uuid.uuid4()),
+                                     controls={'amount': 0, 'tone': 1, 'color': 1, 'whiteBalance': 1})
+                                restored = image_from_render(call('render_image', photoId=photo, level='full', purpose='export'))
+                                assert change(before, restored) == 0, 'Zero strength changed original pixels'
+                                call('apply_color_match', photoId=photo, sessionId=analysis['sessionId'], cancelId=str(uuid.uuid4()),
+                                     controls={'amount': 1, 'tone': 1, 'color': 1, 'whiteBalance': 1})
+                                assert call('image_recipe', photoId=photo)['recipeHash'] == matched_hash
+                                report['checks']['zeroAndRepeatedStrengths'] = True
                         except AssertionError:
                             raise
                         except Exception as error:
@@ -197,6 +259,27 @@ def main():
                 print(json.dumps({'photo': target['photoId'], 'verdict': item['verdict'], 'nativePercent': standard.get('nativeReductionPercent'), 'labPercent': standard.get('labReductionPercent'), 'error': standard.get('error')}), flush=True)
                 report['summary'] = dict(Counter(value['verdict'] for value in report['photos']))
                 artifacts(out, report, manifest)
+            if args.verify_delivery:
+                destination = out / 'native-delivery'
+                delivery = call('export_run', projectId=project, destination=str(destination), destinationKind='folder',
+                    sets=[dict(name='Palette verification', imageIds=[item['auraPhotoId'] for item in report['photos']], format='png',
+                               quality=95, colour='srgb', bitDepth=8, resize='full', sharpen='none', naming='{seq}_{original}', sidecar=False)],
+                    copyright=None, contact=None, creator=None, keywords=[], stripGps=True, stripCameraSerial=True, verify=True)
+                assert delivery['written'] == delivery['verified'] == delivery['requested'] == 10, delivery
+                assert delivery['manifestSealed'] and delivery['renderFailed'] == delivery['corrupt'] == 0, delivery
+                files = raw('export_files', projectId=project)
+                assert len(files) == 10 and all(item['verified'] for item in files)
+                comparisons = []
+                for file in files:
+                    photo = next(item for item in report['photos'] if item['auraPhotoId'] == file['imageId'])
+                    suffix = next((name for name in ('extreme', 'standard') if 'error' not in photo['attempts'][name]), 'before')
+                    with Image.open(destination / file['path']) as actual, Image.open(out / f'{photo["stem"]}.{suffix}.png') as expected:
+                        assert actual.size == expected.size
+                        difference = change(expected.convert('RGB'), actual.convert('RGB'))
+                        comparisons.append({'photoId': photo['photoId'], 'path': file['path'], 'meanRgbDifference': difference})
+                        assert difference == 0, 'Actual lossless delivery differs from its export-purpose render'
+                report['delivery'] = dict(status=delivery, comparisons=comparisons)
+                report['checks']['tenActualLosslessExportsMatchRenders'] = True
             first = targets[0]
             first_photo = report['photos'][0]['auraPhotoId']
             before_hash = call('image_recipe', photoId=first_photo)['recipeHash']
@@ -212,6 +295,25 @@ def main():
             assert call('image_recipe', photoId=first_photo)['recipeHash'] == before_hash
             assert raw('color_match_status', photoId=first_photo)['sessionId'] == before_session
             report['checks']['renamedDuplicateRefusedWithoutChangingEditOrSession'] = True
+            cancellation = page.evaluate('''async ([photoId,referenceId,cancelId])=>{
+                let settled=false;
+                const task=window.__TAURI_INTERNALS__.invoke('prepare_color_match',{input:{photoId,referenceId,cancelId,quality:'precise',intent:'palette'}})
+                    .then(()=>({ok:true}),error=>({ok:false,error})).then(value=>{settled=true;return value});
+                await new Promise(resolve=>setTimeout(resolve,25));
+                const start=performance.now();let cancelled=false;
+                for(let i=0;i<40&&!settled;i++){
+                    cancelled=await window.__TAURI_INTERNALS__.invoke('cancel_job',{jobId:cancelId});
+                    if(cancelled)break;
+                    await new Promise(resolve=>setTimeout(resolve,10));
+                }
+                return {cancelled,result:await task,completionMilliseconds:performance.now()-start};
+            }''', [first_photo, reference['id'], str(uuid.uuid4())])
+            assert cancellation['cancelled'] and not cancellation['result']['ok'], cancellation
+            assert 'stopped' in json.dumps(cancellation['result']).lower() or 'cancel' in json.dumps(cancellation['result']).lower()
+            assert call('image_recipe', photoId=first_photo)['recipeHash'] == before_hash
+            assert raw('color_match_status', photoId=first_photo)['sessionId'] == before_session
+            report['cancellation'] = cancellation
+            report['checks']['nativeCancellationPreservesEditAndSession'] = True
             report['checks']['sourcesUnchanged'] = all(hashlib.sha256(Path(path).read_bytes()).hexdigest() == digest for path, digest in hashes.items())
             successes = [attempt for item in report['photos'] for attempt in item['attempts'].values() if 'error' not in attempt]
             report['checks']['nativePreviewMatchesExport'] = bool(successes) and all(attempt['previewExportMatches'] for attempt in successes)

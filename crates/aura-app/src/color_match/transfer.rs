@@ -135,7 +135,15 @@ impl GradeStats {
 }
 
 fn weighted_quantile(pairs: &mut [(f32, f32)], q: f32) -> Option<f32> {
-    pairs.sort_by(|a, b| a.0.total_cmp(&b.0));
+    // Neutral-axis tails request several ranks from the same array. Preserve that sorted
+    // order and avoid sorting it again; unstable sorting needs no scratch allocation.
+    if !pairs
+        .iter()
+        .zip(pairs.iter().skip(1))
+        .all(|(a, b)| a.0.total_cmp(&b.0).is_le())
+    {
+        pairs.sort_unstable_by(|a, b| a.0.total_cmp(&b.0));
+    }
     let total: f32 = pairs.iter().map(|p| p.1).sum();
     if total <= 0.0 {
         return None;
@@ -152,7 +160,7 @@ fn weighted_quantile(pairs: &mut [(f32, f32)], q: f32) -> Option<f32> {
 }
 
 fn quantiles(mut values: Vec<f32>, count: usize, top: f32, bottom: f32) -> Vec<f32> {
-    values.sort_by(f32::total_cmp);
+    values.sort_unstable_by(f32::total_cmp);
     let last = values.len().saturating_sub(1) as f32;
     (0..count)
         .map(|i| {
@@ -768,6 +776,7 @@ pub(super) fn mix(from: &ReferenceGrade, to: &ReferenceGrade, scales: &Scales) -
         *v = lerp(*a, *b, scales.hue_light);
     }
     out.skin = lerp(from.skin, to.skin, scales.skin);
+    out.skin_fidelity = lerp(from.skin_fidelity, to.skin_fidelity, scales.skin);
     if out.validate().is_err() {
         out = out.bounded();
     }
@@ -792,15 +801,21 @@ struct FitContext<'a> {
     monochrome: bool,
     toned: bool,
     iterations: usize,
+    palette: bool,
 }
 
 impl FitContext<'_> {
     fn corresponding(&self) -> bool {
-        self.content >= SAME_SCENE
+        self.content >= SAME_SCENE || self.palette
     }
 
     fn initial(&self, start: &GradeStats) -> ReferenceGrade {
         let mut grade = ReferenceGrade::identity();
+        grade.skin_fidelity = if self.palette && !self.monochrome {
+            1.0
+        } else {
+            0.0
+        };
         grade.cast_in.clone_from(&start.axis);
         if !self.monochrome {
             grade.cast_out.clone_from(&self.reference.axis);
@@ -914,11 +929,30 @@ pub(super) fn fit_with_checkpoint(
     )
 }
 
+#[cfg(test)]
 pub(super) fn fit_with_quality_checkpoint(
     reference: &GradeStats,
     target: &[Sample],
     similarity: Option<f32>,
     quality: super::MatchQuality,
+    checkpoint: impl FnMut() -> AuraResult<()>,
+) -> AuraResult<Fit> {
+    fit_with_intent_checkpoint(
+        reference,
+        target,
+        similarity,
+        quality,
+        super::MatchIntent::Natural,
+        checkpoint,
+    )
+}
+
+pub(super) fn fit_with_intent_checkpoint(
+    reference: &GradeStats,
+    target: &[Sample],
+    similarity: Option<f32>,
+    quality: super::MatchQuality,
+    intent: super::MatchIntent,
     mut checkpoint: impl FnMut() -> AuraResult<()>,
 ) -> AuraResult<Fit> {
     checkpoint()?;
@@ -948,6 +982,7 @@ pub(super) fn fit_with_quality_checkpoint(
         monochrome: reference.achromatic || keep_target_grey,
         toned: at(&reference.chroma, CHROMA_QUANTILES - 2) < 0.012,
         iterations: quality.iterations(),
+        palette: intent == super::MatchIntent::Palette,
     };
     let mut grade = fitter.initial(&start);
     let mut best = (before, identity.clone());

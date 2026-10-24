@@ -29,12 +29,14 @@ pub use calibration::CalibrationReport;
 mod fine;
 pub use fine::FineControls;
 mod quality;
-pub use quality::MatchQuality;
+pub use quality::{MatchIntent, MatchQuality};
 pub(crate) mod gallery_fit;
 mod grade;
 mod library;
 mod matcher;
+mod native_checks;
 pub use matcher::TransferDiagnostics;
+pub(crate) use native_checks::NativeChecks;
 mod refine;
 mod transfer;
 pub use library::{
@@ -192,6 +194,8 @@ struct Session {
 pub struct FitDiagnostics {
     pub engine: String,
     #[serde(default)]
+    pub intent: MatchIntent,
+    #[serde(default)]
     pub quality: MatchQuality,
     #[serde(default)]
     pub target_samples: usize,
@@ -226,6 +230,8 @@ pub struct PrepareInput {
     pub photo_id: String,
     pub reference_id: String,
     pub cancel_id: String,
+    #[serde(default)]
+    pub intent: MatchIntent,
     #[serde(default)]
     pub quality: MatchQuality,
 }
@@ -623,6 +629,9 @@ pub fn prepare(state: &AppState, input: &PrepareInput) -> IpcResult<MatchReport>
         if let Some(stats) = transfer::recall(state, &input.reference_id)? {
             return matcher::prepare(state, cancel, input, photo, reference, baseline, stats);
         }
+        if input.intent == MatchIntent::Palette {
+            return Err(invalid("Reference palette matching needs fresh colour measurements. Upload its edited photo again, then analyse the match. No edit was saved."));
+        }
         let observed_hash = baseline.observed_hash;
         let baseline = baseline.recipe;
         let baseline_hash = aura_recipe::hash::recipe_hash(&baseline)?;
@@ -807,6 +816,7 @@ pub fn prepare(state: &AppState, input: &PrepareInput) -> IpcResult<MatchReport>
             "No colour treatment could preserve this photo's native skin tones and highlights. No edit was saved."))?;
         let fitting = Some(FitDiagnostics {
             engine: "bounded-pattern-search-v1".into(),
+            intent: input.intent,
             quality: input.quality,
             target_samples: (frame.width as usize) * (frame.height as usize),
             max_iterations: 0,

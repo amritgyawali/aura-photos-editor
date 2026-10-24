@@ -1,6 +1,16 @@
 //! Computational budgets for reference fitting. Both modes retain native apply safeguards.
 use serde::{Deserialize, Serialize};
 
+/// Natural estimates a photographic look; Palette explicitly requests distribution matching.
+/// Neither can recover an unknown editing operation from an unrelated photograph.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MatchIntent {
+    #[default]
+    Natural,
+    Palette,
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MatchQuality {
@@ -43,6 +53,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(input.quality, MatchQuality::Precise);
+        assert_eq!(input.intent, MatchIntent::Natural);
+        assert!(serde_json::from_str::<MatchIntent>(r#""perfect""#).is_err());
         assert!(serde_json::from_str::<MatchQuality>(r#""extreme""#).is_err());
         assert!(MatchQuality::Quick.fitting_edge() < MatchQuality::Precise.fitting_edge());
         assert!(MatchQuality::Quick.target_samples() < MatchQuality::Precise.target_samples());
@@ -51,5 +63,6 @@ mod tests {
             r#"{"engine":"reference-grade-transfer-v3","refinementCandidates":4,"uniqueRenders":2,"cachedProposals":0}"#,
         ).unwrap();
         assert_eq!(older.quality, MatchQuality::Precise);
+        assert_eq!(older.intent, MatchIntent::Natural);
     }
 }

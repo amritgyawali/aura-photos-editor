@@ -70,6 +70,147 @@ fn job() -> String {
 }
 
 #[test]
+fn palette_matching_checks_the_native_endpoint_without_writing_until_apply() {
+    let directory = tempfile::tempdir().expect("native palette catalogue");
+    let target_path = directory.path().join("target.png");
+    let reference_path = directory.path().join("different-reference.png");
+    image::RgbImage::from_fn(144, 96, |x, y| {
+        let value = (35 + x * 150 / 144 + y * 35 / 96) as u8;
+        image::Rgb([value, value.saturating_add(9), value.saturating_add(15)])
+    })
+    .save(&target_path)
+    .expect("target");
+    image::RgbImage::from_fn(96, 144, |x, y| {
+        let value = (45 + y * 150 / 144 + x * 25 / 96) as u8;
+        image::Rgb([value.saturating_add(15), value.saturating_add(5), value])
+    })
+    .save(&reference_path)
+    .expect("reference");
+    let source_bytes = std::fs::read(&target_path).expect("source bytes");
+    let (state, _, photo) = setup_with_baseline(&target_path, directory.path(), false);
+    let reference = color_match::import_reference(
+        &state,
+        &color_match::ImportInput {
+            path: reference_path.to_string_lossy().into_owned(),
+            cancel_id: job(),
+        },
+    )
+    .expect("reference import");
+    let analysis = color_match::prepare(
+        &state,
+        &color_match::PrepareInput {
+            photo_id: photo.to_db(),
+            reference_id: reference.id,
+            cancel_id: job(),
+            quality: color_match::MatchQuality::Quick,
+            intent: color_match::MatchIntent::Palette,
+        },
+    )
+    .expect("native palette analysis");
+    let fitting = analysis.fitting.as_ref().expect("diagnostics");
+    assert_eq!(fitting.intent, color_match::MatchIntent::Palette);
+    assert!(fitting.native_candidate_checked);
+    assert!(fitting.native_backtrack_factor > 0.0 && fitting.native_backtrack_factor <= 1.0);
+    assert!(!analysis.full_resolution_checked);
+    assert!(state
+        .recipe_store()
+        .load(&photo)
+        .expect("no edit")
+        .is_none());
+    let apply = |controls| {
+        color_match::apply(
+            &state,
+            &color_match::ApplyInput {
+                photo_id: photo.to_db(),
+                session_id: analysis.session_id.clone(),
+                controls,
+                cancel_id: job(),
+            },
+        )
+    };
+    let result = apply(color_match::Controls::default()).expect("full-strength apply");
+    assert!(
+        result
+            .fitting
+            .as_ref()
+            .expect("native proof")
+            .cached_proposals
+            > 0,
+        "identical full-resolution pixels should reuse the in-process native proof"
+    );
+    assert!(result.current && result.full_resolution_checked);
+    assert!(result.after_distance <= result.before_distance + 0.0001);
+    let matched = state.recipe_store().load(&photo).expect("saved");
+    assert_eq!(
+        apply(color_match::Controls::default())
+            .expect("repeat")
+            .changed,
+        0
+    );
+    apply(color_match::Controls {
+        amount: 0.0,
+        ..Default::default()
+    })
+    .expect("zero");
+    apply(color_match::Controls::default()).expect("restore fitted endpoint");
+    assert_eq!(
+        state.recipe_store().load(&photo).expect("restored"),
+        matched
+    );
+    assert_eq!(
+        std::fs::read(&target_path).expect("source unchanged"),
+        source_bytes
+    );
+    let mono_path = directory.path().join("different-monochrome.png");
+    image::RgbImage::from_fn(96, 144, |_, y| image::Rgb([(115 + y * 120 / 144) as u8; 3]))
+        .save(&mono_path)
+        .expect("monochrome reference");
+    let mono = color_match::import_reference(
+        &state,
+        &color_match::ImportInput {
+            path: mono_path.to_string_lossy().into_owned(),
+            cancel_id: job(),
+        },
+    )
+    .expect("monochrome import");
+    let analysis = color_match::prepare(
+        &state,
+        &color_match::PrepareInput {
+            photo_id: photo.to_db(),
+            reference_id: mono.id,
+            cancel_id: job(),
+            quality: color_match::MatchQuality::Quick,
+            intent: color_match::MatchIntent::Palette,
+        },
+    )
+    .expect("native monochrome palette fit");
+    let monochrome = color_match::apply(
+        &state,
+        &color_match::ApplyInput {
+            photo_id: photo.to_db(),
+            session_id: analysis.session_id,
+            controls: Default::default(),
+            cancel_id: job(),
+        },
+    )
+    .expect("native monochrome apply");
+    assert!(monochrome.full_resolution_checked);
+    let saved = state
+        .recipe_store()
+        .load(&photo)
+        .expect("saved monochrome")
+        .expect("recipe");
+    let model = aura_recipe::reference_grade::read(&saved)
+        .expect("grade")
+        .expect("monochrome model");
+    assert!(model.chroma.iter().all(|v| v.abs() < 1e-6));
+    assert!(
+        model.skin_fidelity.abs() < 1e-6,
+        "skin must desaturate with a monochrome reference"
+    );
+}
+
+#[test]
 fn identical_source_and_renamed_references_are_refused_without_editing_the_target() {
     let directory = tempfile::tempdir().expect("distinct reference catalogue");
     let target_path = directory.path().join("target.png");
@@ -96,6 +237,7 @@ fn identical_source_and_renamed_references_are_refused_without_editing_the_targe
         let error = color_match::prepare(
             &state,
             &color_match::PrepareInput {
+                intent: Default::default(),
                 photo_id: photo.to_db(),
                 reference_id: reference.id,
                 cancel_id: job(),
@@ -129,6 +271,7 @@ fn identical_source_and_renamed_references_are_refused_without_editing_the_targe
     let accepted = color_match::prepare(
         &state,
         &color_match::PrepareInput {
+            intent: Default::default(),
             photo_id: photo.to_db(),
             reference_id: reference.id,
             cancel_id: job(),
@@ -210,6 +353,7 @@ fn fractional_reanalysis_and_quality_changes_start_from_the_original_match_basel
             let analysis = color_match::prepare(
                 state,
                 &color_match::PrepareInput {
+                    intent: Default::default(),
                     photo_id: photo.to_db(),
                     reference_id: reference.into(),
                     cancel_id: job(),
@@ -327,6 +471,7 @@ fn pristine_analysis_never_overwrites_a_later_first_manual_edit() {
     let analysis = color_match::prepare(
         &state,
         &color_match::PrepareInput {
+            intent: Default::default(),
             photo_id: photo.to_db(),
             reference_id: reference.id,
             cancel_id: job(),
@@ -443,6 +588,7 @@ fn pristine_imports_match_without_analysis_edits_and_first_apply_supports_undo()
         let analysis = color_match::prepare(
             &state,
             &color_match::PrepareInput {
+                intent: Default::default(),
                 photo_id: photo.to_db(),
                 reference_id: reference.id,
                 cancel_id: job(),
@@ -1172,6 +1318,7 @@ fn different_dimensions_match_strengths_restore_and_new_manual_edits_are_kept() 
     let prepared = color_match::prepare(
         &state,
         &color_match::PrepareInput {
+            intent: Default::default(),
             quality: Default::default(),
             photo_id: photo.to_db(),
             reference_id: reference.id.clone(),
@@ -1347,6 +1494,7 @@ fn native_raw_reference_match_does_not_touch_originals() {
     let prepared = color_match::prepare(
         &state,
         &color_match::PrepareInput {
+            intent: Default::default(),
             quality: Default::default(),
             photo_id: photo.to_db(),
             reference_id: reference.id,

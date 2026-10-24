@@ -295,6 +295,44 @@ fn a_different_photograph_takes_the_look_of_an_edited_reference() {
 }
 
 #[test]
+fn explicit_palette_matching_fits_unrelated_tone_without_claiming_scene_correspondence() {
+    let reference = reference_stats(&grade_image(&indoor(), warm));
+    let target = samples(&outdoor(), TARGET_SAMPLES);
+    let natural = fit_with_intent_checkpoint(
+        &reference,
+        &target,
+        None,
+        super::super::MatchQuality::Precise,
+        super::super::MatchIntent::Natural,
+        || Ok(()),
+    )
+    .unwrap();
+    let palette = fit_with_intent_checkpoint(
+        &reference,
+        &target,
+        None,
+        super::super::MatchQuality::Precise,
+        super::super::MatchIntent::Palette,
+        || Ok(()),
+    )
+    .unwrap();
+    println!(
+        "unrelated natural {:.3}, palette {:.3}, baseline {:.3}",
+        natural.after.total, palette.after.total, palette.before.total
+    );
+    assert!(palette.after.total < 0.8 * palette.before.total);
+    assert!(palette.after.total < natural.after.total);
+    assert!(palette.content.abs() < f32::EPSILON);
+    assert_eq!(
+        palette.iterations,
+        super::super::MatchQuality::Precise.iterations()
+    );
+    palette.grade.validate().unwrap();
+    let identity = ReferenceGrade::identity();
+    assert_eq!(toward(&identity, &palette.grade, 0.0), identity);
+}
+
+#[test]
 fn a_batch_matched_to_one_reference_converges_on_one_look() {
     let reference = grade_image(&indoor(), split_tone);
     let stats = reference_stats(&reference);
@@ -339,6 +377,26 @@ fn a_monochrome_reference_produces_neutral_greys() {
         .fold(0.0_f32, f32::max);
     assert!(worst < 0.005, "chroma {worst}");
     assert!(fit.after.tone < fit.before.tone);
+}
+
+#[test]
+fn palette_monochrome_matching_does_not_leave_skin_coloured() {
+    let reference = reference_stats(&grade_image(&indoor(), mono));
+    let pixels = samples(&outdoor(), TARGET_SAMPLES);
+    let fit = fit_with_intent_checkpoint(
+        &reference,
+        &pixels,
+        None,
+        super::super::MatchQuality::Precise,
+        super::super::MatchIntent::Palette,
+        || Ok(()),
+    )
+    .unwrap();
+    let worst = transformed(&fit.grade, &pixels)
+        .iter()
+        .map(|v| v[1].hypot(v[2]))
+        .fold(0.0_f32, f32::max);
+    assert!(worst < 0.005, "monochrome must include skin: {worst}");
 }
 
 #[test]

@@ -26,6 +26,7 @@ def main():
     parser.add_argument('targets', type=Path, nargs=2)
     parser.add_argument('--exe', type=Path, default=ROOT / 'target/desktop-launch/debug/aura-desktop.exe')
     parser.add_argument('--port', type=int, default=9377)
+    parser.add_argument('--intent', choices=['natural', 'palette'], default='natural')
     args = parser.parse_args()
     out = ROOT / '.work-checks' / ('reference-workspace-' + uuid.uuid4().hex[:8])
     out.mkdir(parents=True)
@@ -48,7 +49,7 @@ def main():
                WEBVIEW2_USER_DATA_FOLDER=str(out / 'webview'),
                WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=f'--remote-debugging-port={args.port}')
     process = subprocess.Popen([str(args.exe.resolve())], cwd=ROOT, env=env)
-    report = {'checks': {}, 'pageErrors': [], 'fixtureHashes': hashes, 'uniqueInputs': fingerprints}
+    report = {'checks': {}, 'pageErrors': [], 'fixtureHashes': hashes, 'uniqueInputs': fingerprints, 'intent': args.intent}
     try:
         for _ in range(120):
             try:
@@ -90,6 +91,14 @@ def main():
             expect(panel).to_be_visible()
             expect(page.get_by_alt_text('Colour reference: ' + reference['name'], exact=True)).to_be_visible()
             expect(panel.get_by_role('checkbox', name='Real-Time Color Adjustments')).not_to_be_checked()
+            panel.get_by_label('Matching goal', exact=True).select_option(args.intent)
+            page.evaluate('''()=>{
+                const probe={gaps:[],last:performance.now(),visible:document.visibilityState==='visible'};
+                const tick=t=>{const visible=document.visibilityState==='visible';
+                    if(visible&&probe.visible&&probe.gaps.length<18000)probe.gaps.push(Math.max(0,t-probe.last));
+                    probe.last=t;probe.visible=visible;probe.frame=requestAnimationFrame(tick)};
+                probe.frame=requestAnimationFrame(tick);window.__auraFrameProbe=probe;
+            }''')
             panel.get_by_label('Matching mode', exact=True).select_option('quick')
             panel.get_by_role('button', name='Analyse reference match', exact=True).click()
             apply = panel.get_by_role('button', name='Apply colour strengths', exact=True)
@@ -110,6 +119,7 @@ def main():
 
             saved = wait_status(lambda value: value['fullResolutionChecked'])
             assert saved['fitting']['quality'] == 'quick'
+            assert saved['fitting'].get('intent', 'natural') == args.intent
             assert saved['fitting']['targetSamples'] <= 10000 and saved['fitting']['maxIterations'] == 2
             report['checks']['quickNativeApply'] = True
             print('Quick fitting and native apply passed', flush=True)
@@ -138,7 +148,15 @@ def main():
                 result = status(item['id'])
                 assert result['current'] and result['fullResolutionChecked']
                 assert result['reference']['id'] == reference['id']
+                assert result['fitting'].get('intent', 'natural') == args.intent
             report['checks']['collectionNativeRefits'] = True
+            frame_probe = page.evaluate('''()=>{const p=window.__auraFrameProbe;
+                cancelAnimationFrame(p.frame);return {gaps:p.gaps,visibility:document.visibilityState}}''')
+            gaps = sorted(frame_probe['gaps'])
+            report['responsiveness'] = {'visibleFrameSamples': len(gaps), 'visibilityAtEnd': frame_probe['visibility'],
+                'medianGapMilliseconds': gaps[len(gaps) // 2] if gaps else None,
+                'p95GapMilliseconds': gaps[min(len(gaps) - 1, int(len(gaps) * .95))] if gaps else None,
+                'maximumGapMilliseconds': max(gaps) if gaps else None}
             page.get_by_label('Comparison zoom', exact=True).select_option('1.5')
             page.locator('.reference-comparison').scroll_into_view_if_needed()
             page.screenshot(path=str(out / 'workspace.png'))

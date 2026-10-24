@@ -155,6 +155,8 @@ pub struct AppState {
     /// Buffers before and after each photograph's retouch stack, shared by every render this
     /// process makes. ADR-0098.
     retouch_checkpoints: aura_render::retouch_cache::Checkpoints,
+    /// Native colour verification results, keyed by actual pixels; never persisted.
+    color_match_checks: crate::color_match::NativeChecks,
     /// How many expensive image passes run at once, shared by planners and every renderer:
     /// one on a small machine, a few on a large one. `aura_render::work_gate`.
     image_work_gate: Arc<aura_render::WorkGate>,
@@ -292,6 +294,7 @@ impl AppState {
             previews: Arc::new(Mutex::new(BTreeMap::new())),
             edited_previews: Arc::default(),
             retouch_checkpoints: aura_render::retouch_cache::Checkpoints::new(),
+            color_match_checks: crate::color_match::NativeChecks::default(),
             image_work_gate: Arc::new(aura_render::WorkGate::for_this_machine()),
             cache_root,
             models_root: default_models_root(),
@@ -319,6 +322,7 @@ impl AppState {
             previews: Arc::new(Mutex::new(BTreeMap::new())),
             edited_previews: Arc::default(),
             retouch_checkpoints: aura_render::retouch_cache::Checkpoints::new(),
+            color_match_checks: crate::color_match::NativeChecks::default(),
             image_work_gate: Arc::new(aura_render::WorkGate::for_this_machine()),
             cache_root,
             models_root: default_models_root(),
@@ -1479,6 +1483,10 @@ impl AppState {
 
     pub(crate) fn image_work_gate(&self) -> &Arc<aura_render::WorkGate> {
         &self.image_work_gate
+    }
+
+    pub(crate) fn color_match_checks(&self) -> &crate::color_match::NativeChecks {
+        &self.color_match_checks
     }
 
     /// Where cached previews live.
