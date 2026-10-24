@@ -189,7 +189,7 @@ def main():
                 try:
                     saved = wait_status(lambda value: value['reference']['id'] == replacement['id'] and value['fullResolutionChecked'])
                     if args.intent == 'palette':
-                        assert saved['fitting']['engine'] == 'reference-palette-transport-v6'
+                        assert saved['fitting']['engine'] == 'reference-palette-transport-v7'
                     report['checks']['changedReferenceIsActuallyApplied'] = saved['current']
                     report['referenceSwitchOutcome'] = 'matched'
                 except RuntimeError as error:

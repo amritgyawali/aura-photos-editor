@@ -11,6 +11,10 @@ export type ColorReference = {
 };
 export type ReferenceMetadata = { name?: string; group?: string; favorite?: boolean; defaultControls?: ColorMatchControls };
 export type ColorMatchDistance = { tone: number; cast: number; chroma: number; hue: number; palette: number; total: number };
+export type LightroomPreset = {
+  xml: string; fileName: string; name: string; recipeHash: string; tableFingerprint: string; tableEdge: number;
+  meanTableError: number; p95TableError: number; maxTableError: number; warnings: string[];
+};
 export type ColorMatchReport = {
   sessionId: string; photoId: string; reference: ColorReference; controls: ColorMatchControls;
   matchedRegions: string[]; beforeDistance: number; afterDistance: number; changed: number;
@@ -23,6 +27,8 @@ export type ColorMatchReport = {
   referenceMonochrome?: boolean;
 };
 export const colorMatch = {
+  generatePreset: (photoId: string, sessionId: string, name: string, cancelId: string) =>
+    invoke<LightroomPreset>('generate_color_match_preset', { input: { photoId, sessionId, name, cancelId } }),
   list: () => invoke<ColorReference[]>('list_color_references'),
   status: (photoId: string) => invoke<ColorMatchReport | null>('color_match_status', { photoId }),
   import: (path: string, cancelId: string) => invoke<ColorReference>('import_color_reference', { input: { path, cancelId } }),
@@ -31,7 +37,7 @@ export const colorMatch = {
   capture: (projectId: string, photoId: string, name: string, cancelId: string) =>
     invoke<ColorReference>('capture_color_reference', { input: { projectId, photoId, name, cancelId } }),
   prepare: (photoId: string, referenceId: string, cancelId: string, quality?: ColorMatchQuality, intent?: ColorMatchIntent) =>
-    invoke<ColorMatchReport>('prepare_color_match', { input: { photoId, referenceId, cancelId, ...(quality ? { quality } : {}), ...(intent ? { intent } : {}) } }),
+    invoke<ColorMatchReport>('prepare_color_match', { input: { photoId, referenceId, cancelId, replacePrevious: true, ...(quality ? { quality } : {}), ...(intent ? { intent } : {}) } }),
   apply: (photoId: string, sessionId: string, controls: ColorMatchControls, cancelId: string) =>
     invoke<ColorMatchReport>('apply_color_match', { input: { photoId, sessionId, controls, cancelId } }),
 };

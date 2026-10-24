@@ -10,13 +10,21 @@ vi.mock('../../ipc/client', () => ({ inTauri: () => true, api: { cancelJob: vi.f
   asIpcError: (error: Error) => ({ message: error.message }) }));
 vi.mock('../../ipc/colorMatch', () => ({
   DEFAULT_MATCH_CONTROLS: { amount: 1, tone: 1, color: 1, whiteBalance: 1 }, pickColorReference: vi.fn(), pickColorReferences: vi.fn(),
-  colorMatch: { list: vi.fn(), status: vi.fn(), import: vi.fn(), prepare: vi.fn(), apply: vi.fn(), manage:vi.fn(), capture:vi.fn() },
+  colorMatch: { list: vi.fn(), status: vi.fn(), import: vi.fn(), prepare: vi.fn(), apply: vi.fn(), manage:vi.fn(), capture:vi.fn(), generatePreset:vi.fn() },
 }));
 const reference = { id: 'ref', name: 'My wedding.tiff', width: 4480, height: 6720, convertedIcc: true, regions: ['whole image', 'face skin'] };
 const analysis: ColorMatchReport = { sessionId: 'session', photoId: 'photo', reference,
   controls: { amount: 1, tone: 1, color: 1, whiteBalance: 1 }, matchedRegions: reference.regions,
   beforeDistance: 8, afterDistance: 3, changed: 0, protectedFields: 0, fullResolutionChecked: false, current: true };
 const onApply = async (action: () => Promise<unknown>) => { await action(); };
+it('puts Lightroom export last and disables generation for unsaved strengths', async () => {
+  vi.mocked(colorMatch.status).mockResolvedValue({ ...analysis, fullResolutionChecked: true });
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Generate .xmp for Lightroom' }).hasAttribute('disabled')).toBe(false));
+  expect(screen.getByRole('region', { name: 'Reference colour matching' }).lastElementChild?.getAttribute('aria-label')).toBe('Lightroom preset export');
+  fireEvent.change(screen.getByRole('slider', { name: 'Match amount' }), { target: { value: '75' } });
+  expect(screen.getByRole('button', { name: 'Generate .xmp for Lightroom' }).hasAttribute('disabled')).toBe(true);
+});
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(api.cancelJob).mockResolvedValue(true);
@@ -64,7 +72,7 @@ it('sends independent slider strengths and uses an explicit native application',
 it('shows separately verified tone and palette differences for the saved strengths', async () => {
   const distance = (tone: number, palette: number) => ({ tone, palette, cast: 1, chroma: 1, hue: 1, total: 3 });
   vi.mocked(colorMatch.status).mockResolvedValue({ ...analysis, fullResolutionChecked: true, fitting: {
-    engine: 'reference-palette-transport-v6', intent: 'palette', refinementCandidates: 4, uniqueRenders: 3, cachedProposals: 0,
+    engine: 'reference-palette-transport-v7', intent: 'palette', refinementCandidates: 4, uniqueRenders: 3, cachedProposals: 0,
     transfer: { renderedBefore: distance(8, 6), renderedAfter: distance(4, 2) },
   } });
   render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
@@ -149,7 +157,7 @@ it('does not import or fit when the reference picker is cancelled', async () => 
 it('requires a new analysis when changing from natural look to reference palette and tone', async () => {
   vi.mocked(colorMatch.status).mockResolvedValue(analysis);
   vi.mocked(colorMatch.prepare).mockResolvedValue({ ...analysis, fitting: {
-    engine: 'reference-palette-transport-v6', quality: 'precise', intent: 'palette',
+    engine: 'reference-palette-transport-v7', quality: 'precise', intent: 'palette',
     refinementCandidates: 4, uniqueRenders: 3, cachedProposals: 0,
   } });
   render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
@@ -162,14 +170,14 @@ it('requires a new analysis when changing from natural look to reference palette
   await waitFor(() => expect((screen.getByRole('button', { name: 'Apply colour strengths' }) as HTMLButtonElement).disabled).toBe(false));
 });
 
-it.each(['reference-palette-transport-v4', 'reference-palette-transport-v5'])('refits saved %s sessions with continuous palette transport', async engine => {
+it.each(['reference-palette-transport-v4', 'reference-palette-transport-v5', 'reference-palette-transport-v6'])('refits saved %s sessions with continuous palette transport', async engine => {
   const legacy = { ...analysis, fitting: {
     engine, quality: 'precise' as const, intent: 'palette' as const,
     refinementCandidates: 4, uniqueRenders: 3, cachedProposals: 0,
   } };
   vi.mocked(colorMatch.status).mockResolvedValue(legacy);
   vi.mocked(colorMatch.prepare).mockResolvedValue({ ...legacy, sessionId: 'guarded',
-    fitting: { ...legacy.fitting, engine: 'reference-palette-transport-v6' } });
+    fitting: { ...legacy.fitting, engine: 'reference-palette-transport-v7' } });
   render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
   await screen.findByTestId('colour-match-measurement');
   fireEvent.click(screen.getByRole('checkbox', { name: 'Real-Time Color Adjustments' }));

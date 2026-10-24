@@ -7,6 +7,7 @@ import { FINE_MATCH_FIELDS } from '../../ipc/colorMatchDetails';
 import { ColorReferenceLibrary } from './ColorReferenceLibrary';
 import { RegionalColorMatchPanel } from './RegionalColorMatchPanel';
 import { ReferenceLibraryManager } from './ReferenceLibraryManager';
+import { LightroomPresetExport } from './LightroomPresetExport';
 import { COLOR_MATCH_PREFERENCES, matchPreference, preferenceOf, recommendedReferences } from './colorMatchPreferences';
 import './colorMatchWorkspace.css';
 
@@ -146,7 +147,7 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
         }
         if (!analysis || analysis.reference.id !== referenceId || (analysis.fitting?.quality ?? 'precise') !== mode ||
             (analysis.fitting?.intent ?? 'natural') !== purpose ||
-            (purpose === 'palette' && analysis.fitting?.engine !== 'reference-palette-transport-v6')) {
+            (purpose === 'palette' && analysis.fitting?.engine !== 'reference-palette-transport-v7')) {
           analysis = purpose === 'natural' ? await colorMatch.prepare(photoId, referenceId, id, mode)
             : await colorMatch.prepare(photoId, referenceId, id, mode, purpose);
           if (!current()) return;
@@ -298,7 +299,9 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
   const removedSession = !libraryReference && report?.reference.id === selected;
   const ready = Boolean(report?.current && report.photoId === photoId && report.reference.id === selected &&
     (report.fitting?.quality ?? 'precise') === quality && (report.fitting?.intent ?? 'natural') === matchIntent &&
-    (matchIntent !== 'palette' || report.fitting?.engine === 'reference-palette-transport-v6'));
+    (matchIntent !== 'palette' || report.fitting?.engine === 'reference-palette-transport-v7'));
+  const savedStrengths = Boolean(report && SLIDERS.every(([key]) => controls[key] === report.controls[key]) &&
+    FINE_MATCH_FIELDS.every(([key]) => (controls.detail?.[key] ?? 1) === (report.controls.detail?.[key] ?? 1)));
   return <section className="lr-panel color-match-panel" aria-label="Reference colour matching" aria-busy={busy || regionalBusy}>
     <header className="color-match-heading"><span>AI STYLE</span><h3>Color Match</h3></header>
     <p className="lr-hint">Choose an edited JPEG, PNG or TIFF to guide the colour of a different photo. Tone and colour are matched; facial retouching stays with this photo.</p>
@@ -423,5 +426,8 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
       <button type="button" onClick={stop}>Stop colour matching</button></>}
     {!busy && message && <p role="status">{message}</p>}
     {error && <p role="alert">{error}</p>}
+    <LightroomPresetExport key={`${photoId}:${report?.sessionId ?? ''}:${revision ?? ''}:${JSON.stringify(controls)}:${selected}:${report?.current ?? false}`}
+      photoId={photoId} sessionId={report?.sessionId ?? ''} referenceName={report?.reference.name ?? ''}
+      eligible={ready && Boolean(report?.fullResolutionChecked) && savedStrengths} disabled={locked}/>
   </section>;
 }

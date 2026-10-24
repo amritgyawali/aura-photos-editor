@@ -2,6 +2,8 @@
 
 Date: 2026-10-24. Engine: `reference-palette-transport-v6`.
 
+Follow-up: the [v7 reference-replacement and Lightroom export report](AURA-Lightroom-match-preset-2026-10-24.md) resolves the earlier cross-reference baseline problem below and adds 20 native replacement checks. This v6 report remains the historical first-fit accuracy assessment.
+
 This upgrade addresses unstable colour mapping and newly amplified steps in smooth shadows. It does not make unrelated reference and target photographs match perfectly. Reference-palette resemblance, recovery of a known editing operation, and spatial image quality are measured separately.
 
 ## Code and behaviour
