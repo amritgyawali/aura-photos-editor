@@ -64,6 +64,16 @@ pub struct ReferenceGrade {
     pub zone_gain: Vec<f32>,
     /// How strongly skin-coloured pixels keep their own hue and colourfulness, `0..=1`.
     pub skin: f32,
+    /// Additional per-pixel skin tone/colour displacement protection for palette transfer.
+    /// Absent in older grades; zero preserves their rendering exactly.
+    #[serde(default, skip_serializing_if = "no_fidelity")]
+    pub skin_fidelity: f32,
+}
+
+// Serde's skip_serializing_if callback receives a borrowed field.
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn no_fidelity(value: &f32) -> bool {
+    *value <= 0.0
 }
 
 impl ReferenceGrade {
@@ -84,6 +94,7 @@ impl ReferenceGrade {
             hue_light: vec![0.0; SECTORS],
             zone_gain: vec![1.0; ZONES],
             skin: 0.0,
+            skin_fidelity: 0.0,
         }
     }
 
@@ -135,7 +146,7 @@ impl ReferenceGrade {
             .chain(&self.hue_shift)
             .chain(&self.hue_light)
             .chain(&self.zone_gain)
-            .chain(std::iter::once(&self.skin));
+            .chain([&self.skin, &self.skin_fidelity]);
         if !all.into_iter().all(|v| v.is_finite()) {
             return refuse("reference grade holds a non-finite value");
         }
@@ -180,6 +191,7 @@ impl ReferenceGrade {
                 .iter()
                 .any(|v| v.abs() > MAX_HUE_LIGHT + 1e-6)
             || !(0.0..=1.0).contains(&self.skin)
+            || !(0.0..=1.0).contains(&self.skin_fidelity)
         {
             return refuse("reference grade hue or zone adjustment is out of range");
         }
@@ -219,6 +231,7 @@ impl ReferenceGrade {
             *v = finite(*v, 0.0).clamp(-MAX_HUE_LIGHT, MAX_HUE_LIGHT);
         }
         self.skin = finite(self.skin, 0.0).clamp(0.0, 1.0);
+        self.skin_fidelity = finite(self.skin_fidelity, 0.0).clamp(0.0, 1.0);
         self
     }
 }
@@ -266,6 +279,19 @@ mod tests {
         write(&mut recipe, &identity).unwrap();
         assert_eq!(recipe, before);
         assert_eq!(read(&recipe).unwrap(), None);
+    }
+
+    #[test]
+    fn old_grades_keep_zero_skin_fidelity_and_new_fidelity_is_bounded() {
+        let identity = ReferenceGrade::identity();
+        let old = serde_json::to_value(&identity).unwrap();
+        assert!(old.get("skinFidelity").is_none());
+        let restored: ReferenceGrade = serde_json::from_value(old).unwrap();
+        assert_eq!(restored, identity);
+        let mut invalid = identity;
+        invalid.skin_fidelity = 1.5;
+        assert!(invalid.validate().is_err());
+        assert!((invalid.bounded().skin_fidelity - 1.0).abs() < f32::EPSILON);
     }
 
     #[test]

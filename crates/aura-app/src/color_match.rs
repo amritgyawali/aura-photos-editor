@@ -21,18 +21,22 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use crate::{commands::IpcResult, AppState};
 
 mod appearance;
+mod baseline;
+use baseline::AnalysisBaseline;
 mod calibration;
 mod content;
 pub use calibration::CalibrationReport;
 mod fine;
 pub use fine::FineControls;
 mod quality;
-pub use quality::MatchQuality;
+pub use quality::{MatchIntent, MatchQuality};
 pub(crate) mod gallery_fit;
 mod grade;
 mod library;
 mod matcher;
+mod native_checks;
 pub use matcher::TransferDiagnostics;
+pub(crate) use native_checks::NativeChecks;
 mod refine;
 mod transfer;
 pub use library::{
@@ -190,6 +194,8 @@ struct Session {
 pub struct FitDiagnostics {
     pub engine: String,
     #[serde(default)]
+    pub intent: MatchIntent,
+    #[serde(default)]
     pub quality: MatchQuality,
     #[serde(default)]
     pub target_samples: usize,
@@ -224,6 +230,8 @@ pub struct PrepareInput {
     pub photo_id: String,
     pub reference_id: String,
     pub cancel_id: String,
+    #[serde(default)]
+    pub intent: MatchIntent,
     #[serde(default)]
     pub quality: MatchQuality,
 }
@@ -397,8 +405,9 @@ fn persist_reference(
                     existing.achromatic = content::achromatic(image);
                     updated = true;
                 }
-                if existing.summary.preview.is_none() {
-                    existing.summary.preview = Some(reference_preview(image)?);
+                let preview = reference_preview(image, summary.width, summary.height)?;
+                if existing.summary.preview.as_deref() != Some(preview.as_str()) {
+                    existing.summary.preview = Some(preview);
                     updated = true;
                 }
                 if updated {
@@ -429,7 +438,7 @@ fn persist_reference(
         "data:image/png;base64,{}",
         crate::develop_commands::base64(&bytes)
     ));
-    summary.preview = Some(reference_preview(image)?);
+    summary.preview = Some(reference_preview(image, summary.width, summary.height)?);
     let regions = regions
         .into_iter()
         .map(|mut r| {
@@ -454,11 +463,28 @@ fn persist_reference(
 
 /// Locally stored comparison image; portable libraries deliberately export descriptors only.
 /// Bound each JPEG to 32 KiB so 128 references still fit the library metadata budget.
-fn reference_preview(image: &Rgb8) -> AuraResult<String> {
+fn reference_preview(image: &Rgb8, width: u32, height: u32) -> AuraResult<String> {
+    Ok(format!(
+        "data:image/jpeg;base64,{}",
+        crate::develop_commands::base64(&reference_preview_jpeg(image, width, height)?)
+    ))
+}
+
+fn reference_preview_jpeg(image: &Rgb8, width: u32, height: u32) -> AuraResult<Vec<u8>> {
     let rgb = image::RgbImage::from_raw(image.width, image.height, image.data.clone())
         .ok_or_else(|| invalid("Reference preview dimensions are invalid."))?;
     for edge in [512, 384, 256, 128] {
-        let small = image::imageops::thumbnail(&rgb, edge, edge);
+        // imageops resizes to exact dimensions. Keep the oriented source ratio
+        // for display without changing the measured pixels used by the matcher.
+        let scale = f64::from(edge) / f64::from(width.max(height).max(1));
+        let display_width = (f64::from(width) * scale).round().max(1.0) as u32;
+        let display_height = (f64::from(height) * scale).round().max(1.0) as u32;
+        let small = image::imageops::resize(
+            &rgb,
+            display_width,
+            display_height,
+            image::imageops::FilterType::Triangle,
+        );
         let mut bytes = Vec::new();
         image::codecs::jpeg::JpegEncoder::new_with_quality(&mut bytes, 82)
             .encode(
@@ -469,10 +495,7 @@ fn reference_preview(image: &Rgb8) -> AuraResult<String> {
             )
             .map_err(|_| invalid("Cannot save the reference comparison preview."))?;
         if bytes.len() <= 32 * 1024 {
-            return Ok(format!(
-                "data:image/jpeg;base64,{}",
-                crate::develop_commands::base64(&bytes)
-            ));
+            return Ok(bytes);
         }
     }
     Err(invalid(
@@ -599,14 +622,18 @@ pub fn prepare(state: &AppState, input: &PrepareInput) -> IpcResult<MatchReport>
         let reference: Reference = read(state, &asset_key(&input.reference_id)?)?
             .filter(|r: &Reference| r.engine == ENGINE)
             .ok_or_else(|| invalid("Choose a saved reference image first."))?;
-        let baseline = state.recipe_store().load(&photo)?.ok_or_else(|| {
-            invalid("Save an initial correction or edit on this photo before matching a reference.")
-        })?;
+        require_distinct_reference(state, photo, &reference.summary.id)?;
+        let baseline = AnalysisBaseline::select(state, photo, &reference.summary.id)?;
         // A reference measured by this build is matched by distribution transfer (ADR-0160).
         // One imported before it keeps the slider fit below until it is imported again.
         if let Some(stats) = transfer::recall(state, &input.reference_id)? {
             return matcher::prepare(state, cancel, input, photo, reference, baseline, stats);
         }
+        if input.intent == MatchIntent::Palette {
+            return Err(invalid("Reference palette matching needs fresh colour measurements. Upload its edited photo again, then analyse the match. No edit was saved."));
+        }
+        let observed_hash = baseline.observed_hash;
+        let baseline = baseline.recipe;
         let baseline_hash = aura_recipe::hash::recipe_hash(&baseline)?;
         // Fit reduced pixels from the native full decode. A camera's embedded thumbnail
         // already has its own colour treatment and is not the RAW export's fitting domain.
@@ -789,6 +816,7 @@ pub fn prepare(state: &AppState, input: &PrepareInput) -> IpcResult<MatchReport>
             "No colour treatment could preserve this photo's native skin tones and highlights. No edit was saved."))?;
         let fitting = Some(FitDiagnostics {
             engine: "bounded-pattern-search-v1".into(),
+            intent: input.intent,
             quality: input.quality,
             target_samples: (frame.width as usize) * (frame.height as usize),
             max_iterations: 0,
@@ -803,13 +831,7 @@ pub fn prepare(state: &AppState, input: &PrepareInput) -> IpcResult<MatchReport>
             transfer: None,
         });
         check_cancel(cancel)?;
-        if aura_recipe::hash::recipe_hash(&crate::develop_commands::load_or_neutral(state, photo)?)?
-            != baseline_hash
-        {
-            return Err(invalid(
-                "The photo changed during analysis. Your newer edit was kept. Analyse it again.",
-            ));
-        }
+        baseline::verify_current(state, photo, &observed_hash)?;
         let default_controls = reference.summary.default_controls.unwrap_or_default();
         let session = Session {
             engine: ENGINE.into(),
@@ -818,7 +840,7 @@ pub fn prepare(state: &AppState, input: &PrepareInput) -> IpcResult<MatchReport>
             reference: reference.summary,
             baseline,
             baseline_hash: baseline_hash.clone(),
-            last_hash: baseline_hash,
+            last_hash: observed_hash,
             fitted,
             reference_regions: reference.regions,
             target_regions,
@@ -953,14 +975,27 @@ pub fn apply(state: &AppState, input: &ApplyInput) -> IpcResult<MatchReport> {
             ));
         }
         let photo = PhotoId::from_db(&input.photo_id).map_err(|_| invalid("Invalid photo."))?;
-        let current = crate::develop_commands::load_or_neutral(state, photo)?;
+        require_distinct_reference(state, photo, &session.reference.id)?;
+        let saved = state.recipe_store().load(&photo)?;
+        let has_saved_recipe = saved.is_some();
+        let current =
+            saved.unwrap_or_else(|| crate::develop_commands::neutral_recipe(state, photo));
         let hash = aura_recipe::hash::recipe_hash(&current)?;
         if hash != session.last_hash && hash != session.baseline_hash {
             return Err(invalid("The photo changed after reference analysis. Your newer edit was kept. Analyse again before applying."));
         }
         if let Some(transfer) = session.transfer.clone() {
             return matcher::apply(
-                state, cancel, input, &key, session, transfer, photo, &current, hash,
+                state,
+                cancel,
+                input,
+                &key,
+                session,
+                transfer,
+                photo,
+                &current,
+                hash,
+                has_saved_recipe,
             );
         }
         let mono_strength =
@@ -1029,10 +1064,10 @@ pub fn apply(state: &AppState, input: &ApplyInput) -> IpcResult<MatchReport> {
         })?;
         let project = ProjectId::from_db(&project).map_err(|_| invalid("Invalid collection."))?;
         if !changes.changed.is_empty() {
-            state.recipe_store().save_if_current(&project, &photo, &merged, &changes.changed,
+            save_verified(state, &project, &photo, &merged, &changes.changed,
                 &format!("Reference colour: {}; amount {:.0}%, tone {:.0}%, colour {:.0}%, warmth {:.0}%; native-resolution appearance distance {:.2}",
                     session.reference.name, input.controls.amount * 100.0, input.controls.tone * 100.0,
-                    input.controls.color * 100.0, input.controls.white_balance * 100.0, distance), &hash)?;
+                    input.controls.color * 100.0, input.controls.white_balance * 100.0, distance), has_saved_recipe.then_some(hash.as_str()))?;
         }
         session.last_hash = if changes.changed.is_empty() {
             hash
@@ -1059,6 +1094,46 @@ pub fn apply(state: &AppState, input: &ApplyInput) -> IpcResult<MatchReport> {
     })
 }
 
+/// Both ingest and uploaded-reference IDs hash the complete source file with BLAKE3.
+/// Check every associated source (for example RAW plus JPEG), independent of its filename.
+fn require_distinct_reference(state: &AppState, photo: PhotoId, reference: &str) -> AuraResult<()> {
+    let identical: bool = state.catalog().read(|conn| {
+        conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM photo_file WHERE photo_id=?1 AND content_hash=?2)",
+            rusqlite::params![photo.to_db(), reference],
+            |row| row.get(0),
+        )
+        .map_err(|e| {
+            aura_core::errors::db::statement_failed("colour reference source identity", &e)
+        })
+    })?;
+    if identical {
+        return Err(invalid("Choose a different photo as the colour reference. This reference is the same source photo as the target."));
+    }
+    Ok(())
+}
+
+/// Preserve the recipe-presence snapshot taken before verification through the atomic save.
+/// An absent recipe is an implicit neutral baseline, never permission to overwrite a first edit.
+fn save_verified(
+    state: &AppState,
+    project: &ProjectId,
+    photo: &PhotoId,
+    recipe: &Recipe,
+    changed: &[String],
+    label: &str,
+    expected_hash: Option<&str>,
+) -> AuraResult<()> {
+    match expected_hash {
+        Some(hash) => state
+            .recipe_store()
+            .save_if_current(project, photo, recipe, changed, label, hash),
+        None => state
+            .recipe_store()
+            .save_first(project, photo, recipe, changed, label),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1070,13 +1145,29 @@ mod tests {
             height: 400,
             data: (0..600 * 400 * 3).map(|i| (i % 251) as u8).collect(),
         };
-        let preview = reference_preview(&image).unwrap();
+        let preview = reference_preview(&image, 600, 400).unwrap();
         assert!(preview.starts_with("data:image/jpeg;base64,"));
         assert!(
             preview.len() <= "data:image/jpeg;base64,".len() + (32_usize * 1024).div_ceil(3) * 4
         );
         let old: ReferenceSummary = serde_json::from_str(r#"{"id":"reference","name":"Old","width":600,"height":400,"convertedIcc":false,"regions":[]}"#).unwrap();
         assert!(old.preview.is_none());
+    }
+
+    #[test]
+    fn comparison_preview_preserves_landscape_and_portrait_photo_shapes() {
+        for (width, height) in [(640, 384), (384, 640)] {
+            let samples = Rgb8 {
+                width,
+                height,
+                data: vec![128; (width * height * 3) as usize],
+            };
+            let bytes = reference_preview_jpeg(&samples, width, height).unwrap();
+            let image = image::load_from_memory(&bytes).unwrap();
+            assert!(image.width().max(image.height()) <= 512);
+            let ratio = f64::from(image.width()) / f64::from(image.height());
+            assert!((ratio - f64::from(width) / f64::from(height)).abs() < 0.004);
+        }
     }
 
     #[test]

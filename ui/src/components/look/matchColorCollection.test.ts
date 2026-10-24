@@ -61,6 +61,14 @@ it('defaults to precise instead of reusing a saved quick fit', async () => {
   expect(colorMatch.prepare).toHaveBeenCalledTimes(2);
   expect(colorMatch.prepare).toHaveBeenNthCalledWith(1, 'a', 'ref', 'job');
 });
+
+it('refits each target when palette matching replaces a saved natural analysis', async () => {
+  vi.mocked(colorMatch.status).mockImplementation(async photo => result(photo));
+  await matchColorCollection('project', 'ref', controls, 'job', () => false, vi.fn(), vi.fn(), { quality: 'quick', intent: 'palette' });
+  expect(colorMatch.prepare).toHaveBeenCalledTimes(2);
+  expect(colorMatch.prepare).toHaveBeenNthCalledWith(1, 'a', 'ref', 'job', 'quick', 'palette');
+  expect(colorMatch.prepare).toHaveBeenNthCalledWith(2, 'b', 'ref', 'job', 'quick', 'palette');
+});
 it('rejects a native result for a different reference', async () => {
   vi.mocked(colorMatch.apply).mockResolvedValueOnce({ ...result('a'), reference: { ...result('a').reference, id: 'other' } });
   const results = await matchColorCollection('project', 'ref', controls, 'job', () => false, vi.fn(), vi.fn());

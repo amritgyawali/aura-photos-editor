@@ -236,6 +236,7 @@ fn a_new_photograph_takes_an_edited_references_look_through_the_renderer() {
     let prepared = color_match::prepare(
         &state,
         &color_match::PrepareInput {
+            intent: Default::default(),
             quality: Default::default(),
             photo_id: photo.to_db(),
             reference_id: reference.id.clone(),
@@ -335,6 +336,7 @@ fn a_new_photograph_takes_an_edited_references_look_through_the_renderer() {
     let replacing = color_match::prepare(
         &state,
         &color_match::PrepareInput {
+            intent: Default::default(),
             quality: Default::default(),
             photo_id: photo.to_db(),
             reference_id: second.id,
@@ -418,6 +420,7 @@ fn a_native_regression_is_refused_and_stale_measurements_can_be_refreshed() {
     };
     let reference = color_match::import_reference(&state, &input).expect("reference");
     let prepare = color_match::PrepareInput {
+        intent: Default::default(),
         quality: Default::default(),
         photo_id: photo.to_db(),
         reference_id: reference.id.clone(),
@@ -548,6 +551,7 @@ fn clipping_is_refused_even_when_it_would_match_reference_statistics() {
     let session = color_match::prepare(
         &state,
         &color_match::PrepareInput {
+            intent: Default::default(),
             quality: Default::default(),
             photo_id: photo.to_db(),
             reference_id: reference.id,
