@@ -11,21 +11,31 @@ pub(super) struct AnalysisBaseline {
 }
 
 impl AnalysisBaseline {
-    pub(super) fn select(state: &AppState, photo: PhotoId, reference: &str) -> AuraResult<Self> {
+    pub(super) fn select(
+        state: &AppState,
+        photo: PhotoId,
+        reference: &str,
+        replace_previous: bool,
+    ) -> AuraResult<Self> {
         let current = crate::develop_commands::load_or_neutral(state, photo)?;
         let observed_hash = aura_recipe::hash::recipe_hash(&current)?;
         let previous: Option<Session> = read(state, &session_key(&photo.to_db())?)?;
-        let recipe = previous
+        let mut recipe = previous
             .filter(|session| {
                 session.engine == ENGINE
                     && session.photo_id == photo.to_db()
-                    && session.reference.id == reference
+                    && (session.reference.id == reference || replace_previous)
                     && (session.last_hash == observed_hash
                         || session.baseline_hash == observed_hash)
                     && aura_recipe::hash::recipe_hash(&session.baseline)
                         .is_ok_and(|hash| hash == session.baseline_hash)
             })
             .map_or(current, |session| session.baseline);
+        if replace_previous {
+            // Only the reference treatment is replaced. A newer manual edit remains
+            // the current baseline above; its exposure, masks and finishing are kept.
+            recipe.extra.remove(aura_recipe::reference_grade::KEY);
+        }
         Ok(Self {
             recipe,
             observed_hash,
@@ -80,6 +90,17 @@ mod tests {
         let baseline = crate::develop_commands::neutral_recipe(&state, photo);
         let mut shown = baseline.clone();
         shown.global.saturation = 12;
+        let mut earlier_grade = aura_recipe::reference_grade::ReferenceGrade::identity();
+        earlier_grade
+            .tone
+            .iter_mut()
+            .for_each(|value| *value *= 0.9);
+        aura_recipe::reference_grade::write(&mut shown, &earlier_grade)
+            .expect("earlier reference grade");
+        let shown: Recipe = serde_json::from_str(
+            &aura_recipe::hash::canonical(&shown).expect("canonical earlier grade"),
+        )
+        .expect("stored numeric representation");
         state
             .recipe_store()
             .save_first(
@@ -115,15 +136,25 @@ mod tests {
             transfer: None,
         };
         store(&state, &session_key(&photo.to_db()).expect("key"), &session).expect("session");
-        let selected =
-            AnalysisBaseline::select(&state, photo, &reference).expect("select stable baseline");
+        let selected = AnalysisBaseline::select(&state, photo, &reference, false)
+            .expect("select stable baseline");
         assert_eq!(selected.recipe, baseline);
         assert_eq!(selected.observed_hash, shown_hash);
-        let different =
-            AnalysisBaseline::select(&state, photo, &"b".repeat(64)).expect("other reference");
+        let different = AnalysisBaseline::select(&state, photo, &"b".repeat(64), false)
+            .expect("other reference");
         assert_eq!(
             different.recipe, shown,
             "different references retain their earlier-look crossfade"
+        );
+        let replacement = AnalysisBaseline::select(&state, photo, &"b".repeat(64), true)
+            .expect("replacement baseline");
+        assert_eq!(
+            replacement.recipe, baseline,
+            "replace the earlier treatment from its stable baseline"
+        );
+        assert_eq!(
+            replacement.observed_hash, shown_hash,
+            "saving is still guarded by the current edit"
         );
         let mut manual = shown;
         manual.global.exposure = 0.25;
@@ -147,11 +178,19 @@ mod tests {
                 .expect("saved"),
             manual
         );
-        let refreshed =
-            AnalysisBaseline::select(&state, photo, &reference).expect("explicit fresh analysis");
+        let refreshed = AnalysisBaseline::select(&state, photo, &reference, false)
+            .expect("explicit fresh analysis");
         assert_eq!(
             refreshed.recipe, manual,
             "a stale session must not discard a newer manual baseline"
+        );
+        let mut expected = manual.clone();
+        expected.extra.remove(aura_recipe::reference_grade::KEY);
+        let replacement = AnalysisBaseline::select(&state, photo, &"b".repeat(64), true)
+            .expect("replacement after manual edit");
+        assert_eq!(
+            replacement.recipe, expected,
+            "keep all newer manual work while replacing only the reference grade"
         );
     }
 }

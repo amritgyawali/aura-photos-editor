@@ -27,12 +27,14 @@ def main():
     parser.add_argument('--exe', type=Path, default=ROOT / 'target/desktop-launch/debug/aura-desktop.exe')
     parser.add_argument('--port', type=int, default=9377)
     parser.add_argument('--intent', choices=['natural', 'palette'], default='natural')
+    parser.add_argument('--second-reference', type=Path, help='Also verify switching to a different reference and matching it in one click.')
+    parser.add_argument('--allow-switch-refusal', action='store_true', help='Also accept an explicit native refusal only when the prior recipe/session remain unchanged. Record refusal separately from matching.')
     args = parser.parse_args()
     out = ROOT / '.work-checks' / ('reference-workspace-' + uuid.uuid4().hex[:8])
     out.mkdir(parents=True)
     sources = []
     fingerprints = []
-    for index, source in enumerate([args.reference, *args.targets]):
+    for index, source in enumerate([args.reference, *args.targets, *([args.second_reference] if args.second_reference else [])]):
         with Image.open(source) as image:
             image = ImageOps.exif_transpose(image).convert('RGB')
             normalized = hashlib.sha256(image.resize((32, 32)).tobytes()).hexdigest()
@@ -41,14 +43,15 @@ def main():
             assert all(normalized != previous['pixelHash'] and (dhash ^ previous['dHash']).bit_count() > 6 for previous in fingerprints), 'The smoke test requires different photos, not duplicate or before/after versions of the same frame.'
             fingerprints.append({'path': str(source.resolve()), 'pixelHash': normalized, 'dHash': dhash})
             image.thumbnail((640, 640))
-            path = out / ('reference.png' if index == 0 else f'target-{index}.png')
+            path = out / ('reference.png' if index == 0 else 'second-reference.png' if index == 3 else f'target-{index}.png')
             image.save(path)
             sources.append(path)
     hashes = {str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in sources}
     env = dict(os.environ, AURA_TEST_CATALOG=str(out / 'catalog.sqlite'),
                WEBVIEW2_USER_DATA_FOLDER=str(out / 'webview'),
                WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=f'--remote-debugging-port={args.port}')
-    process = subprocess.Popen([str(args.exe.resolve())], cwd=ROOT, env=env)
+    desktop_log = (out / 'desktop.log').open('w', encoding='utf-8')
+    process = subprocess.Popen([str(args.exe.resolve())], cwd=ROOT, env=env, stdout=desktop_log, stderr=subprocess.STDOUT)
     report = {'checks': {}, 'pageErrors': [], 'fixtureHashes': hashes, 'uniqueInputs': fingerprints, 'intent': args.intent}
     try:
         for _ in range(120):
@@ -60,6 +63,9 @@ def main():
         with sync_playwright() as pw:
             browser = pw.chromium.connect_over_cdp(f'http://127.0.0.1:{args.port}')
             page = next(p for c in browser.contexts for p in c.pages)
+            page.on('close', lambda: report.setdefault('runtimeEvents', []).append('page closed'))
+            page.on('crash', lambda: report.setdefault('runtimeEvents', []).append('page crashed'))
+            browser.on('disconnected', lambda: report.setdefault('runtimeEvents', []).append('CDP browser disconnected'))
             page.set_viewport_size({'width': 1920, 'height': 1080})
             page.set_default_timeout(180000)
             expect.set_options(timeout=180000)
@@ -74,7 +80,7 @@ def main():
 
             name = 'Reference workspace ' + uuid.uuid4().hex[:6]
             project = call('create_project', name=name, coupleNames=None, eventDate=None)['id']
-            call('start_ingest', projectId=project, roots=[str(path) for path in sources[1:]])
+            call('start_ingest', projectId=project, roots=[str(path) for path in sources[1:3]])
             photos = []
             for _ in range(120):
                 photos = call('list_images', projectId=project, offset=0, limit=10, orderBy='timeline')
@@ -100,11 +106,10 @@ def main():
                 probe.frame=requestAnimationFrame(tick);window.__auraFrameProbe=probe;
             }''')
             panel.get_by_label('Matching mode', exact=True).select_option('quick')
-            panel.get_by_role('button', name='Analyse reference match', exact=True).click()
-            apply = panel.get_by_role('button', name='Apply colour strengths', exact=True)
-            expect(apply).to_be_enabled()
-            apply.click()
-            expect(apply).to_be_enabled()
+            match = panel.get_by_role('button', name='Match reference to this photo', exact=True)
+            expect(panel.get_by_text('The selected reference has not been applied', exact=False)).to_be_visible()
+            match.click()
+            expect(match).to_be_enabled()
             active_name = page.get_by_role('listbox', name='Filmstrip').get_by_role('option', selected=True).get_attribute('aria-label')
             photo = next(item['id'] for item in photos if item['fileName'] == active_name)
 
@@ -114,18 +119,36 @@ def main():
                     value = status(photo)
                     if value and predicate(value):
                         return value
+                    alerts = page.get_by_role('alert').all_text_contents()
+                    if alerts:
+                        raise RuntimeError('Native UI refusal: ' + ' '.join(alerts))
                     time.sleep(.3)
                 raise AssertionError('Timed out waiting for saved colour match')
 
             saved = wait_status(lambda value: value['fullResolutionChecked'])
+            def verify_components(value):
+                transfer = value['fitting']['transfer']
+                assert abs(transfer['renderedAfter']['total'] - value['afterDistance']) < .001
+                components = panel.get_by_test_id('colour-match-components')
+                expect(components).to_contain_text(f"Tone difference: {transfer['renderedBefore']['tone']:.2f} \u2192 {transfer['renderedAfter']['tone']:.2f}.")
+                if args.intent == 'palette':
+                    expect(components).to_contain_text(f"Colour palette difference: {transfer['renderedBefore']['palette']:.2f} \u2192 {transfer['renderedAfter']['palette']:.2f}.")
+                report.setdefault('componentReadouts', []).append(dict(amount=value['controls']['amount'],
+                    renderedAfter=transfer['renderedAfter'], text=components.inner_text()))
+
+            verify_components(saved)
+            report['checks']['nativeComponentReadouts'] = True
             assert saved['fitting']['quality'] == 'quick'
             assert saved['fitting'].get('intent', 'natural') == args.intent
             assert saved['fitting']['targetSamples'] <= 10000 and saved['fitting']['maxIterations'] == 2
             report['checks']['quickNativeApply'] = True
+            report['checks']['oneClickMatchesSelectedReference'] = saved['reference']['id'] == reference['id']
             print('Quick fitting and native apply passed', flush=True)
             panel.get_by_role('checkbox', name='Real-Time Color Adjustments').check()
             panel.get_by_role('slider', name='Match amount', exact=True).evaluate("el => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, '75'); el.dispatchEvent(new Event('input', {bubbles:true})); }")
-            wait_status(lambda value: abs(value['controls']['amount'] - .75) < .001)
+            live = wait_status(lambda value: abs(value['controls']['amount'] - .75) < .001)
+            verify_components(live)
+            report['checks']['componentReadoutsFollowSavedStrength'] = True
             report['checks']['liveStrengthSaved'] = True
             expect(panel.get_by_role('button', name='Save Preset', exact=True)).to_be_enabled()
             panel.get_by_role('button', name='Save Preset', exact=True).click()
@@ -152,6 +175,34 @@ def main():
             report['checks']['collectionNativeRefits'] = True
             frame_probe = page.evaluate('''()=>{const p=window.__auraFrameProbe;
                 cancelAnimationFrame(p.frame);return {gaps:p.gaps,visibility:document.visibilityState}}''')
+            if args.second_reference:
+                replacement = call('import_color_reference', path=str(sources[3]), cancelId=str(uuid.uuid4()))
+                before_switch = call('image_recipe', photoId=photo)['recipeHash']
+                session_before_switch = status(photo)['sessionId']
+                page.reload()
+                page.get_by_role('button', name=f'{name} 2', exact=True).click()
+                page.get_by_role('button', name='Match a look Your reference, your photos', exact=True).click()
+                panel.get_by_label('Saved colour reference', exact=True).select_option(replacement['id'])
+                expect(panel.get_by_text('The selected reference has not been applied', exact=False)).to_be_visible()
+                assert call('image_recipe', photoId=photo)['recipeHash'] == before_switch
+                panel.get_by_role('button', name='Match reference to this photo', exact=True).click()
+                try:
+                    saved = wait_status(lambda value: value['reference']['id'] == replacement['id'] and value['fullResolutionChecked'])
+                    if args.intent == 'palette':
+                        assert saved['fitting']['engine'] == 'reference-palette-transport-v7'
+                    report['checks']['changedReferenceIsActuallyApplied'] = saved['current']
+                    report['referenceSwitchOutcome'] = 'matched'
+                except RuntimeError as error:
+                    if not args.allow_switch_refusal or not str(error).startswith('Native UI refusal:'):
+                        raise
+                    assert call('image_recipe', photoId=photo)['recipeHash'] == before_switch
+                    assert status(photo)['sessionId'] == session_before_switch
+                    expect(panel.get_by_text('The selected reference has not been applied', exact=False)).to_be_visible()
+                    expect(panel.get_by_text('Matching the selected reference to this photo', exact=False)).to_have_count(0)
+                    report['referenceSwitchOutcome'] = 'refused without changing the saved edit or prior session'
+                    report['referenceSwitchRefusal'] = str(error)
+                    report['checks']['refusedReferenceSwitchPreservesEditAndSession'] = True
+                    report['checks']['refusalClearsMatchingProgress'] = True
             gaps = sorted(frame_probe['gaps'])
             report['responsiveness'] = {'visibleFrameSamples': len(gaps), 'visibilityAtEnd': frame_probe['visibility'],
                 'medianGapMilliseconds': gaps[len(gaps) // 2] if gaps else None,
@@ -168,12 +219,14 @@ def main():
         report['failure'] = f'{type(error).__name__}: {error}'
         raise
     finally:
+        report['desktopExitCodeBeforeCleanup'] = process.poll()
         (out / 'results.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
         process.terminate()
         try:
             process.wait(timeout=15)
         except subprocess.TimeoutExpired:
             process.kill()
+        desktop_log.close()
 
 
 if __name__ == '__main__':

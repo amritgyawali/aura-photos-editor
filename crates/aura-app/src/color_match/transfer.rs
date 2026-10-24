@@ -81,6 +81,9 @@ mod sampling;
 pub(super) use sampling::samples;
 mod neutral;
 use neutral::neutral_axis;
+mod palette;
+mod quantile;
+use quantile::QuantileMap;
 
 /// What a photograph's colour and tone are, as the fit compares them.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -99,6 +102,11 @@ pub(super) struct GradeStats {
     pub sector_hue: Vec<f32>,
     pub sector_light: Vec<f32>,
     pub achromatic: bool,
+    /// Compact joint colour evidence. Older v3 measurements are refreshed from their preview.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub palette_samples: Vec<[f32; 3]>,
+    #[serde(default)]
+    pub palette_matching: bool,
 }
 
 impl GradeStats {
@@ -130,7 +138,9 @@ impl GradeStats {
                 .chain(&self.sector_chroma)
                 .chain(&self.sector_hue)
                 .chain(&self.sector_light)
+                .chain(self.palette_samples.iter().flatten())
                 .all(|v| v.is_finite())
+            && self.palette_samples.len() <= 1024
     }
 }
 
@@ -280,6 +290,8 @@ pub(super) fn measure(labs: &[[f32; 3]]) -> GradeStats {
         sector_hue,
         sector_light,
         achromatic,
+        palette_samples: palette::compact(labs),
+        palette_matching: false,
     }
 }
 
@@ -301,6 +313,8 @@ pub struct Distance {
     pub cast: f32,
     pub chroma: f32,
     pub hue: f32,
+    #[serde(default)]
+    pub palette: f32,
     pub total: f32,
 }
 
@@ -338,60 +352,29 @@ pub(super) fn distance(reference: &GradeStats, actual: &GradeStats) -> Distance 
     } else {
         0.0
     };
+    let palette = if reference.palette_matching {
+        palette::distance(&reference.palette_samples, &actual.palette_samples)
+    } else {
+        0.0
+    };
     Distance {
         tone,
         cast,
         chroma,
         hue,
-        total: (tone + cast + chroma + hue) / 4.0,
+        palette,
+        total: if reference.palette_matching {
+            (tone + cast + chroma + hue + 4.0 * palette) / 8.0
+        } else {
+            (tone + cast + chroma + hue) / 4.0
+        },
     }
 }
 
 /// Map `x` through the quantile function: where `x` sits among `from`, the same place in `to`.
 /// Runs of equal quantiles - a clipped sky, a black border - map to the mean of their run.
 fn quantile_map(from: &[f32], to: &[f32], x: f32, ceiling: f32, slopes: (f32, f32)) -> f32 {
-    let last = from.len().min(to.len()).saturating_sub(1);
-    if last == 0 {
-        return x;
-    }
-    let edge = (from.len() / 16).clamp(1, last);
-    let slope = |df: f32, dt: f32| {
-        if df > 1e-4 {
-            (dt / df).clamp(slopes.0, slopes.1)
-        } else {
-            1.0
-        }
-    };
-    let (f0, fl) = (at(from, 0), at(from, last));
-    if x <= f0 {
-        let s = slope(at(from, edge) - f0, at(to, edge) - at(to, 0));
-        return (at(to, 0) - (f0 - x) * s).max(0.0);
-    }
-    if x >= fl {
-        let s = slope(
-            fl - at(from, last - edge),
-            at(to, last) - at(to, last - edge),
-        );
-        return (at(to, last) + (x - fl) * s).min(ceiling);
-    }
-    let run_mean = |index: usize| {
-        let value = at(from, index);
-        let start = from.partition_point(|v| *v < value);
-        let end = from.partition_point(|v| *v <= value).max(start + 1);
-        let span = start..end.min(last + 1);
-        let count = span.len().max(1) as f32;
-        span.map(|i| at(to, i)).sum::<f32>() / count
-    };
-    let j = from
-        .partition_point(|v| *v <= x)
-        .saturating_sub(1)
-        .min(last - 1);
-    let (fa, fb) = (at(from, j), at(from, j + 1));
-    let (ta, tb) = (run_mean(j), run_mean(j + 1));
-    if fb - fa <= 1e-7 {
-        return ta;
-    }
-    ta + (tb - ta) * ((x - fa) / (fb - fa)).clamp(0.0, 1.0)
+    QuantileMap::new(from, to, ceiling, slopes).apply(x)
 }
 
 /// Evaluate a curve stored as evenly spaced nodes over `0..=span`, linearly.
@@ -777,6 +760,7 @@ pub(super) fn mix(from: &ReferenceGrade, to: &ReferenceGrade, scales: &Scales) -
     }
     out.skin = lerp(from.skin, to.skin, scales.skin);
     out.skin_fidelity = lerp(from.skin_fidelity, to.skin_fidelity, scales.skin);
+    out.palette = palette::mix(from.palette.as_ref(), to.palette.as_ref(), scales);
     if out.validate().is_err() {
         out = out.bounded();
     }
@@ -956,6 +940,9 @@ pub(super) fn fit_with_intent_checkpoint(
     mut checkpoint: impl FnMut() -> AuraResult<()>,
 ) -> AuraResult<Fit> {
     checkpoint()?;
+    let mut reference = reference.clone();
+    reference.palette_matching = intent == super::MatchIntent::Palette;
+    let reference = &reference;
     let labs: Vec<[f32; 3]> = target.iter().map(|s| s.lab).collect();
     let start = measure(&labs);
     let before = distance(reference, &start);
@@ -1001,6 +988,9 @@ pub(super) fn fit_with_intent_checkpoint(
         if d.total.is_finite() && d.total + 1e-4 < best.0.total {
             best = (d, candidate);
         }
+    }
+    if fitter.palette && !fitter.monochrome && reference.palette_samples.len() >= MIN_SAMPLES {
+        best = palette::refine(reference, target, best, quality, &mut checkpoint)?;
     }
     Ok(Fit {
         grade: best.1,
@@ -1113,7 +1103,9 @@ fn stats_key(id: &str) -> AuraResult<String> {
 /// A reference imported before this engine is measured the next time it is imported or captured.
 pub(super) fn remember(state: &AppState, id: &str, image: &Rgb8) -> AuraResult<()> {
     let key = stats_key(id)?;
-    if super::read::<GradeStats>(state, &key)?.is_some_and(|s| s.usable()) {
+    if super::read::<GradeStats>(state, &key)?
+        .is_some_and(|s| s.usable() && s.palette_samples.len() >= MIN_SAMPLES)
+    {
         return Ok(());
     }
     let labs: Vec<[f32; 3]> = samples(image, REFERENCE_SAMPLES)

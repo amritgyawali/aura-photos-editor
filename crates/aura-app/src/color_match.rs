@@ -30,9 +30,12 @@ mod fine;
 pub use fine::FineControls;
 mod quality;
 pub use quality::{MatchIntent, MatchQuality};
+mod contours;
 pub(crate) mod gallery_fit;
 mod grade;
 mod library;
+mod lightroom;
+pub use lightroom::{generate as generate_lightroom_preset, PresetInput, PresetReport};
 mod matcher;
 mod native_checks;
 pub use matcher::TransferDiagnostics;
@@ -234,6 +237,10 @@ pub struct PrepareInput {
     pub intent: MatchIntent,
     #[serde(default)]
     pub quality: MatchQuality,
+    /// Replace an earlier reference treatment while preserving manual recipe work.
+    /// Omitted by legacy callers, which retain their earlier-look crossfade.
+    #[serde(default)]
+    pub replace_previous: bool,
 }
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -623,7 +630,8 @@ pub fn prepare(state: &AppState, input: &PrepareInput) -> IpcResult<MatchReport>
             .filter(|r: &Reference| r.engine == ENGINE)
             .ok_or_else(|| invalid("Choose a saved reference image first."))?;
         require_distinct_reference(state, photo, &reference.summary.id)?;
-        let baseline = AnalysisBaseline::select(state, photo, &reference.summary.id)?;
+        let baseline =
+            AnalysisBaseline::select(state, photo, &reference.summary.id, input.replace_previous)?;
         // A reference measured by this build is matched by distribution transfer (ADR-0160).
         // One imported before it keeps the slider fit below until it is imported again.
         if let Some(stats) = transfer::recall(state, &input.reference_id)? {

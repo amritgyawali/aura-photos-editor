@@ -94,7 +94,12 @@ fn diagnostics(
     observation: Observations,
 ) -> FitDiagnostics {
     FitDiagnostics {
-        engine: ENGINE_NAME.into(),
+        engine: if input.intent == MatchIntent::Palette {
+            "reference-palette-transport-v7"
+        } else {
+            ENGINE_NAME
+        }
+        .into(),
         intent: input.intent,
         quality: input.quality,
         target_samples: observation.samples,
@@ -122,6 +127,26 @@ fn diagnostics(
     }
 }
 
+fn upgrade_palette_measurements(
+    reference: &Reference,
+    stats: &mut transfer::GradeStats,
+) -> AuraResult<()> {
+    // Older v3 descriptors have a small stored preview but no joint colour evidence.
+    if stats.palette_samples.is_empty() {
+        if reference.small_rgb.len() != content::BYTES {
+            return Err(invalid("This reference needs joint colour measurements. Upload its edited photo again. No edit was saved."));
+        }
+        stats.palette_samples = transfer::measure_image(&Rgb8 {
+            width: content::EDGE,
+            height: content::EDGE,
+            data: reference.small_rgb.clone(),
+        })
+        .palette_samples;
+    }
+    stats.palette_matching = true;
+    Ok(())
+}
+
 /// Measure the photograph without any earlier reference grade and fit the reference onto it.
 pub(super) fn prepare(
     state: &AppState,
@@ -130,8 +155,11 @@ pub(super) fn prepare(
     photo: PhotoId,
     reference: Reference,
     baseline: AnalysisBaseline,
-    reference_measurements: transfer::GradeStats,
+    mut reference_measurements: transfer::GradeStats,
 ) -> AuraResult<MatchReport> {
+    if input.intent == MatchIntent::Palette {
+        upgrade_palette_measurements(&reference, &mut reference_measurements)?;
+    }
     let observed_hash = baseline.observed_hash;
     let baseline = baseline.recipe;
     let baseline_hash = aura_recipe::hash::recipe_hash(&baseline)?;
@@ -314,7 +342,7 @@ fn verified_distances(
         session.reference_monochrome,
     )?;
     let checked = review.check(state, cancel, candidate)?.ok_or_else(|| invalid(
-        "This strength failed the full-resolution highlight or skin-colour check, or moved colour farther from the reference. Reduce the strengths and apply again. No edit was saved."))?;
+        "This strength failed the full-resolution smoothness, highlight or skin-colour check, or moved colour farther from the reference. Reduce the strengths and apply again. No edit was saved."))?;
     Ok((review.before, checked.after, checked.reused))
 }
 
@@ -349,6 +377,10 @@ pub(super) fn apply(
     if let Some(fitting) = session.fitting.as_mut() {
         fitting.native_candidate_checked = true;
         fitting.cached_proposals += usize::from(reused);
+        if let Some(transfer) = fitting.transfer.as_mut() {
+            transfer.rendered_before = before;
+            transfer.rendered_after = after;
+        }
     }
     let mut merged = current.clone();
     match candidate.extra.get(grade_model::KEY) {

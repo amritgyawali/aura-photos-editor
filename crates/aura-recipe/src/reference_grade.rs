@@ -15,6 +15,9 @@ use crate::{errors::recipe_invalid, Recipe};
 use aura_core::AuraResult;
 use serde::{Deserialize, Serialize};
 
+pub mod palette;
+pub use palette::PaletteMap;
+
 pub const KEY: &str = "reference_grade_v1";
 /// Tone curve nodes, evenly spaced over input OKLab lightness `0..=1`.
 pub const TONE_NODES: usize = 33;
@@ -68,6 +71,9 @@ pub struct ReferenceGrade {
     /// Absent in older grades; zero preserves their rendering exactly.
     #[serde(default, skip_serializing_if = "no_fidelity")]
     pub skin_fidelity: f32,
+    /// Optional full-palette chromatic transport; older grades render exactly as before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub palette: Option<PaletteMap>,
 }
 
 // Serde's skip_serializing_if callback receives a borrowed field.
@@ -95,6 +101,7 @@ impl ReferenceGrade {
             zone_gain: vec![1.0; ZONES],
             skin: 0.0,
             skin_fidelity: 0.0,
+            palette: None,
         }
     }
 
@@ -113,6 +120,7 @@ impl ReferenceGrade {
                 .zip(&self.cast_out)
                 .all(|(a, b)| (a[0] - b[0]).abs() <= 1e-5 && (a[1] - b[1]).abs() <= 1e-5);
         near(&self.tone, &identity.tone)
+            && self.palette.as_ref().is_none_or(PaletteMap::is_identity)
             && casts_equal
             && near(&self.chroma, &identity.chroma)
             && near(&self.hue_gain, &identity.hue_gain)
@@ -124,6 +132,9 @@ impl ReferenceGrade {
     /// # Errors
     /// Wrong node counts, non-finite values, a decreasing curve or a value outside its bound.
     pub fn validate(&self) -> AuraResult<()> {
+        if let Some(palette) = &self.palette {
+            palette.validate()?;
+        }
         let refuse = |why: &str| Err(recipe_invalid(KEY, why));
         let lengths = self.tone.len() == TONE_NODES
             && self.cast_in.len() == AXIS_NODES
@@ -232,6 +243,9 @@ impl ReferenceGrade {
         }
         self.skin = finite(self.skin, 0.0).clamp(0.0, 1.0);
         self.skin_fidelity = finite(self.skin_fidelity, 0.0).clamp(0.0, 1.0);
+        if let Some(palette) = self.palette.as_mut() {
+            palette.bound();
+        }
         self
     }
 }
