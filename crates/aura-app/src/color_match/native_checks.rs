@@ -130,6 +130,7 @@ mod tests {
             cast: total,
             chroma: total,
             hue: total,
+            palette: total,
             total,
         }
     }

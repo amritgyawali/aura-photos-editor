@@ -288,7 +288,7 @@ def main():
             duplicate.write_bytes((dataset / first['input']['path']).read_bytes())
             duplicate_reference = call('import_color_reference', path=str(duplicate), cancelId=str(uuid.uuid4()))
             try:
-                call('prepare_color_match', photoId=first_photo, referenceId=duplicate_reference['id'], cancelId=str(uuid.uuid4()), quality='precise')
+                call('prepare_color_match', photoId=first_photo, referenceId=duplicate_reference['id'], cancelId=str(uuid.uuid4()), quality=args.quality, intent=args.intent)
                 raise AssertionError('Identical renamed reference was accepted')
             except Exception as error:
                 assert 'different' in str(error).lower() or 'same' in str(error).lower(), str(error)
@@ -333,6 +333,7 @@ def main():
         report['failure'] = f'{type(error).__name__}: {error}'
         raise
     finally:
+        report['desktopExitCodeBeforeCleanup'] = process.poll()
         artifacts(out, report, manifest)
         process.terminate()
         try: process.wait(timeout=15)

@@ -60,6 +60,41 @@ it('sends independent slider strengths and uses an explicit native application',
   fireEvent.click(screen.getByRole('button', { name: 'Remove matched treatment' }));
   await waitFor(() => expect(colorMatch.apply).toHaveBeenLastCalledWith('photo', 'session', { amount: 0, tone: 0.2, color: 0.8, whiteBalance: 0 }, expect.any(String)));
 });
+it('matches the newly selected reference with a fresh analysis and native apply in one click', async () => {
+  const warm = { ...reference, id: 'warm', name: 'Warm portrait.jpg' };
+  vi.mocked(colorMatch.list).mockResolvedValue([reference, warm]);
+  vi.mocked(colorMatch.status).mockResolvedValue({ ...analysis, fullResolutionChecked: true });
+  vi.mocked(colorMatch.prepare).mockResolvedValue({ ...analysis, sessionId: 'warm-session', reference: warm });
+  vi.mocked(colorMatch.apply).mockImplementation(async (_photo,_session,controls) => ({
+    ...analysis, reference: warm, sessionId: 'warm-session', controls, fullResolutionChecked: true, changed: 1,
+  }));
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
+  await screen.findByRole('option', { name: warm.name });
+  fireEvent.change(screen.getByLabelText('Saved colour reference'), { target: { value: 'warm' } });
+  expect(screen.getByText(/selected reference has not been applied/)).toBeTruthy();
+  expect(colorMatch.apply).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Match reference to this photo' }));
+  await screen.findByText('Matched Warm portrait.jpg to this photo. Use Undo to compare.');
+  expect(colorMatch.prepare).toHaveBeenCalledWith('photo','warm',expect.any(String),'precise','natural');
+  expect(colorMatch.apply).toHaveBeenCalledWith('photo','warm-session',analysis.controls,expect.any(String));
+  expect(screen.queryByText(/selected reference has not been applied/)).toBeNull();
+});
+it('never applies a one-click analysis returned for another reference', async () => {
+  vi.mocked(colorMatch.prepare).mockResolvedValue({ ...analysis, reference: { ...reference, id: 'wrong' } });
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
+  await screen.findByRole('option', { name: reference.name });
+  fireEvent.click(screen.getByRole('button', { name: 'Match reference to this photo' }));
+  await screen.findByText('The reference or photo changed. Match this photo again.');
+  expect(colorMatch.apply).not.toHaveBeenCalled();
+});
+it('does not report a closer match when native safety retained an unchanged endpoint', async () => {
+  vi.mocked(colorMatch.apply).mockResolvedValue({ ...analysis, afterDistance: analysis.beforeDistance, changed: 0, fullResolutionChecked: true });
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
+  await screen.findByRole('option', { name: reference.name });
+  fireEvent.click(screen.getByRole('button', { name: 'Match reference to this photo' }));
+  await screen.findByText('No closer colour match passed this photo’s safety checks. No stronger match was saved.');
+  expect(screen.queryByText(/Matched My wedding/)).toBeNull();
+});
 it('refuses to apply a stale analysis and restores saved strengths', async () => {
   vi.mocked(colorMatch.status).mockResolvedValue({ ...analysis, current: false, controls: { ...analysis.controls, amount: 0.4 } });
   render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
@@ -92,7 +127,7 @@ it('does not import or fit when the reference picker is cancelled', async () => 
 it('requires a new analysis when changing from natural look to reference palette and tone', async () => {
   vi.mocked(colorMatch.status).mockResolvedValue(analysis);
   vi.mocked(colorMatch.prepare).mockResolvedValue({ ...analysis, fitting: {
-    engine: 'reference-grade-transfer-v3', quality: 'precise', intent: 'palette',
+    engine: 'reference-palette-transport-v4', quality: 'precise', intent: 'palette',
     refinementCandidates: 4, uniqueRenders: 3, cachedProposals: 0,
   } });
   render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);

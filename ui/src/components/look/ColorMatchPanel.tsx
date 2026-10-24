@@ -145,7 +145,8 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
           setError('This photo changed. Analyse the reference again before enabling real-time matching.'); return;
         }
         if (!analysis || analysis.reference.id !== referenceId || (analysis.fitting?.quality ?? 'precise') !== mode ||
-            (analysis.fitting?.intent ?? 'natural') !== purpose) {
+            (analysis.fitting?.intent ?? 'natural') !== purpose ||
+            (purpose === 'palette' && analysis.fitting?.engine !== 'reference-palette-transport-v4')) {
           analysis = purpose === 'natural' ? await colorMatch.prepare(photoId, referenceId, id, mode)
             : await colorMatch.prepare(photoId, referenceId, id, mode, purpose);
           if (!current()) return;
@@ -190,6 +191,41 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
     acceptReport(result);
     setMessage('Analysis ready. Adjust the strengths, then apply to see the saved result.');
   });
+  const matchNow = () => {
+    pendingLive.current = false;
+    const sequence = ++intent.current;
+    const referenceId = selected;
+    const mode = quality;
+    const purpose = matchIntent;
+    const strengths = structuredClone(controlsRef.current);
+    void run(async (id, current) => {
+      const latest = () => current() && sequence === intent.current && referenceId === activeReference.current;
+      setMessage('Matching the selected reference to this photo…');
+      const analysis = await colorMatch.prepare(photoId, referenceId, id, mode, purpose);
+      if (!latest()) return;
+      if (!analysis.current || analysis.photoId !== photoId || analysis.reference.id !== referenceId) {
+        throw new Error('The reference or photo changed. Match this photo again.');
+      }
+      acceptReport(analysis);
+      if (disabledRef.current) throw new Error('Another edit is running. Match this photo again when it finishes.');
+      ownWrite.current = true;
+      try {
+        await onApply(async () => {
+          if (!latest()) return;
+          const result = await colorMatch.apply(photoId, analysis.sessionId, strengths, id);
+          if (!current()) return;
+          if (!result.current || !result.fullResolutionChecked || result.photoId !== photoId || result.reference.id !== referenceId) {
+            throw new Error('This photo returned no current native-resolution colour check. Match this photo again.');
+          }
+          acceptReport(result); setControls(result.controls);
+          setMessage(result.afterDistance >= result.beforeDistance - 0.0001
+            ? 'No closer colour match passed this photo’s safety checks. No stronger match was saved.'
+            : result.changed ? `Matched ${result.reference.name} to this photo. Use Undo to compare.`
+              : 'This photo already has the selected reference match saved.');
+        });
+      } finally { ownWrite.current = false; }
+    });
+  };
   const apply = (next = controls) => run(async (id, current) => {
     if (!report || !report.current || report.photoId !== photoId || report.reference.id !== selected ||
         (report.fitting?.quality ?? 'precise') !== quality || (report.fitting?.intent ?? 'natural') !== matchIntent) return;
@@ -205,7 +241,7 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
   });
   const choose = (reference: ColorReference) => {
     ++generation.current; activeReference.current = reference.id;
-    setSelected(reference.id); acceptReport(null); setMessage(null);
+    setSelected(reference.id); acceptReport(null); setMessage('Reference selected. Click Match reference to this photo to apply its colours.');
     setControls(reference.defaultControls ?? { ...DEFAULT_MATCH_CONTROLS });
     controlsRef.current = reference.defaultControls ?? { ...DEFAULT_MATCH_CONTROLS }; requestLive();
   };
@@ -261,7 +297,8 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
   const libraryReference = references.some(item => item.id === selected);
   const removedSession = !libraryReference && report?.reference.id === selected;
   const ready = Boolean(report?.current && report.photoId === photoId && report.reference.id === selected &&
-    (report.fitting?.quality ?? 'precise') === quality && (report.fitting?.intent ?? 'natural') === matchIntent);
+    (report.fitting?.quality ?? 'precise') === quality && (report.fitting?.intent ?? 'natural') === matchIntent &&
+    (matchIntent !== 'palette' || report.fitting?.engine === 'reference-palette-transport-v4'));
   return <section className="lr-panel color-match-panel" aria-label="Reference colour matching" aria-busy={busy || regionalBusy}>
     <header className="color-match-heading"><span>AI STYLE</span><h3>Color Match</h3></header>
     <p className="lr-hint">Choose an edited JPEG, PNG or TIFF to guide the colour of a different photo. Tone and colour are matched; facial retouching stays with this photo.</p>
@@ -301,6 +338,10 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
       {removedSession && <option value={selected}>{report.reference.name} (saved match only)</option>}
       {references.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
     </select></label>
+    <button type="button" disabled={locked || !libraryReference} onClick={matchNow}>Match reference to this photo</button>
+    {selected && (!ready || !report?.fullResolutionChecked) && <p role="status" className="lr-hint">
+      The selected reference has not been applied to this photo. Match it to update Your photograph.
+    </p>}
     <div className="color-match-tabs" role="tablist" aria-label="Colour reference views">
       <button type="button" role="tab" aria-selected={referenceTab === 'recommended'} aria-controls="recommended-color-references" id="recommended-color-tab"
         onClick={() => setReferenceTab('recommended')}>Recommended</button>
@@ -311,7 +352,7 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
       aria-labelledby={referenceTab === 'recommended' ? 'recommended-color-tab' : 'my-color-tab'}>
       <p className="lr-hint">{referenceTab === 'recommended' ? 'Recommended from your library: shared measured regions, then favorites.' : 'Your uploaded and created references, stored locally.'}</p>
       <div className="color-match-reference-cards">{(referenceTab === 'recommended' ? recommendedReferences(references, report?.matchedRegions ?? []) : references).map(reference =>
-        <button type="button" key={reference.id} aria-label={`Match reference ${reference.name}`} aria-pressed={reference.id === selected} disabled={locked} onClick={() => choose(reference)}>
+        <button type="button" key={reference.id} aria-label={`Select reference ${reference.name}`} aria-pressed={reference.id === selected} disabled={locked} onClick={() => choose(reference)}>
           {reference.preview || reference.thumbnail ? <img src={reference.preview || reference.thumbnail} alt="" loading="lazy"/> : <span className="color-match-no-preview">Colour descriptor</span>}
           <span>{reference.name}</span>
         </button>)}</div>

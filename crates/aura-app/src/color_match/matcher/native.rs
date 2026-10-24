@@ -74,6 +74,37 @@ impl Review {
         ungraded: &Recipe,
         grade: &ReferenceGrade,
     ) -> AuraResult<Option<Endpoint>> {
+        let mut best = self.fit_candidate(state, cancel, ungraded, grade)?;
+        // A strong chromatic transport can force a global backtrack to preserve a face.
+        // Also check the underlying tone/cast fit, using the same native frame and guards.
+        // Keep whichever actually passes with the smaller full-palette distance.
+        if grade.palette.is_some() && best.as_ref().is_none_or(|fit| fit.factor < 0.5) {
+            let mut underlying = grade.clone();
+            underlying.palette = None;
+            let alternative = self.fit_candidate(state, cancel, ungraded, &underlying)?;
+            let renders = best.as_ref().map_or(7, |v| v.renders)
+                + alternative.as_ref().map_or(7, |v| v.renders)
+                - 1;
+            if alternative
+                .as_ref()
+                .is_some_and(|a| best.as_ref().is_none_or(|b| a.after.total < b.after.total))
+            {
+                best = alternative;
+            }
+            if let Some(best) = best.as_mut() {
+                best.renders = renders;
+            }
+        }
+        Ok(best)
+    }
+
+    fn fit_candidate(
+        &self,
+        state: &AppState,
+        cancel: &CancelToken,
+        ungraded: &Recipe,
+        grade: &ReferenceGrade,
+    ) -> AuraResult<Option<Endpoint>> {
         let identity = ReferenceGrade::identity();
         let (mut lower, mut upper, mut factor) = (0.0, 1.0, 1.0);
         let mut accepted: Option<Endpoint> = None;
