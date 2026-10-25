@@ -15,7 +15,8 @@
 //!
 //! `AURA_LOOK_FLAT=1` hands every method a flat render of the target (blacks lifted, whites
 //! lowered, as an unedited RAW render arrives) and still scores against the look applied to the
-//! finished photograph.
+//! finished photograph. `AURA_LOOK_CAST=warm|cool|green` hands every method the target under a
+//! coloured light and scores against the look applied to it under neutral light.
 use super::super::tone_prior::{self, ScenePrior, TonePrior};
 use super::*;
 use aura_recipe::reference_grade::{ReferenceGrade, AXIS_NODES, MAX_CAST, TONE_NODES};
@@ -230,6 +231,17 @@ fn estimated_tone(case: &Case<'_>, own: bool) -> ReferenceGrade {
     grade
 }
 
+/// Colour casts a target may arrive with (`AURA_LOOK_CAST`), as a light multiplies them in.
+fn warm_light(rgb: [f32; 3]) -> [f32; 3] {
+    in_linear(rgb, |l| [l[0] * 1.18, l[1] * 1.02, l[2] * 0.8])
+}
+fn cool_light(rgb: [f32; 3]) -> [f32; 3] {
+    in_linear(rgb, |l| [l[0] * 0.86, l[1] * 1.0, l[2] * 1.18])
+}
+fn green_light(rgb: [f32; 3]) -> [f32; 3] {
+    in_linear(rgb, |l| [l[0] * 0.94, l[1] * 1.07, l[2] * 0.93])
+}
+
 /// A finished photograph as a flat, unedited render shows it: blacks lifted, whites lowered.
 fn flatten(rgb: [f32; 3]) -> [f32; 3] {
     rgb.map(|v| 0.16 + 0.68 * v)
@@ -342,14 +354,24 @@ fn known_looks_carry_across_real_photographs() {
     // In flat mode every target arrives as a flat render of itself and is still scored against
     // the look applied to the finished photograph.
     let flat = env("AURA_LOOK_FLAT", 0_u8) == 1;
+    // With a cast, every target arrives under a coloured light and is still scored against the
+    // look applied to the photograph under neutral light.
+    let light: Option<GradeOperation> = match env("AURA_LOOK_CAST", String::new()).as_str() {
+        "warm" => Some(warm_light),
+        "cool" => Some(cool_light),
+        "green" => Some(green_light),
+        _ => None,
+    };
     let target_pixels: Vec<Vec<Sample>> = photos
         .iter()
         .map(|p| {
-            if flat {
-                samples(&grade_image(p, flatten), target_samples)
+            let p = if flat {
+                grade_image(p, flatten)
             } else {
-                samples(p, target_samples)
-            }
+                p.clone()
+            };
+            let p = light.map_or_else(|| p.clone(), |c| grade_image(&p, c));
+            samples(&p, target_samples)
         })
         .collect();
     let scene_lightness: Vec<Vec<f32>> = scene_pixels

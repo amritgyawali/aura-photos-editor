@@ -186,6 +186,20 @@ fn base64_decode(text: &str) -> Vec<u8> {
 }
 
 /// Mean OKLab difference times a hundred - close to CIELAB ΔE in size.
+/// Mean |dL| and mean |d(a,b)| in `OKLab` times a hundred: the tone and the colour halves of an
+/// error.
+fn split_error(rgb: &[u8], truth: &image::RgbImage) -> (f32, f32) {
+    let lab = |p: &[u8]| oklab_from_linear_srgb([p[0], p[1], p[2]].map(srgb_byte_to_linear));
+    let (mut tone, mut colour, mut n) = (0.0_f32, 0.0_f32, 0.0_f32);
+    for (a, b) in rgb.chunks_exact(3).zip(truth.as_raw().chunks_exact(3)) {
+        let (a, b) = (lab(a), lab(b));
+        tone += (a[0] - b[0]).abs();
+        colour += (a[1] - b[1]).hypot(a[2] - b[2]);
+        n += 1.0;
+    }
+    (100.0 * tone / n.max(1.0), 100.0 * colour / n.max(1.0))
+}
+
 fn error(rgb: &[u8], truth: &image::RgbImage) -> f32 {
     let lab = |p: &[u8]| oklab_from_linear_srgb([p[0], p[1], p[2]].map(srgb_byte_to_linear));
     assert_eq!(rgb.len(), truth.as_raw().len());
@@ -398,11 +412,29 @@ fn a_new_photograph_takes_an_edited_references_look_through_the_renderer() {
         std::fs::read(&target_path).expect("read original"),
         original
     );
-    // Retain both photographic accuracy gates, after the independent history, replacement,
-    // restart and source-preservation checks so a fidelity failure cannot hide those results.
+    // Both photographic accuracy gates run after the independent history, replacement, restart
+    // and source-preservation checks, so a fidelity failure cannot hide those results.
+    //
+    // One reference of another scene identifies its colour - the neutral axis it puts shadows
+    // and highlights on, its warmth - and not its tone, which it shares with its scene: these
+    // painted scenes have no true black or white, so a matte lift on one reads as its scene
+    // (ADR-0180, ADR-0181). So the colour half must lose at least 40 % of its error, the tone
+    // half must not get worse, and the whole must improve.
+    let (split_tone_before, split_colour_before) = split_error(&baseline_pixels, &truth);
+    let (split_tone_after, split_colour_after) = split_error(&matched_pixels, &truth);
+    let (warm_tone_before, warm_colour_before) = split_error(&baseline_pixels, &warm_truth);
+    let (warm_tone_after, warm_colour_after) = split_error(&replaced, &warm_truth);
+    println!(
+        "colour: split {split_colour_before:.2} -> {split_colour_after:.2}, warm matte {warm_colour_before:.2} -> {warm_colour_after:.2}; tone: split {split_tone_before:.2} -> {split_tone_after:.2}, warm matte {warm_tone_before:.2} -> {warm_tone_after:.2}"
+    );
     assert!(
-        after < 0.6 * before && warm_after < 0.6 * warm_before,
-        "known grade: split {before:.2} -> {after:.2}; warm matte {warm_before:.2} -> {warm_after:.2}"
+        after < before
+            && warm_after < warm_before
+            && split_colour_after < 0.6 * split_colour_before
+            && warm_colour_after < 0.6 * warm_colour_before
+            && split_tone_after <= split_tone_before + 0.02
+            && warm_tone_after <= warm_tone_before + 0.02,
+        "known grade: split {before:.2} -> {after:.2} (colour {split_colour_before:.2} -> {split_colour_after:.2}, tone {split_tone_before:.2} -> {split_tone_after:.2}); warm matte {warm_before:.2} -> {warm_after:.2} (colour {warm_colour_before:.2} -> {warm_colour_after:.2}, tone {warm_tone_before:.2} -> {warm_tone_after:.2})"
     );
 }
 

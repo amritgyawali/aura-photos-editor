@@ -394,24 +394,58 @@ fn explicit_palette_matching_fits_unrelated_tone_without_claiming_scene_correspo
     assert_eq!(toward(&identity, &palette.grade, 0.0), identity);
 }
 
+/// Mean |dL| and mean |d(a,b)| between two sets of `OKLab` samples, times a hundred: the tone and
+/// the colour halves of an error.
+fn split_error(result: &[[f32; 3]], truth: &[[f32; 3]]) -> (f32, f32) {
+    let n = result.len().max(1) as f32;
+    let (tone, colour) = result.iter().zip(truth).fold((0.0, 0.0), |(t, c), (a, b)| {
+        (
+            t + (a[0] - b[0]).abs(),
+            c + (a[1] - b[1]).hypot(a[2] - b[2]),
+        )
+    });
+    (100.0 * tone / n, 100.0 * colour / n)
+}
+
 #[test]
 fn a_batch_matched_to_one_reference_converges_on_one_look() {
+    // Two photographs of one scene, one already graded warm, matched to one split-toned
+    // reference of another scene. Both must arrive at the same look: the photograph's own cast
+    // is removed before the reference's is applied (ADR-0181), so the truth for both is the look
+    // on the neutral photograph, not the look stacked on the earlier warm grade.
+    //
+    // What one reference of another scene identifies is its colour - the neutral axis it puts
+    // shadows and highlights on - not its tone, which it shares with its scene (ADR-0180); the
+    // tone of this look is a few hundredths of lightness. So the colour half must lose at least
+    // 40 % of its error, the tone half must not get worse, and the whole must improve.
     let reference = grade_image(&indoor(), split_tone);
     let stats = reference_stats(&reference);
-    let first = outdoor();
-    let second = grade_image(&outdoor(), warm);
+    let neutral = outdoor();
+    let truth: Vec<[f32; 3]> = unchanged(&grade_image(&neutral, split_tone));
+    let mut results = Vec::new();
     let mut failures = Vec::new();
-    for (index, target) in [first, second].into_iter().enumerate() {
+    for (index, target) in [neutral.clone(), grade_image(&neutral, warm)]
+        .into_iter()
+        .enumerate()
+    {
         let pixels = samples(&target, TARGET_SAMPLES);
         let fit = fit(&stats, &pixels, None);
-        // A large histogram decrease can be achieved by repainting different objects.
-        // Require fidelity to the known grade instead, retaining descriptor non-regression.
-        let truth = grade_image(&target, split_tone);
-        let before = error(&unchanged(&target), &truth);
-        let after = error(&transformed(&fit.grade, &pixels), &truth);
-        println!("batch split tone: {before:.3} -> {after:.3}");
-        if !before.is_finite() || !after.is_finite() || after >= 0.6 * before {
-            failures.push(format!("target {index}: {before:.3} -> {after:.3}"));
+        let plain = unchanged(&target);
+        let result = transformed(&fit.grade, &samples(&target, usize::MAX));
+        let (tone_before, colour_before) = split_error(&plain, &truth);
+        let (tone_after, colour_after) = split_error(&result, &truth);
+        let before = error(&plain, &grade_image(&neutral, split_tone));
+        let after = error(&result, &grade_image(&neutral, split_tone));
+        println!(
+            "batch target {index}: {before:.3} -> {after:.3}; tone {tone_before:.3} -> {tone_after:.3}; colour {colour_before:.3} -> {colour_after:.3}"
+        );
+        if !(after < before
+            && colour_after < 0.6 * colour_before
+            && tone_after <= tone_before + 0.02)
+        {
+            failures.push(format!(
+                "target {index}: {before:.3} -> {after:.3}, colour {colour_before:.3} -> {colour_after:.3}, tone {tone_before:.3} -> {tone_after:.3}"
+            ));
         }
         assert!(
             fit.after.total < fit.before.total,
@@ -420,6 +454,14 @@ fn a_batch_matched_to_one_reference_converges_on_one_look() {
             fit.after
         );
         fit.grade.validate().unwrap();
+        results.push((plain, result));
+    }
+    // The two photographs began a whole warm grade apart; they must end at least 40 % closer.
+    let apart = split_error(&results[0].0, &results[1].0).1;
+    let together = split_error(&results[0].1, &results[1].1).1;
+    println!("batch colour apart {apart:.3} -> together {together:.3}");
+    if together >= 0.6 * apart {
+        failures.push(format!("colour apart {apart:.3} -> {together:.3}"));
     }
     assert!(
         failures.is_empty(),

@@ -1034,7 +1034,10 @@ mod tests {
         // Full-size reconstruction changes pixels too, even though the model proxy is fixed.
         assert!(engine.contains(&format!("+raw.{}", aura_raw::full::DEMOSAIC_VER)));
         assert!(engine.contains(&format!("+skin.{}", crate::retouch_skin::REFERENCE_VERSION)));
-        assert!(engine.ends_with("+labs.selected-v5"));
+        assert!(engine.contains("+labs.selected-v5+"));
+        // The calibrated look and the background repair are stages whose pixels it decides too.
+        assert!(engine.contains("+calibrated.2+"));
+        assert!(engine.ends_with("+background-repair.1"));
         assert!(engine.contains(&format!("+clear.{}+", crate::retouch_clear::VERSION)));
         assert!(engine.contains(&format!("+undereye.{}+", crate::retouch_undereye::VERSION)));
     }

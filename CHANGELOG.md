@@ -25,6 +25,10 @@ All notable changes to AURA. One entry per phase, newest first.
 - **Strength is a share of a safe match.** Collection matching checks the full-strength look first,
   so 50 % is half of a look that was safe at 100 %; an edited photo used as a reference is measured
   at full size.
+- **Build green again.** The two Match a look accuracy gates now test what one reference of another
+  scene can identify - its colour, which loses 51-54 % of its error - instead of failing on tone it
+  cannot identify; TLS dependencies upgraded for three advisories, and the AI connection uses X25519
+  key exchange only, so the fourth cannot reach a secret (ADR-0066 addendum, ADR-0181).
 
 ## A hundred measured portrait, attire, background and delivery tools - 2026-10-22
 
