@@ -246,7 +246,7 @@ fn a_new_photograph_takes_an_edited_references_look_through_the_renderer() {
     )
     .expect("transfer fit");
     let fitting = prepared.fitting.clone().expect("diagnostics");
-    assert_eq!(fitting.engine, "reference-grade-transfer-v3");
+    assert_eq!(fitting.engine, "reference-grade-transfer-v4-scene-tone");
     let transfer = fitting.transfer.expect("transfer diagnostics");
     assert!(
         transfer.rendered_after.total < transfer.rendered_before.total,
@@ -527,7 +527,7 @@ fn a_native_regression_is_refused_and_stale_measurements_can_be_refreshed() {
             .fitting
             .expect("diagnostics")
             .engine,
-        "reference-grade-transfer-v3"
+        "reference-grade-transfer-v4-scene-tone"
     );
     assert_eq!(history(), history_before);
 }
@@ -591,8 +591,11 @@ fn clipping_is_refused_even_when_it_would_match_reference_statistics() {
         },
     )
     .expect_err("a perfect white histogram cannot justify destroying target detail");
+    assert_eq!(refused.code, "AURA-ML-5146");
+    // Native quality checks now share a refusal covering smoothness, highlights and skin.
+    // Assert the refusal protocol here; unchanged recipe/history below are the safety proof.
     assert!(
-        refused.message.contains("full-resolution highlight"),
+        refused.message.contains("full-resolution") && refused.message.contains("highlight"),
         "{refused:?}"
     );
     assert_eq!(

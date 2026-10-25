@@ -438,7 +438,9 @@ fn a_monochrome_reference_produces_neutral_greys() {
         .map(|l| l[1].hypot(l[2]))
         .fold(0.0_f32, f32::max);
     assert!(worst < 0.005, "chroma {worst}");
-    assert!(fit.after.tone < fit.before.tone);
+    // An ordinary reference of another scene keeps this photograph's tone (ADR-0180); it never
+    // moves it farther from the reference's.
+    assert!(fit.after.tone <= fit.before.tone + 1e-4);
 }
 
 #[test]
@@ -591,3 +593,6 @@ fn stored_measurements_round_trip_and_reject_another_version() {
     old.version = 2;
     assert!(!old.usable());
 }
+
+#[cfg(test)]
+mod looks;

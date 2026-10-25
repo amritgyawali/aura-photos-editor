@@ -8,8 +8,10 @@ vi.mock('../look/referenceStyle', () => ({ referenceStyle: { apply: vi.fn().mock
 vi.mock('../../ipc/client', () => ({
   api: { listImages: vi.fn() }, develop: { enhancePhoto: vi.fn(), renderImage: vi.fn(), imageRecipe: vi.fn() },
   editProfiles: { apply: vi.fn().mockResolvedValue({ profileId: 'film-portra', changed: 9, protectedFields: [], adaptations: ['Warmth reduced to 60% because the light is already warm.'] }) },
-  asIpcError: (error: Error) => ({ message: error.message }),
+  asIpcError: (error: unknown) => (typeof error === 'object' && error !== null && 'runbookUrl' in error ? error : { message: 'AURA hit an unexpected problem and stopped safely.' }),
 }));
+// A failure as the backend sends it: a typed error, not a JavaScript exception.
+const backendError = (message: string) => ({ code: 'AURA-DB-3001', message, runbookUrl: 'https://aura.app/e/AURA-DB-3001', retryable: false });
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(api.listImages).mockResolvedValue([{ id: 'a', fileName: 'a.jpg' }, { id: 'b', fileName: 'b.jpg' }] as never);
@@ -51,7 +53,7 @@ it('edits only requested photos and treats an empty selection as no work', async
   expect(api.listImages).not.toHaveBeenCalled();
 });
 it('keeps a readable failed step and continues other photographs', async () => {
-  vi.mocked(develop.enhancePhoto).mockRejectedValueOnce(new Error('Missing original'));
+  vi.mocked(develop.enhancePhoto).mockRejectedValueOnce(backendError('Missing original'));
   const result = await prepareCollection('project', () => false, vi.fn(), vi.fn());
   expect(result[0]).toMatchObject({ outcome: 'failed', detail: 'Missing original' });
   expect(result[1]?.outcome).toBe('ready');
@@ -77,7 +79,7 @@ it('finds selected photos beyond the first page without editing repeated IDs twi
 it('waits for the current render to drain when reading its recipe fails', async () => {
   let finish!: (value: never) => void;
   vi.mocked(develop.renderImage).mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
-  vi.mocked(develop.imageRecipe).mockRejectedValueOnce(new Error('Recipe unavailable'));
+  vi.mocked(develop.imageRecipe).mockRejectedValueOnce(backendError('Recipe unavailable'));
   const pending = prepareCollection('project', () => false, vi.fn(), vi.fn());
   await vi.waitFor(() => expect(develop.renderImage).toHaveBeenCalledOnce());
   expect(develop.enhancePhoto).toHaveBeenCalledOnce();
@@ -93,6 +95,28 @@ it('applies the selected reference to each new photo before rendering it', async
   expect(referenceStyle.apply).toHaveBeenNthCalledWith(1, 'a', 'style', 0.8);
   expect(referenceStyle.apply).toHaveBeenNthCalledWith(2, 'b', 'style', 0.8);
   expect(results.every(photo => photo.outcome === 'ready' && photo.detail.includes('@reference'))).toBe(true);
+});
+
+it('says when the look was learned from the reference photo\'s own original', async () => {
+  vi.mocked(referenceStyle.apply).mockResolvedValue({ changed: 3, learnedFrom: '989A2698.CR3' } as never);
+  const selection = { analysis: { id: 'style', origin: 'Studio look' }, strength: 1 };
+  const results = await prepareCollection('project', () => false, vi.fn(), vi.fn(), selection as never);
+  expect(results.every(photo => photo.detail.includes('learned from your own edit of 989A2698.CR3'))).toBe(true);
+  vi.mocked(referenceStyle.apply).mockResolvedValue({} as never);
+  const estimated = await prepareCollection('project', () => false, vi.fn(), vi.fn(), selection as never);
+  expect(estimated.some(photo => photo.detail.includes('learned from'))).toBe(false);
+});
+
+it('never reports a reference match that changed nothing as a match', async () => {
+  vi.mocked(referenceStyle.apply).mockResolvedValue({ changed: 0, beforeDistance: 11.3, afterDistance: 11.3, protectedFields: 0 } as never);
+  const selection = { analysis: { id: 'style', origin: '@reference' }, strength: 0.8 };
+  const results = await prepareCollection('project', () => false, vi.fn(), vi.fn(), selection as never);
+  expect(results.every(photo => photo.detail.startsWith('Not matched to @reference:'))).toBe(true);
+  expect(results.some(photo => photo.detail.includes('Matched to'))).toBe(false);
+  expect(results[0]?.detail).toContain('left as it was');
+  vi.mocked(referenceStyle.apply).mockResolvedValue({ changed: 0, beforeDistance: 4, afterDistance: 4, protectedFields: 5 } as never);
+  const kept = await prepareCollection('project', () => false, vi.fn(), vi.fn(), selection as never);
+  expect(kept[0]?.detail).toContain('your own settings on this photo were kept');
 });
 
 it('passes the active cancellation job into each native reference fit', async () => {

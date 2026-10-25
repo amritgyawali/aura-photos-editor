@@ -10,7 +10,6 @@ use aura_core::{AuraResult, PhotoId, ProjectId};
 use aura_raw::codec::Rgb8;
 use aura_recipe::reference_grade::{self as grade_model, ReferenceGrade};
 use aura_recipe::{schema, Recipe};
-use aura_render::Frame;
 use serde::{Deserialize, Serialize};
 
 use super::{
@@ -21,7 +20,9 @@ use super::{
 
 mod native;
 
-const ENGINE_NAME: &str = "reference-grade-transfer-v3";
+const ENGINE_NAME: &str = "reference-grade-transfer-v4-scene-tone";
+/// The engine of a look learned from the reference's own original (ADR-0161).
+const LEARNED_ENGINE: &str = "reference-original-calibrated-v1";
 
 /// What a transfer session keeps between analysis and every later strength change.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,6 +34,10 @@ pub(super) struct TransferSession {
     /// The reference's measurement, kept so the session works after the reference is removed
     /// from the library.
     pub reference: transfer::GradeStats,
+    /// The look learned from the reference's own original in the collection (ADR-0161), whose
+    /// `model.amount` is the strongest share of it that passed this photograph's native checks.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub learned: Option<super::learned::LearnedLook>,
 }
 
 /// How the transfer fit went, for the report and the panel.
@@ -47,35 +52,22 @@ pub struct TransferDiagnostics {
     pub rendered_after: transfer::Distance,
     pub skin: transfer::SkinReview,
     pub replaced_earlier_match: bool,
+    /// The scene-prior tone estimate, present when the reference's scene differs (ADR-0180).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tone_estimate: Option<transfer::ToneReading>,
+    /// The reference's own original, found in the collection, that the look was learned from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub learned_from: Option<String>,
+    /// Why a photograph that looked like the reference's original could not be learned from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub original_refused: Option<String>,
+    /// How far the fitted look stretched nearby colours before it was limited to avoid bands.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stretch_limited_from: Option<f32>,
 }
 
 fn measured(reference: &transfer::GradeStats, image: &Rgb8) -> transfer::Distance {
     transfer::distance(reference, &transfer::measure_image(image))
-}
-
-fn preview_distances(
-    state: &AppState,
-    frame: &Frame,
-    baseline: &Recipe,
-    plain: &Rgb8,
-    reference: &transfer::GradeStats,
-    grade: &ReferenceGrade,
-) -> AuraResult<(transfer::Distance, transfer::Distance)> {
-    let earlier;
-    let shown = if grade_model::read(baseline)?.is_some() {
-        earlier = rendered(state, frame, baseline)?;
-        &earlier
-    } else {
-        plain
-    };
-    let before = measured(reference, shown);
-    let mut candidate = baseline.clone();
-    candidate.extra.remove(grade_model::KEY);
-    grade_model::write(&mut candidate, grade)?;
-    Ok((
-        before,
-        measured(reference, &rendered(state, frame, &candidate)?),
-    ))
 }
 
 struct Observations {
@@ -86,6 +78,7 @@ struct Observations {
     similarity: Option<f32>,
     prior: bool,
     samples: usize,
+    refused: Option<String>,
 }
 
 fn diagnostics(
@@ -95,7 +88,7 @@ fn diagnostics(
 ) -> FitDiagnostics {
     FitDiagnostics {
         engine: if input.intent == MatchIntent::Palette {
-            "reference-palette-transport-v7"
+            "reference-palette-transport-v8"
         } else {
             ENGINE_NAME
         }
@@ -123,6 +116,10 @@ fn diagnostics(
             rendered_after: observation.after,
             skin: observation.skin,
             replaced_earlier_match: observation.prior,
+            tone_estimate: fit.tone,
+            learned_from: None,
+            original_refused: observation.refused,
+            stretch_limited_from: fit.stretch_limited_from,
         }),
     }
 }
@@ -148,6 +145,7 @@ fn upgrade_palette_measurements(
 }
 
 /// Measure the photograph without any earlier reference grade and fit the reference onto it.
+#[allow(clippy::too_many_lines)]
 pub(super) fn prepare(
     state: &AppState,
     cancel: &CancelToken,
@@ -170,6 +168,30 @@ pub(super) fn prepare(
     let plain = rendered(state, &frame, &ungraded)?;
     check_cancel(cancel)?;
     let target_regions = appearance::analyse(&plain)?;
+    let monochrome = reference_measurements.achromatic || reference.achromatic;
+    // The reference's own original in this collection gives the photographer's actual edit,
+    // learned pixel for pixel; it is used whenever it is there, whatever the matching goal.
+    let project = photo_project(state, &photo)?;
+    let (learned, refused) = super::learned::find(state, cancel, &reference.summary.id, &project)?;
+    if let Some(learned) = learned {
+        return prepare_learned(
+            state,
+            cancel,
+            input,
+            photo,
+            reference,
+            Learning {
+                baseline,
+                baseline_hash,
+                observed_hash,
+                prior,
+                regions: target_regions,
+                measurements: reference_measurements,
+                monochrome,
+                learned,
+            },
+        );
+    }
     let similarity = content::similarity(&reference.small_rgb, &plain);
     let target_samples = transfer::samples(&plain, input.quality.target_samples());
     let mut fit = transfer::fit_with_intent_checkpoint(
@@ -180,55 +202,41 @@ pub(super) fn prepare(
         input.intent,
         || check_cancel(cancel),
     )?;
-    let monochrome = reference_measurements.achromatic || reference.achromatic;
     let skin = transfer::review_skin(&mut fit.grade, &plain, &target_regions, monochrome);
     check_cancel(cancel)?;
-    // Palette transfer explicitly allows the reference's tone distribution to guide an
-    // unrelated scene. Find a native-safe fitted endpoint before offering it at 100%.
-    // The safeguards are identical to Apply, and every attempted render shares one baseline.
-    let native_fit = if input.intent == MatchIntent::Palette {
-        Some(native::fit(
-            state,
-            cancel,
-            native::FitInput {
-                photo,
-                baseline: &baseline,
-                ungraded: &ungraded,
-                regions: &target_regions,
-                reference: &reference_measurements,
-                monochrome,
-                grade: &mut fit.grade,
-            },
-        )?)
-    } else {
-        None
-    };
+    // Both intents can move tone across an unrelated scene (Palette by distribution, Natural by
+    // the scene-prior estimate), so find a native-safe endpoint before offering it at 100%: a
+    // match the panel offers should be one Apply accepts. The safeguards are identical to Apply,
+    // and every attempted render shares one baseline.
+    let native_fit = native::fit(
+        state,
+        cancel,
+        native::FitInput {
+            photo,
+            baseline: &baseline,
+            ungraded: &ungraded,
+            regions: &target_regions,
+            reference: &reference_measurements,
+            monochrome,
+            grade: &mut fit.grade,
+        },
+    )?;
     // The renderer is the instrument: report what the stage drew, not what the fit predicted.
-    let (rendered_before, rendered_after) = if let Some(native) = native_fit {
-        (native.0, native.1)
-    } else {
-        preview_distances(
-            state,
-            &frame,
-            &baseline,
-            &plain,
-            &reference_measurements,
-            &fit.grade,
-        )?
-    };
+    let (rendered_before, rendered_after) = (native_fit.0, native_fit.1);
     check_cancel(cancel)?;
     baseline::verify_current(state, photo, &observed_hash)?;
     let fitting = diagnostics(
         input,
         &fit,
         Observations {
-            native: native_fit,
+            native: Some(native_fit),
             before: rendered_before,
             after: rendered_after,
             skin,
             similarity,
             prior: prior.is_some(),
             samples: target_samples.len(),
+            refused,
         },
     );
     let session = Session {
@@ -248,6 +256,7 @@ pub(super) fn prepare(
         checked_hash: None,
         measured_before: None,
         measured_after: None,
+        measured_visible: None,
         fitting: Some(fitting),
         reference_monochrome: monochrome,
         grade_offsets: [0.0; 6],
@@ -255,6 +264,165 @@ pub(super) fn prepare(
             prior,
             fitted: fit.grade,
             reference: reference_measurements,
+            learned: None,
+        }),
+    };
+    save_analysis(state, &session)
+}
+
+fn photo_project(state: &AppState, photo: &PhotoId) -> AuraResult<ProjectId> {
+    let key = photo.to_db();
+    let project: String = state.catalog().read(move |conn| {
+        conn.query_row(
+            "SELECT project_id FROM photo WHERE photo_id=?1",
+            [&key],
+            |r| r.get(0),
+        )
+        .map_err(|e| aura_core::errors::db::statement_failed("colour match photo", &e))
+    })?;
+    ProjectId::from_db(&project).map_err(|_| invalid("Invalid collection."))
+}
+
+/// What an analysis with a learned look works from.
+struct Learning {
+    baseline: Recipe,
+    baseline_hash: String,
+    observed_hash: String,
+    prior: Option<ReferenceGrade>,
+    regions: Vec<appearance::Region>,
+    measurements: transfer::GradeStats,
+    monochrome: bool,
+    learned: super::learned::LearnedLook,
+}
+
+/// The recipe a learned look gives at `amount` of the photographer's edit. Zero is the
+/// photograph exactly as it was; above it, any earlier reference look fades out as the learned
+/// one fades in, so two looks never stack.
+fn learned_recipe(
+    baseline: &Recipe,
+    prior: Option<&ReferenceGrade>,
+    learned: &super::learned::LearnedLook,
+    amount: f32,
+) -> AuraResult<Recipe> {
+    let amount = amount.clamp(0.0, 1.0);
+    if amount <= 0.0 {
+        return canonical(baseline);
+    }
+    let mut recipe = baseline.clone();
+    recipe.extra.remove(grade_model::KEY);
+    recipe.extra.remove(aura_recipe::calibrated_look::KEY);
+    if let Some(prior) = prior {
+        let faded = transfer::toward(&ReferenceGrade::identity(), prior, 1.0 - amount);
+        grade_model::write(&mut recipe, &faded)?;
+    }
+    let mut model = learned.model.clone();
+    model.amount = amount;
+    aura_recipe::calibrated_look::write(&mut recipe, &model)?;
+    schema::Validation::check(&recipe)?;
+    canonical(&recipe)
+}
+
+/// Analyse with the look learned from the reference's original: find the strongest share of it
+/// that passes this photograph's native checks, so 100% is an endpoint Apply accepts.
+fn prepare_learned(
+    state: &AppState,
+    cancel: &CancelToken,
+    input: &PrepareInput,
+    photo: PhotoId,
+    reference: Reference,
+    learning: Learning,
+) -> AuraResult<MatchReport> {
+    let Learning {
+        baseline,
+        baseline_hash,
+        observed_hash,
+        prior,
+        regions,
+        measurements,
+        monochrome,
+        mut learned,
+    } = learning;
+    let review = native::Review::new(
+        state,
+        cancel,
+        photo,
+        &baseline,
+        &regions,
+        &measurements,
+        monochrome,
+        Some(learned.allowance),
+    )?;
+    let endpoint = review
+        .fit_learned(state, cancel, 1.0, |amount| {
+            learned_recipe(&baseline, prior.as_ref(), &learned, amount)
+        })?
+        .ok_or_else(|| {
+            invalid(format!(
+                "Your own edit of {} could not be applied to this photo without banding, extra clipping or changing skin more than that edit did. No edit was saved.",
+                learned.label
+            ))
+        })?;
+    learned.model.amount = endpoint.factor;
+    check_cancel(cancel)?;
+    baseline::verify_current(state, photo, &observed_hash)?;
+    let fitting = FitDiagnostics {
+        engine: LEARNED_ENGINE.into(),
+        intent: input.intent,
+        quality: input.quality,
+        target_samples: 0,
+        max_iterations: 0,
+        refinement_candidates: 0,
+        unique_renders: endpoint.renders,
+        cached_proposals: 0,
+        grade_candidates: 0,
+        native_candidate_checked: true,
+        native_backtrack_factor: endpoint.factor,
+        structure_similarity: None,
+        regularization_weight: 0.0,
+        transfer: Some(TransferDiagnostics {
+            content_similarity: 0.0,
+            iterations: 0,
+            predicted_before: review.before,
+            predicted_after: endpoint.after,
+            rendered_before: review.before,
+            rendered_after: endpoint.after,
+            skin: transfer::SkinReview::default(),
+            replaced_earlier_match: prior.is_some(),
+            tone_estimate: None,
+            learned_from: Some(learned.label.clone()),
+            original_refused: None,
+            stretch_limited_from: None,
+        }),
+    };
+    drop(endpoint.recipe);
+    let mut controls = reference.summary.default_controls.unwrap_or_default();
+    controls.amount = controls.amount.min(1.0);
+    let session = Session {
+        engine: ENGINE.into(),
+        id: uuid::Uuid::new_v4().to_string(),
+        photo_id: input.photo_id.clone(),
+        reference: reference.summary.clone(),
+        baseline,
+        baseline_hash,
+        last_hash: observed_hash,
+        fitted: StyleDelta::neutral(),
+        reference_regions: reference.regions,
+        target_regions: regions,
+        before_distance: review.before.total,
+        fitted_distance: endpoint.after.total,
+        controls,
+        checked_hash: None,
+        measured_before: None,
+        measured_after: None,
+        measured_visible: None,
+        fitting: Some(fitting),
+        reference_monochrome: monochrome,
+        grade_offsets: [0.0; 6],
+        transfer: Some(TransferSession {
+            prior,
+            fitted: ReferenceGrade::identity(),
+            reference: measurements,
+            learned: Some(learned),
         }),
     };
     save_analysis(state, &session)
@@ -302,6 +470,12 @@ fn candidate(
     transfer: &TransferSession,
     controls: &Controls,
 ) -> AuraResult<Recipe> {
+    if let Some(learned) = &transfer.learned {
+        // Only the amount scales a learned edit: tone, colour and warmth have no separate part
+        // in one pixel-for-pixel operation, and 100% is the photographer's own edit.
+        let amount = controls.amount.clamp(0.0, 1.0) * learned.model.amount;
+        return learned_recipe(&session.baseline, transfer.prior.as_ref(), learned, amount);
+    }
     let identity = ReferenceGrade::identity();
     let from = transfer.prior.as_ref().unwrap_or(&identity);
     let model = transfer::mix(from, &transfer.fitted, &scales(controls));
@@ -328,10 +502,11 @@ fn verified_distances(
     state: &AppState,
     cancel: &CancelToken,
     session: &Session,
-    reference: &transfer::GradeStats,
+    transfer: &TransferSession,
     photo: &PhotoId,
     candidate: &Recipe,
-) -> AuraResult<(transfer::Distance, transfer::Distance, bool)> {
+) -> AuraResult<(transfer::Distance, transfer::Distance, bool, f32)> {
+    let reference = &transfer.reference;
     let review = native::Review::new(
         state,
         cancel,
@@ -340,10 +515,16 @@ fn verified_distances(
         &session.target_regions,
         reference,
         session.reference_monochrome,
+        transfer.learned.as_ref().map(|learned| learned.allowance),
     )?;
     let checked = review.check(state, cancel, candidate)?.ok_or_else(|| invalid(
         "This strength failed the full-resolution smoothness, highlight or skin-colour check, or moved colour farther from the reference. Reduce the strengths and apply again. No edit was saved."))?;
-    Ok((review.before, checked.after, checked.reused))
+    Ok((
+        review.before,
+        checked.after,
+        checked.reused,
+        checked.visible,
+    ))
 }
 
 /// Apply explicit strengths from the saved baseline and measure the full-resolution result.
@@ -366,14 +547,8 @@ pub(super) fn apply(
         ));
     }
     let candidate = candidate(&session, &transfer, &input.controls)?;
-    let (before, after, reused) = verified_distances(
-        state,
-        cancel,
-        &session,
-        &transfer.reference,
-        &photo,
-        &candidate,
-    )?;
+    let (before, after, reused, visible) =
+        verified_distances(state, cancel, &session, &transfer, &photo, &candidate)?;
     if let Some(fitting) = session.fitting.as_mut() {
         fitting.native_candidate_checked = true;
         fitting.cached_proposals += usize::from(reused);
@@ -383,12 +558,15 @@ pub(super) fn apply(
         }
     }
     let mut merged = current.clone();
-    match candidate.extra.get(grade_model::KEY) {
-        Some(value) => {
-            merged.extra.insert(grade_model::KEY.into(), value.clone());
-        }
-        None => {
-            merged.extra.remove(grade_model::KEY);
+    // A match owns exactly its reference looks: the transfer grade and a learned operation.
+    for key in [grade_model::KEY, aura_recipe::calibrated_look::KEY] {
+        match candidate.extra.get(key) {
+            Some(value) => {
+                merged.extra.insert(key.into(), value.clone());
+            }
+            None => {
+                merged.extra.remove(key);
+            }
         }
     }
     // Canonical identity is the renderer/store contract; JSON number representations may
@@ -397,18 +575,14 @@ pub(super) fn apply(
     let changed: Vec<String> = if candidate_hash == hash {
         Vec::new()
     } else {
-        vec![format!("extra.{}", grade_model::KEY)]
+        [grade_model::KEY, aura_recipe::calibrated_look::KEY]
+            .into_iter()
+            .filter(|key| current.extra.get(*key) != merged.extra.get(*key))
+            .map(|key| format!("extra.{key}"))
+            .collect()
     };
     check_cancel(cancel)?;
-    let project: String = state.catalog().read(|conn| {
-        conn.query_row(
-            "SELECT project_id FROM photo WHERE photo_id=?1",
-            [&input.photo_id],
-            |r| r.get(0),
-        )
-        .map_err(|e| aura_core::errors::db::statement_failed("colour match photo", &e))
-    })?;
-    let project = ProjectId::from_db(&project).map_err(|_| invalid("Invalid collection."))?;
+    let project = photo_project(state, &photo)?;
     if !changed.is_empty() {
         let c = &input.controls;
         super::save_verified(
@@ -439,10 +613,12 @@ pub(super) fn apply(
     session.checked_hash = Some(session.last_hash.clone());
     session.measured_before = Some(before.total);
     session.measured_after = Some(after.total);
+    session.measured_visible = Some(visible);
     session.transfer = Some(transfer);
     store(state, key, &session)?;
     let mut result = report(&session, changed.len(), 0, after.total, true, true);
     result.before_distance = before.total;
+    result.visible_change = Some(visible);
     Ok(result)
 }
 

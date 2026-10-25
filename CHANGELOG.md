@@ -2,6 +2,30 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Match a look: fixes for the deep assessment, learned originals, tone from the reference - 2026-10-25
+
+- **Your own edit, learned.** When the edited reference you upload was made from a photo in the
+  collection, the Match a look panel (as well as the start screen and collection preparation) finds
+  that photo by name or capture time, confirms it by pixels, and learns your edit pixel for pixel.
+  On the 20-photo desktop test the result came within a median 0.71 of the true look (from 7.6)
+  and the original was found in 19 of 20 cases (ADR-0161, ADR-0181).
+- **No more repainted scenes.** A reference of a different scene is matched as a look, not as a
+  colour distribution: a blue sky no longer turns the colour of the reference's fruit, nor a white
+  floor the green of its forest. Collection matching moved closer to the true look in 18 of 20
+  photos (was 12).
+- **No new bands or blotches.** Every fitted look is limited in how steeply it may stretch nearby
+  colours (twofold), and every result is checked for new bands and patches at every brightness, not
+  only in shadows. Palette results with new bands: 6 of 20 to 0; their median error to the true look
+  9.8 to 6.0.
+- **Tone from the reference.** Matte, airy, moody and contrasty looks now carry their tone across
+  scenes, estimated against ordinary finished photographs (ADR-0180).
+- **Honest results.** A refused save no longer leaves Matching... on screen, and a saved result
+  that looks the same as the original is reported as such, with its measured difference, never as a
+  match.
+- **Strength is a share of a safe match.** Collection matching checks the full-strength look first,
+  so 50 % is half of a look that was safe at 100 %; an edited photo used as a reference is measured
+  at full size.
+
 ## A hundred measured portrait, attire, background and delivery tools - 2026-10-22
 
 - **Sliders that find what they act on** (ADR-0150), in the style of Evoto: twenty more face sliders

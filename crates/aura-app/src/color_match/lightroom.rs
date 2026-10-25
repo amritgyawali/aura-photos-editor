@@ -252,7 +252,11 @@ pub fn generate(state: &AppState, input: &PresetInput) -> IpcResult<PresetReport
             "Local masks, face retouching and crop are not included in this colour preset.".into(),
             "Spatial highlights, shadows and detail controls use Lightroom's implementation and can differ from AURA.".into(),
         ];
-        if recipe.extra.keys().any(|key| key != reference_grade::KEY) {
+        if recipe
+            .extra
+            .keys()
+            .any(|key| key != reference_grade::KEY && key != aura_recipe::calibrated_look::KEY)
+        {
             warnings.push("Other AURA-only tools are not included. The preset carries the saved reference grade and supported develop settings.".into());
         }
         if table.p95_error > 2.0 {

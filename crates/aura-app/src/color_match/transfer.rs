@@ -37,6 +37,7 @@ use super::AppState;
 /// Bump when [`measure`] changes; a stored measurement of another version is re-taken.
 pub(super) const STATS_VERSION: u32 = 3;
 const STATS: &str = "colour_reference_grade_v1:";
+const REFERENCE_SAMPLING: u32 = 1;
 const LIGHT_QUANTILES: usize = 65;
 const CHROMA_QUANTILES: usize = 33;
 /// A photograph is fitted from this many pixels, sub-sampled on a grid so the distribution is
@@ -83,6 +84,9 @@ mod neutral;
 use neutral::neutral_axis;
 mod palette;
 mod quantile;
+pub(super) mod tone_prior;
+pub use tone_prior::ToneReading;
+
 use quantile::QuantileMap;
 
 /// What a photograph's colour and tone are, as the fit compares them.
@@ -90,6 +94,9 @@ use quantile::QuantileMap;
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct GradeStats {
     pub version: u32,
+    /// Zero means legacy/unspecified pixels; one means native stratified reference import.
+    #[serde(default)]
+    pub reference_sampling: u32,
     pub samples: u32,
     pub lightness: Vec<f32>,
     pub axis: Vec<[f32; 2]>,
@@ -112,6 +119,7 @@ pub(super) struct GradeStats {
 impl GradeStats {
     pub(super) fn usable(&self) -> bool {
         self.version == STATS_VERSION
+            && self.reference_sampling <= REFERENCE_SAMPLING
             && self.lightness.len() == LIGHT_QUANTILES
             && self.axis.len() == AXIS_NODES
             && self.axis_weight.len() == AXIS_NODES
@@ -278,6 +286,7 @@ pub(super) fn measure(labs: &[[f32; 3]]) -> GradeStats {
     let achromatic = !labs.is_empty() && labs.iter().all(|l| l[1].hypot(l[2]) < 0.004);
     GradeStats {
         version: STATS_VERSION,
+        reference_sampling: 0,
         samples: labs.len() as u32,
         lightness,
         axis,
@@ -302,6 +311,13 @@ pub(super) fn measure_image(image: &Rgb8) -> GradeStats {
         .map(|s| s.lab)
         .collect();
     measure(&labs)
+}
+
+pub(super) fn sample_labs(image: &Rgb8, limit: usize) -> Vec<[f32; 3]> {
+    samples(image, limit)
+        .iter()
+        .map(|sample| sample.lab)
+        .collect()
 }
 
 /// How far two photographs' colour and tone are apart, in `OKLab` units times a hundred - close
@@ -775,6 +791,10 @@ pub(super) struct Fit {
     pub after: Distance,
     pub iterations: usize,
     pub content: f32,
+    /// The scene-prior tone estimate, when the reference's scene is not this photograph's.
+    pub tone: Option<ToneReading>,
+    /// How far the fit stretched colour differences before it was limited, when it had to be.
+    pub stretch_limited_from: Option<f32>,
 }
 
 /// The evidence available for a fit. Similarity is structural correspondence, not confidence.
@@ -937,6 +957,22 @@ pub(super) fn fit_with_intent_checkpoint(
     similarity: Option<f32>,
     quality: super::MatchQuality,
     intent: super::MatchIntent,
+    checkpoint: impl FnMut() -> AuraResult<()>,
+) -> AuraResult<Fit> {
+    fit_tones(
+        reference, target, similarity, quality, intent, true, checkpoint,
+    )
+}
+
+/// The fit, with or without the scene-prior tone; only the looks harness turns it off, to
+/// measure against the fit as it was before ADR-0180.
+fn fit_tones(
+    reference: &GradeStats,
+    target: &[Sample],
+    similarity: Option<f32>,
+    quality: super::MatchQuality,
+    intent: super::MatchIntent,
+    scene_tone: bool,
     mut checkpoint: impl FnMut() -> AuraResult<()>,
 ) -> AuraResult<Fit> {
     checkpoint()?;
@@ -958,6 +994,8 @@ pub(super) fn fit_with_intent_checkpoint(
             after: before,
             iterations: 0,
             content,
+            tone: None,
+            stretch_limited_from: None,
         });
     }
     // A colour reference cannot restore colours absent from a genuinely grey target.
@@ -992,18 +1030,200 @@ pub(super) fn fit_with_intent_checkpoint(
     if fitter.palette && !fitter.monochrome && reference.palette_samples.len() >= MIN_SAMPLES {
         best = palette::refine(reference, target, best, quality, &mut checkpoint)?;
     }
+    // Across different scenes the reference's lightness histogram is mostly its scene, so
+    // matching it is wrong and ignoring it loses every matte, airy, moody or contrasty look. The
+    // scene prior estimates the part of it that is an edit, and how far this photograph itself
+    // sits from an ordinary finished one, and the tone moves by the difference (ADR-0180). It is
+    // a posterior mean already, so the distribution score does not get to undo it.
+    let mut tone = None;
+    if !fitter.corresponding() && !fitter.palette && scene_tone {
+        checkpoint()?;
+        if let Some((curve, reading)) =
+            tone_prior::for_target(&reference.lightness, &start.lightness, TONE_NODES)
+        {
+            best.1.tone = regularise_tone(curve);
+            best.1 = best.1.clone().bounded();
+            best.0 = distance(reference, &measure(&transformed(&best.1, target)));
+            tone = Some(reading);
+        }
+    }
+    // Bound how steeply the transform stretches nearby colours, at the colours this photograph
+    // contains: a steep spot is a band in a sky or a patch on a floor (ADR-0181).
+    // The same picture edited is a real edit to recover, and real edits can be steeper; the limit
+    // applies where the scenes differ.
+    checkpoint()?;
+    let (limited, stretch_limited_from) = if fitter.content >= SAME_SCENE {
+        (best.1, None)
+    } else {
+        limit_stretch(best.1, target)
+    };
+    best.1 = limited;
+    if stretch_limited_from.is_some() {
+        best.0 = distance(reference, &measure(&transformed(&best.1, target)));
+    }
     Ok(Fit {
         grade: best.1,
         before,
         after: best.0,
         iterations,
         content,
+        tone,
+        stretch_limited_from,
     })
 }
 
 #[cfg(test)]
 fn fit(reference: &GradeStats, target: &[Sample], similarity: Option<f32>) -> Fit {
     fit_with_checkpoint(reference, target, similarity, || Ok(())).unwrap()
+}
+
+/// The Natural fit without the scene-prior tone, as it was before ADR-0180.
+#[cfg(test)]
+fn fit_without_scene_tone(
+    reference: &GradeStats,
+    target: &[Sample],
+    similarity: Option<f32>,
+) -> Fit {
+    fit_tones(
+        reference,
+        target,
+        similarity,
+        super::MatchQuality::Precise,
+        super::MatchIntent::Natural,
+        false,
+        || Ok(()),
+    )
+    .unwrap()
+}
+
+/// How much a transform stretches small colour differences at the colours a photograph contains:
+/// the 99th percentile, over up to 4,096 of its samples, of the largest local gain in six `OKLab`
+/// directions. A look stretches by a bounded, smooth amount everywhere - a contrast curve by its
+/// slope; a transform that would band a sky or blotch a floor has a spike, where colours a hair
+/// apart land far apart. Measured on the function, not on noisy pixels, so a strong look on a
+/// noisy shadow is not mistaken for a band (ADR-0181).
+pub(super) fn stretch(grade: &ReferenceGrade, samples: &[Sample]) -> f32 {
+    const STEP: f32 = 0.006;
+    let evaluator = Evaluator::new(grade);
+    let stride = (samples.len() / 4096).max(1);
+    let mut gains: Vec<f32> = samples
+        .iter()
+        .step_by(stride)
+        .filter_map(|sample| {
+            let from = oklab_from_linear_srgb(evaluator.linear_srgb(sample.linear));
+            let mut worst = 0.0_f32;
+            for axis in 0..3 {
+                for sign in [-1.0_f32, 1.0] {
+                    let mut lab = sample.lab;
+                    if let Some(v) = lab.get_mut(axis) {
+                        *v += sign * STEP;
+                    }
+                    let linear = aura_render::reference_grade::linear_srgb_from_oklab(lab);
+                    if linear.iter().any(|v| !(0.0..=1.0).contains(v)) {
+                        continue;
+                    }
+                    let moved = oklab_from_linear_srgb(linear);
+                    let input = (0..3)
+                        .map(|c| {
+                            (moved.get(c).copied().unwrap_or(0.0)
+                                - sample.lab.get(c).copied().unwrap_or(0.0))
+                            .powi(2)
+                        })
+                        .sum::<f32>()
+                        .sqrt();
+                    if input < 1e-4 {
+                        continue;
+                    }
+                    let to = oklab_from_linear_srgb(evaluator.linear_srgb(linear));
+                    let output = (0..3)
+                        .map(|c| {
+                            (to.get(c).copied().unwrap_or(0.0)
+                                - from.get(c).copied().unwrap_or(0.0))
+                            .powi(2)
+                        })
+                        .sum::<f32>()
+                        .sqrt();
+                    worst = worst.max(output / input);
+                }
+            }
+            (worst > 0.0).then_some(worst)
+        })
+        .collect();
+    if gains.is_empty() {
+        return 1.0;
+    }
+    gains.sort_by(f32::total_cmp);
+    gains
+        .get(((gains.len() - 1) as f32 * 0.99).round() as usize)
+        .copied()
+        .unwrap_or(1.0)
+}
+
+/// The most a fitted transform may stretch small colour differences. Real looks learned from
+/// their own originals stretch the assessment photographs by at most 3.2 (a strong contrast and
+/// saturation look) and Natural fits by about 1.1; unconstrained palette fits reached 4 to 42 and
+/// banded skies and blotched floors. Limits of 4, 2.5 and 2 left new bands in 10, 3 and 2 of 20
+/// palette results, and the tightest was also the closest to the true looks (ADR-0181), so only an
+/// explicitly requested palette transfer is ever shortened by it.
+pub(super) const MAX_STRETCH: f32 = 2.0;
+
+/// Bring a transform within [`MAX_STRETCH`] by shrinking whichever component - tone, chroma,
+/// saturation, hue or cast - is making it steep, a quarter at a time, rather than weakening the
+/// whole look. Returns the stretch it started from when it had to.
+pub(super) fn limit_stretch(
+    grade: ReferenceGrade,
+    samples: &[Sample],
+) -> (ReferenceGrade, Option<f32>) {
+    let stride = (samples.len() / 2048).max(1);
+    let probe: Vec<Sample> = samples.iter().step_by(stride).copied().collect();
+    let first = stretch(&grade, &probe);
+    if first <= MAX_STRETCH {
+        return (grade, None);
+    }
+    let identity = ReferenceGrade::identity();
+    let shrink = |scales: &Scales, component: usize| {
+        let mut next = *scales;
+        match component {
+            0 => next.tone = next.tone.map(|t| t * 0.75),
+            1 => next.chroma *= 0.75,
+            2 => next.saturation *= 0.75,
+            3 => {
+                next.hue *= 0.75;
+                next.hue_light *= 0.75;
+            }
+            _ => {
+                next.temperature *= 0.75;
+                next.tint *= 0.75;
+            }
+        }
+        next
+    };
+    let mut scales = Scales::uniform(1.0);
+    let (mut best, mut current) = (grade.clone(), first);
+    for _ in 0..32 {
+        if current <= MAX_STRETCH {
+            break;
+        }
+        let choice = (0..5)
+            .map(|component| {
+                let trial = shrink(&scales, component);
+                let candidate = mix(&identity, &grade, &trial);
+                (stretch(&candidate, &probe), trial, candidate)
+            })
+            .min_by(|a, b| a.0.total_cmp(&b.0));
+        match choice {
+            Some((value, trial, candidate)) if value < current - 1e-3 => {
+                (scales, best, current) = (trial, candidate, value);
+            }
+            // No single component is responsible: shorten the whole look.
+            _ => {
+                scales = (0..5).fold(scales, |s, component| shrink(&s, component));
+                best = mix(&identity, &grade, &scales);
+                current = stretch(&best, &probe);
+            }
+        }
+    }
+    (best, Some(first))
 }
 
 /// What the skin review found.
@@ -1101,21 +1321,26 @@ fn stats_key(id: &str) -> AuraResult<String> {
 
 /// Measure a reference once, when it enters the library, and keep the measurement by content.
 /// A reference imported before this engine is measured the next time it is imported or captured.
-pub(super) fn remember(state: &AppState, id: &str, image: &Rgb8) -> AuraResult<()> {
+pub(super) fn remember(state: &AppState, id: &str, image: &Rgb8) -> AuraResult<bool> {
     let key = stats_key(id)?;
-    if super::read::<GradeStats>(state, &key)?
-        .is_some_and(|s| s.usable() && s.palette_samples.len() >= MIN_SAMPLES)
-    {
-        return Ok(());
+    if super::read::<GradeStats>(state, &key)?.is_some_and(|s| {
+        s.usable()
+            && s.palette_samples.len() >= MIN_SAMPLES
+            && s.reference_sampling == REFERENCE_SAMPLING
+    }) {
+        return Ok(false);
     }
     let labs: Vec<[f32; 3]> = samples(image, REFERENCE_SAMPLES)
         .iter()
         .map(|s| s.lab)
         .collect();
     if labs.len() < MIN_SAMPLES {
-        return Ok(());
+        return Ok(false);
     }
-    super::store(state, &key, &measure(&labs))
+    let mut measured = measure(&labs);
+    measured.reference_sampling = REFERENCE_SAMPLING;
+    super::store(state, &key, &measured)?;
+    Ok(true)
 }
 
 /// The stored measurement of a reference, when it has one this build can use.

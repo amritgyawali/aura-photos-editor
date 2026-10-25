@@ -36,10 +36,13 @@ mod grade;
 mod library;
 mod lightroom;
 pub use lightroom::{generate as generate_lightroom_preset, PresetInput, PresetReport};
+mod learned;
 mod matcher;
 mod native_checks;
+pub(crate) mod original;
 pub use matcher::TransferDiagnostics;
 pub(crate) use native_checks::NativeChecks;
+mod reduction;
 mod refine;
 mod transfer;
 pub use library::{
@@ -47,7 +50,7 @@ pub use library::{
     CaptureInput, ManageInput, WorkflowInput as LibraryWorkflowInput,
     WorkflowSnapshot as LibraryWorkflowSnapshot,
 };
-pub use transfer::{Distance as TransferDistance, SkinReview};
+pub use transfer::{Distance as TransferDistance, SkinReview, ToneReading};
 mod reference_image;
 mod regional;
 use appearance::Region;
@@ -190,6 +193,9 @@ struct Session {
     /// the slider fit above.
     #[serde(default)]
     transfer: Option<matcher::TransferSession>,
+    /// How different the saved result looked from the original at the last native apply.
+    #[serde(default)]
+    measured_visible: Option<f32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -268,6 +274,11 @@ pub struct MatchReport {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fitting: Option<FitDiagnostics>,
     pub reference_monochrome: bool,
+    /// After a native apply: mean `OKLab` difference times a hundred between the photograph as it
+    /// was and the saved result. Below about 0.45 (about one CIE76 unit) the match is not visible, and the panel says so
+    /// rather than reporting a match.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub visible_change: Option<f32>,
 }
 
 fn read<T: DeserializeOwned>(state: &AppState, key: &str) -> AuraResult<Option<T>> {
@@ -357,7 +368,7 @@ fn session_key(photo: &str) -> AuraResult<String> {
 /// Unsupported input/profile, allocation bounds, cancellation or analysis failure.
 pub fn import_reference(state: &AppState, input: &ImportInput) -> IpcResult<ReferenceSummary> {
     job(state, &input.cancel_id, |cancel| {
-        let decoded = reference_image::decode(Path::new(&input.path))?;
+        let decoded = reference_image::decode_native(Path::new(&input.path))?;
         let name = Path::new(&input.path)
             .file_name()
             .map_or_else(|| "Reference".into(), |s| s.to_string_lossy().into_owned());
@@ -368,7 +379,10 @@ pub fn import_reference(state: &AppState, input: &ImportInput) -> IpcResult<Refe
             decoded.height,
             decoded.converted_icc,
         );
-        persist_reference(state, summary, &decoded.image, cancel)
+        let summary = persist_reference(state, summary, &decoded.image, cancel)?;
+        // Kept so the reference's own original can be found in a collection later (ADR-0161).
+        learned::remember_source(state, &summary.id, Path::new(&input.path))?;
+        Ok(summary)
     })
 }
 
@@ -402,10 +416,10 @@ fn persist_reference(
 ) -> AuraResult<ReferenceSummary> {
     check_cancel(cancel)?;
     let key = asset_key(&summary.id)?;
-    transfer::remember(state, &summary.id, image)?;
+    let refreshed = transfer::remember(state, &summary.id, image)?;
     if let Some(mut existing) = read::<Reference>(state, &key)? {
         if existing.engine == ENGINE {
-            if existing.summary.thumbnail.is_some() {
+            if !refreshed && existing.summary.thumbnail.is_some() {
                 let mut updated = false;
                 if existing.small_rgb.len() != content::BYTES {
                     existing.small_rgb = content::thumbnail(image);
@@ -561,6 +575,7 @@ fn report(
         current,
         fitting: session.fitting.clone(),
         reference_monochrome: session.reference_monochrome,
+        visible_change: None,
     }
 }
 
@@ -858,6 +873,7 @@ pub fn prepare(state: &AppState, input: &PrepareInput) -> IpcResult<MatchReport>
             checked_hash: None,
             measured_before: None,
             measured_after: None,
+            measured_visible: None,
             fitting,
             reference_monochrome,
             grade_offsets,
@@ -956,6 +972,7 @@ pub fn status(state: &AppState, photo_id: &str) -> IpcResult<Option<MatchReport>
     );
     if checked {
         result.before_distance = session.measured_before.unwrap_or(session.before_distance);
+        result.visible_change = session.measured_visible;
     }
     if hash == session.baseline_hash && hash != session.last_hash {
         result.controls.amount = 0.0;
