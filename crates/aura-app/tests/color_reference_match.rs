@@ -87,7 +87,7 @@ fn palette_matching_checks_the_native_endpoint_without_writing_until_apply() {
     .save(&reference_path)
     .expect("reference");
     let source_bytes = std::fs::read(&target_path).expect("source bytes");
-    let (state, _, photo) = setup_with_baseline(&target_path, directory.path(), false);
+    let (state, project, photo) = setup_with_baseline(&target_path, directory.path(), false);
     let reference = color_match::import_reference(
         &state,
         &color_match::ImportInput {
@@ -99,8 +99,9 @@ fn palette_matching_checks_the_native_endpoint_without_writing_until_apply() {
     let analysis = color_match::prepare(
         &state,
         &color_match::PrepareInput {
+            replace_previous: false,
             photo_id: photo.to_db(),
-            reference_id: reference.id,
+            reference_id: reference.id.clone(),
             cancel_id: job(),
             quality: color_match::MatchQuality::Quick,
             intent: color_match::MatchIntent::Palette,
@@ -147,11 +148,33 @@ fn palette_matching_checks_the_native_endpoint_without_writing_until_apply() {
             .changed,
         0
     );
-    apply(color_match::Controls {
+    let zero = apply(color_match::Controls {
         amount: 0.0,
         ..Default::default()
     })
     .expect("zero");
+    let verified = zero
+        .fitting
+        .as_ref()
+        .expect("zero diagnostics")
+        .transfer
+        .as_ref()
+        .expect("zero component measurements");
+    assert!((verified.rendered_before.total - zero.before_distance).abs() < 1e-6);
+    assert!((verified.rendered_after.total - zero.after_distance).abs() < 1e-6);
+    assert!((verified.rendered_after.tone - verified.rendered_before.tone).abs() < 1e-6);
+    assert!((verified.rendered_after.palette - verified.rendered_before.palette).abs() < 1e-6);
+    let identity_preset = color_match::generate_lightroom_preset(
+        &state,
+        &color_match::PresetInput {
+            photo_id: photo.to_db(),
+            session_id: analysis.session_id.clone(),
+            name: "Zero strength".into(),
+            cancel_id: job(),
+        },
+    )
+    .expect("checked zero strength exports a valid identity preset");
+    assert!(identity_preset.p95_table_error < 0.1);
     apply(color_match::Controls::default()).expect("restore fitted endpoint");
     assert_eq!(
         state.recipe_store().load(&photo).expect("restored"),
@@ -176,6 +199,7 @@ fn palette_matching_checks_the_native_endpoint_without_writing_until_apply() {
     let analysis = color_match::prepare(
         &state,
         &color_match::PrepareInput {
+            replace_previous: false,
             photo_id: photo.to_db(),
             reference_id: mono.id,
             cancel_id: job(),
@@ -208,6 +232,89 @@ fn palette_matching_checks_the_native_endpoint_without_writing_until_apply() {
         model.skin_fidelity.abs() < 1e-6,
         "skin must desaturate with a monochrome reference"
     );
+    let replacement = color_match::prepare(
+        &state,
+        &color_match::PrepareInput {
+            photo_id: photo.to_db(),
+            reference_id: reference.id,
+            cancel_id: job(),
+            quality: color_match::MatchQuality::Quick,
+            intent: color_match::MatchIntent::Palette,
+            replace_previous: true,
+        },
+    )
+    .expect("replace monochrome with the earlier colour reference");
+    let preset_input = || color_match::PresetInput {
+        photo_id: photo.to_db(),
+        session_id: replacement.session_id.clone(),
+        name: "Warm & <soft> look".into(),
+        cancel_id: job(),
+    };
+    assert!(
+        color_match::generate_lightroom_preset(&state, &preset_input()).is_err(),
+        "analysis alone is not an applied preset"
+    );
+    let result = color_match::apply(
+        &state,
+        &color_match::ApplyInput {
+            photo_id: photo.to_db(),
+            session_id: replacement.session_id.clone(),
+            controls: Default::default(),
+            cancel_id: job(),
+        },
+    )
+    .expect("replacement colour apply");
+    assert!(result.current && result.full_resolution_checked);
+    let replaced = state
+        .recipe_store()
+        .load(&photo)
+        .expect("replacement saved")
+        .expect("recipe");
+    assert_eq!(aura_recipe::reference_grade::read(&replaced).expect("replacement grade"),
+        aura_recipe::reference_grade::read(matched.as_ref().expect("first matched recipe")).expect("first grade"),
+        "switching back must recover the original colour fit, without a monochrome crossfade baseline");
+    let preset = color_match::generate_lightroom_preset(&state, &preset_input())
+        .expect("self-contained Lightroom preset");
+    assert!(preset.xml.contains("Warm &amp; &lt;soft&gt; look"));
+    assert!(preset
+        .xml
+        .contains(&format!("crs:Table_{}=", preset.table_fingerprint)));
+    assert!(
+        preset.xml.contains("crs:PresetType=\"Normal\"") && preset.xml.contains("crs:RGBTable=")
+    );
+    assert_eq!(preset.table_edge, 32);
+    assert!(preset.mean_table_error.is_finite() && preset.p95_table_error.is_finite());
+    assert_eq!(
+        state
+            .recipe_store()
+            .load(&photo)
+            .expect("unchanged by export"),
+        Some(replaced.clone())
+    );
+    let mut manual = replaced;
+    manual.global.exposure += 0.25;
+    state
+        .recipe_store()
+        .save(
+            &project,
+            &photo,
+            &manual,
+            &["global.exposure".into()],
+            "Later manual exposure",
+        )
+        .expect("manual change");
+    assert!(
+        color_match::generate_lightroom_preset(&state, &preset_input()).is_err(),
+        "never export a stale matched treatment as the current edit"
+    );
+    assert_eq!(
+        state.recipe_store().load(&photo).expect("manual kept"),
+        Some(manual)
+    );
+    assert_eq!(
+        std::fs::read(&target_path).expect("source unchanged after export"),
+        source_bytes
+    );
 }
 
 #[test]
@@ -237,6 +344,7 @@ fn identical_source_and_renamed_references_are_refused_without_editing_the_targe
         let error = color_match::prepare(
             &state,
             &color_match::PrepareInput {
+                replace_previous: false,
                 intent: Default::default(),
                 photo_id: photo.to_db(),
                 reference_id: reference.id,
@@ -271,6 +379,7 @@ fn identical_source_and_renamed_references_are_refused_without_editing_the_targe
     let accepted = color_match::prepare(
         &state,
         &color_match::PrepareInput {
+            replace_previous: false,
             intent: Default::default(),
             photo_id: photo.to_db(),
             reference_id: reference.id,
@@ -353,6 +462,7 @@ fn fractional_reanalysis_and_quality_changes_start_from_the_original_match_basel
             let analysis = color_match::prepare(
                 state,
                 &color_match::PrepareInput {
+                    replace_previous: false,
                     intent: Default::default(),
                     photo_id: photo.to_db(),
                     reference_id: reference.into(),
@@ -471,6 +581,7 @@ fn pristine_analysis_never_overwrites_a_later_first_manual_edit() {
     let analysis = color_match::prepare(
         &state,
         &color_match::PrepareInput {
+            replace_previous: false,
             intent: Default::default(),
             photo_id: photo.to_db(),
             reference_id: reference.id,
@@ -588,6 +699,7 @@ fn pristine_imports_match_without_analysis_edits_and_first_apply_supports_undo()
         let analysis = color_match::prepare(
             &state,
             &color_match::PrepareInput {
+                replace_previous: false,
                 intent: Default::default(),
                 photo_id: photo.to_db(),
                 reference_id: reference.id,
@@ -1318,6 +1430,7 @@ fn different_dimensions_match_strengths_restore_and_new_manual_edits_are_kept() 
     let prepared = color_match::prepare(
         &state,
         &color_match::PrepareInput {
+            replace_previous: false,
             intent: Default::default(),
             quality: Default::default(),
             photo_id: photo.to_db(),
@@ -1494,6 +1607,7 @@ fn native_raw_reference_match_does_not_touch_originals() {
     let prepared = color_match::prepare(
         &state,
         &color_match::PrepareInput {
+            replace_previous: false,
             intent: Default::default(),
             quality: Default::default(),
             photo_id: photo.to_db(),

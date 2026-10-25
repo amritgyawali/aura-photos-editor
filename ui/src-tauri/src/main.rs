@@ -3392,6 +3392,19 @@ async fn color_match_status(
 }
 
 #[tauri::command]
+async fn generate_color_match_preset(
+    state: State<'_, AppState>,
+    input: aura_app::color_match::PresetInput,
+) -> IpcResult<aura_app::color_match::PresetReport> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::color_match::generate_lightroom_preset(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
 async fn analyse_portrait(
     state: State<'_, AppState>,
     input: aura_app::portrait_commands::PortraitInput,
@@ -4087,9 +4100,11 @@ async fn evoto_faces(
     input: aura_app::evoto_workflow::PhotoInput,
 ) -> IpcResult<aura_app::evoto_workflow::FacesDto> {
     let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || aura_app::evoto_workflow::evoto_faces(&app, &input))
-        .await
-        .map_err(|_| background_request_failed())?
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::evoto_workflow::evoto_faces(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
 }
 
 /// An ID photograph, a measured crop or a level eye line, saved as one manual edit. ADR-0150.
@@ -4099,9 +4114,11 @@ async fn apply_evoto_framing(
     input: aura_app::evoto_workflow::FramingInput,
 ) -> IpcResult<aura_app::evoto_workflow::FramingDto> {
     let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || aura_app::evoto_workflow::apply_evoto_framing(&app, &input))
-        .await
-        .map_err(|_| background_request_failed())?
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::evoto_workflow::apply_evoto_framing(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
 }
 
 /// A cut-out, grid, carousel, before and after or enlargement, written into a chosen folder. ADR-0150.
@@ -4111,9 +4128,11 @@ async fn evoto_export(
     input: aura_app::evoto_workflow::ExportInput,
 ) -> IpcResult<aura_app::evoto_workflow::ExportDto> {
     let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || aura_app::evoto_workflow::evoto_export(&app, &input))
-        .await
-        .map_err(|_| background_request_failed())?
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::evoto_workflow::evoto_export(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
 }
 
 /// The photographs in a collection with a face whose eyes look closed. ADR-0150.
@@ -4123,9 +4142,11 @@ async fn blink_check(
     input: aura_app::evoto_workflow::BlinkInput,
 ) -> IpcResult<aura_app::evoto_workflow::BlinkDto> {
     let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || aura_app::evoto_workflow::blink_check(&app, &input))
-        .await
-        .map_err(|_| background_request_failed())?
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::evoto_workflow::blink_check(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
 }
 
 /// "Connect Claude" / "Connect ChatGPT": open the provider's own key page in the browser.
@@ -4277,6 +4298,7 @@ fn main() {
             prepare_color_match,
             apply_color_match,
             color_match_status,
+            generate_color_match_preset,
             enhance_photo,
             enhance_portrait,
             auto_retouch,

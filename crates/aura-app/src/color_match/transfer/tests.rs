@@ -2,6 +2,68 @@ use super::*;
 use aura_raw::colour::curve::srgb_decode;
 use aura_render::reference_grade::linear_srgb_from_oklab;
 
+#[test]
+fn palette_transport_moves_missing_blue_hues_into_a_warm_reference_palette() {
+    let cool = image(128, 128, |x, y| {
+        let light = 0.25 + 0.6 * y as f32 / 127.0;
+        let a = -0.035 + 0.025 * x as f32 / 127.0;
+        linear_srgb_from_oklab([light, a, -0.08]).map(aura_raw::colour::curve::srgb_encode)
+    });
+    let warm = image(128, 128, |x, y| {
+        let light = 0.25 + 0.6 * y as f32 / 127.0;
+        let a = 0.01 + 0.025 * x as f32 / 127.0;
+        linear_srgb_from_oklab([light, a, 0.07]).map(aura_raw::colour::curve::srgb_encode)
+    });
+    let samples = samples(&cool, TARGET_SAMPLES);
+    let mut reference = reference_stats(&warm);
+    reference.palette_matching = true;
+    let fitted = fit_with_intent_checkpoint(
+        &reference,
+        &samples,
+        None,
+        super::super::MatchQuality::Precise,
+        super::super::MatchIntent::Palette,
+        || Ok(()),
+    )
+    .unwrap();
+    assert!(
+        fitted.grade.palette.is_some(),
+        "missing-hue transfer must use joint colour evidence"
+    );
+    let after = transformed(&fitted.grade, &samples);
+    let mean_b = after.iter().map(|p| p[2]).sum::<f32>() / after.len() as f32;
+    assert!(
+        mean_b > 0.035,
+        "blue must become warm, not merely less saturated: {mean_b}"
+    );
+    let measured = measure(&after);
+    let before = measure(&samples.iter().map(|p| p.lab).collect::<Vec<_>>());
+    assert!(distance(&reference, &measured).palette < 0.35 * distance(&reference, &before).palette);
+    assert!(after.iter().all(|p| p.iter().all(|v| v.is_finite())));
+}
+
+#[test]
+fn palette_strength_endpoints_restore_the_entire_previous_map_exactly() {
+    use aura_recipe::reference_grade::{palette::EDGE, PaletteMap};
+    let mut prior = ReferenceGrade::identity();
+    prior.palette = Some(PaletteMap {
+        offset: [0.01, -0.02],
+        deltas: vec![[0.005, 0.0]; EDGE * EDGE],
+    });
+    let mut next = ReferenceGrade::identity();
+    next.palette = Some(PaletteMap {
+        offset: [-0.01, 0.06],
+        deltas: vec![[0.0, 0.015]; EDGE * EDGE],
+    });
+    assert_eq!(mix(&prior, &next, &Scales::uniform(0.0)), prior);
+    assert_eq!(mix(&prior, &next, &Scales::uniform(1.0)), next);
+    let mut no_warmth = Scales::uniform(1.0);
+    no_warmth.temperature = 0.0;
+    no_warmth.tint = 0.0;
+    let mixed = mix(&prior, &next, &no_warmth);
+    assert_eq!(mixed.palette.unwrap().offset, prior.palette.unwrap().offset);
+}
+
 /// Deterministic texture, so no two neighbouring pixels are identical.
 fn noise(x: u32, y: u32, seed: u32) -> f32 {
     let mut h = x.wrapping_mul(374_761_393)

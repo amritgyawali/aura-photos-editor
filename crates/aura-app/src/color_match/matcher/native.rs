@@ -56,7 +56,7 @@ pub(super) fn fit(
         input.monochrome,
     )?;
     let endpoint = review.fit(state, cancel, input.ungraded, input.grade)?
-        .ok_or_else(|| super::invalid("No reference palette fit preserved this photo's native skin tones, highlights and measured colour distance. Try Natural look or a different reference. No edit was saved."))?;
+        .ok_or_else(|| super::invalid("No reference palette fit preserved this photo's smooth gradients, skin tones, highlights and measured colour distance. Try Natural look or a different reference. No edit was saved."))?;
     *input.grade = endpoint.grade;
     Ok((
         review.before,
@@ -68,6 +68,37 @@ pub(super) fn fit(
 
 impl Review {
     pub(super) fn fit(
+        &self,
+        state: &AppState,
+        cancel: &CancelToken,
+        ungraded: &Recipe,
+        grade: &ReferenceGrade,
+    ) -> AuraResult<Option<Endpoint>> {
+        let mut best = self.fit_candidate(state, cancel, ungraded, grade)?;
+        // A strong chromatic transport can force a global backtrack to preserve a face.
+        // Also check the underlying tone/cast fit, using the same native frame and guards.
+        // Keep whichever actually passes with the smaller full-palette distance.
+        if grade.palette.is_some() && best.as_ref().is_none_or(|fit| fit.factor < 0.5) {
+            let mut underlying = grade.clone();
+            underlying.palette = None;
+            let alternative = self.fit_candidate(state, cancel, ungraded, &underlying)?;
+            let renders = best.as_ref().map_or(7, |v| v.renders)
+                + alternative.as_ref().map_or(7, |v| v.renders)
+                - 1;
+            if alternative
+                .as_ref()
+                .is_some_and(|a| best.as_ref().is_none_or(|b| a.after.total < b.after.total))
+            {
+                best = alternative;
+            }
+            if let Some(best) = best.as_mut() {
+                best.renders = renders;
+            }
+        }
+        Ok(best)
+    }
+
+    fn fit_candidate(
         &self,
         state: &AppState,
         cancel: &CancelToken,
@@ -156,6 +187,7 @@ impl Review {
                     Arc::new(Guard {
                         regions: readings,
                         clipped: appearance::clipped(&image),
+                        contours: super::super::contours::Contours::new(&image),
                     }),
                 )
             });
@@ -192,7 +224,8 @@ impl Review {
             }));
         }
         // Cheap rejection first: do not sort colour distributions for a failed safety check.
-        if appearance::clipped(&image) > self.guard.clipped + 0.01
+        if !self.guard.contours.accepts(&image)
+            || appearance::clipped(&image) > self.guard.clipped + 0.01
             || !skin_guard(
                 &self.guard.regions,
                 &appearance::readings(&image, &self.points),
@@ -203,9 +236,7 @@ impl Review {
         }
         let after = super::measured(&self.reference, &image);
         check_cancel(cancel)?;
-        let checked = self.before.total.is_finite()
-            && after.total.is_finite()
-            && after.total <= self.before.total + 0.0001;
+        let checked = native_checks::non_regressing(self.before, after);
         if checked {
             state
                 .color_match_checks()

@@ -22,6 +22,8 @@ use rayon::prelude::*;
 
 use crate::contract::render::OutputColour;
 
+mod palette;
+
 /// Samples in each one-dimensional lookup table built from the stored curves.
 const LUT: usize = 1024;
 /// Sector spacing in radians.
@@ -139,6 +141,7 @@ pub struct Evaluator {
     zone: Vec<f32>,
     skin: f32,
     skin_fidelity: f32,
+    palette: Option<aura_recipe::reference_grade::PaletteMap>,
 }
 
 impl Evaluator {
@@ -167,6 +170,7 @@ impl Evaluator {
             zone: grade.zone_gain.clone(),
             skin: grade.skin,
             skin_fidelity: grade.skin_fidelity,
+            palette: grade.palette.clone(),
         }
     }
 
@@ -231,6 +235,9 @@ impl Evaluator {
             relative[0] + source[0] + cast[0],
             relative[1] + source[1] + cast[1],
         ];
+        if let Some(map) = &self.palette {
+            palette::apply(map, &mut result);
+        }
         // Keep this weight independent of lightness. Fading a displacement cap across a
         // narrow lightness interval can reverse an otherwise monotone tone gradient.
         let fidelity = self.skin_fidelity * skin_likeness([0.6, a, b]);

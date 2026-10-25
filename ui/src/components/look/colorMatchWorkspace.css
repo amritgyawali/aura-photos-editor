@@ -17,4 +17,7 @@
 .color-match-no-preview { min-height: 115px; display: grid; place-items: center; background: #292d34; color: #c1c8d4; }
 .color-match-footer button { border-radius: 20px; }
 .color-match-panel label > select { width: 100%; }
+.lightroom-preset-export { border-top: 1px solid #484c51; margin-top: 20px; padding-top: 12px; }
+.lightroom-preset-export h4 { margin: 8px 0; }
+.lightroom-preset-download { display: block; margin: 12px 0; padding: 10px 12px; border: 1px solid #9fafd6; border-radius: 8px; text-align: center; color: #e8ecff; }
 @media (max-width: 480px) { .color-match-primary-actions, .color-match-reference-cards { grid-template-columns: 1fr; } }
