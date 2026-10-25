@@ -140,6 +140,43 @@ test `a_batch_matched_to_one_reference_converges_on_one_look` and the accuracy g
 `tests/reference_grade_transfer.rs` failed before this work and still fail: both ask one unrelated
 reference to remove more of a known look's error than one unrelated reference can identify.
 
+## Neutralise the photograph, then apply every colour of the reference: measured
+
+The technique asked for after this work was: measure every colour, colour value and tone of the
+reference; bring the photograph to neutral colour and neutral white balance; then apply the
+reference's colours and tones to it. Two readings of it were measured on the known-look harness.
+
+**Copying the reference's colour values as measured** is what Palette mode does. Neutralising the
+photograph first does not change the result, because a monotone quantile map lands on the
+reference's distribution whatever monotone change preceded it. It measured 13.55 against Natural's
+3.72 (ADR-0180): a reference's colours are mostly its scene, so copying them repaints the scene.
+
+**Neutralising the photograph and applying the reference's departure from an ordinary photograph**
+is what Natural already does for white balance and split toning (the photograph's own neutral
+axis is replaced by the reference's) and, since ADR-0180, for tone. To find what is left, each part
+of the Natural fit was replaced in turn by the ideal answer, learned from the reference's own
+original (`nat+pcast`, `nat+pchroma`, `nat+psector` in `transfer/tests/looks.rs`). Mean `OKLab`
+x100 to the true look, 18 looks:
+
+| | tuning, 26 photos | held out, 11 Pexels + 27 wedding frames |
+|---|---:|---:|
+| leave the photograph alone | 4.34 | 4.77 |
+| Natural (this ADR) | 3.70 | 3.75 |
+| ... with the ideal white balance and split toning | 3.70 | 3.73 |
+| ... with the ideal saturation | 3.64 | 3.60 |
+| ... with the ideal per-hue colours | 3.84 | 3.96 |
+| learned from the reference's own original | 1.89 | 2.26 |
+
+White balance is already where the ideal puts it; per-hue colours cannot be carried across scenes
+even when known exactly. Saturation was the one part with room, so it was estimated the way
+ADR-0180 estimates tone: a Gaussian scene prior over five log-chroma landmarks of ordinary
+photographs, a no-edit probability, the photograph's own departure removed first, and the posterior
+mean in closed form. At every setting tried (no-edit 0.3, 0.6, 0.8; evidence 0.5, 1.0) it gained at
+most 0.01 and made more photographs worse; a scene's colourfulness varies too widely for one
+reference to say how much of its colourfulness is an edit. It was not kept. The remaining gap is
+tone, and the only route to it is the reference's original: put the unedited photograph in the
+collection (or use Paired) and the look is learned exactly (median 0.71 on the desktop run).
+
 ## Not done, and why
 
 * **Semantic region correspondence** (match sky to sky, skin to skin) and **a trained

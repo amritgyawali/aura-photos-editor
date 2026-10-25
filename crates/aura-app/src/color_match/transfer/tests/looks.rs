@@ -9,7 +9,9 @@
 //! `paired` (the look learned from the reference's own original - the ceiling of the transform
 //! family, not something a photographer has), and diagnostics that swap one half of a fit for the
 //! ceiling's (`nat+ptone`, `nat+pcolour`) or for the scene-prior tone estimate (`nat+btone` look
-//! only, `nat+rtone` look relative to the target's own departure).
+//! only, `nat+rtone` look relative to the target's own departure). `nat+pchroma`, `nat+psector`
+//! and `nat+pcast` take only the saturation, the per-hue colours or the neutral axis (white
+//! balance and split toning) from the ceiling: the most a better estimate of that part could gain.
 //!
 //! `AURA_LOOK_FLAT=1` hands every method a flat render of the target (blacks lifted, whites
 //! lowered, as an unedited RAW render arrives) and still scores against the look applied to the
@@ -270,6 +272,27 @@ fn run(method: &str, case: &Case<'_>) -> Vec<[f32; 3]> {
         "paired" => paired(),
         "nat+ptone" => hybrid(&paired(), &natural()),
         "nat+pcolour" => hybrid(&natural(), &paired()),
+        // Headroom per colour component: the current fit with one component taken from the
+        // ceiling.
+        "nat+pchroma" => {
+            let (mut grade, ideal) = (current(), paired());
+            grade.chroma = ideal.chroma;
+            grade.zone_gain = ideal.zone_gain;
+            grade
+        }
+        "nat+psector" => {
+            let (mut grade, ideal) = (current(), paired());
+            grade.hue_gain = ideal.hue_gain;
+            grade.hue_shift = ideal.hue_shift;
+            grade.hue_light = ideal.hue_light;
+            grade
+        }
+        "nat+pcast" => {
+            let (mut grade, ideal) = (current(), paired());
+            grade.cast_in = ideal.cast_in;
+            grade.cast_out = ideal.cast_out;
+            grade
+        }
         "btone" => estimated_tone(case, false),
         "nat+btone" => hybrid(&estimated_tone(case, false), &natural()),
         "rtone" => estimated_tone(case, true),
