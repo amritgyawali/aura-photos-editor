@@ -27,6 +27,9 @@ pub(super) struct Review {
     /// The original's colours at a fixed set of pixels, so the result can be compared with what
     /// the photograph looked like before - a "match" nobody can see is reported as one.
     original: Vec<(usize, [f32; 3])>,
+    /// Whether a result must also come closer to the reference's colour distribution. A learned
+    /// look need not: a correct edit of a different scene does not have to.
+    regression: bool,
 }
 
 /// Up to this many pixels compare a result with the original.
@@ -71,6 +74,9 @@ pub(super) struct Endpoint {
     pub(super) after: transfer::Distance,
     pub(super) factor: f32,
     pub(super) renders: usize,
+    /// The share of the photograph the look newly clipped before its highlights were held back,
+    /// when they were.
+    pub(super) highlights_limited_from: Option<f32>,
 }
 
 pub(super) struct FitInput<'a> {
@@ -81,13 +87,21 @@ pub(super) struct FitInput<'a> {
     pub(super) reference: &'a transfer::GradeStats,
     pub(super) monochrome: bool,
     pub(super) grade: &'a mut ReferenceGrade,
+    /// Larger skin and clipping limits, for the reference's exact colours (ADR-0182).
+    pub(super) allowance: Option<Allowance>,
 }
 
 pub(super) fn fit(
     state: &AppState,
     cancel: &CancelToken,
     input: FitInput<'_>,
-) -> AuraResult<(transfer::Distance, transfer::Distance, f32, usize)> {
+) -> AuraResult<(
+    transfer::Distance,
+    transfer::Distance,
+    f32,
+    usize,
+    Option<f32>,
+)> {
     let review = Review::new(
         state,
         cancel,
@@ -96,8 +110,9 @@ pub(super) fn fit(
         input.regions,
         input.reference,
         input.monochrome,
-        None,
-    )?;
+        input.allowance,
+    )?
+    .with_regression_check(true);
     let endpoint = review.fit(state, cancel, input.ungraded, input.grade)?
         .ok_or_else(|| super::invalid("No colour match kept this photo's smooth gradients, skin tones and highlights while bringing it closer to the reference. Try a different reference. No edit was saved."))?;
     *input.grade = endpoint.grade;
@@ -106,6 +121,7 @@ pub(super) fn fit(
         endpoint.after,
         endpoint.factor,
         endpoint.renders,
+        endpoint.highlights_limited_from,
     ))
 }
 
@@ -165,6 +181,36 @@ impl Review {
         grade: &ReferenceGrade,
     ) -> AuraResult<Option<Endpoint>> {
         let mut best = self.fit_candidate(state, cancel, ungraded, grade)?;
+        // A look shortened for the native checks may have been refused only for clipping its
+        // highlights. Hold those back instead and keep whichever endpoint comes closer to the
+        // reference; only this case pays for the extra renders. Not for a palette transport:
+        // with its highlights held, the whole transport passes at full strength and overshoots
+        // the look (desktop run, ADR-0181).
+        if !self.monochrome
+            && grade.palette.is_none()
+            && best.as_ref().is_none_or(|fit| fit.factor < 1.0)
+        {
+            let (held, from, spent) = self.hold_highlights(state, cancel, ungraded, grade)?;
+            if from.is_some() {
+                let alternative = self.fit_candidate(state, cancel, ungraded, &held)?;
+                let renders = best.as_ref().map_or(7, |v| v.renders)
+                    + spent
+                    + alternative.as_ref().map_or(7, |v| v.renders)
+                    - 1;
+                if alternative
+                    .as_ref()
+                    .is_some_and(|a| best.as_ref().is_none_or(|b| a.after.total < b.after.total))
+                {
+                    best = alternative.map(|mut endpoint| {
+                        endpoint.highlights_limited_from = from;
+                        endpoint
+                    });
+                }
+                if let Some(best) = best.as_mut() {
+                    best.renders = renders;
+                }
+            }
+        }
         // A strong chromatic transport can force a global backtrack to preserve a face.
         // Also check the underlying tone/cast fit, using the same native frame and guards.
         // Keep whichever actually passes with the smaller full-palette distance.
@@ -186,6 +232,48 @@ impl Review {
             }
         }
         Ok(best)
+    }
+
+    /// Hold back the highlights of a look the full render shows clipping, before any of the rest
+    /// of the look is given up for them (ADR-0181). The fit estimates clipping by evaluating the
+    /// look on a reduced frame's colours, but the look is one stage of the render and the stages
+    /// after it decide the brightest values, so the estimate is calibrated against the render: a
+    /// look that newly clips three times what the estimate says is limited to a third of the
+    /// target. Returns the held look, the new clipping it began with when it had to be held, and
+    /// the renders spent (at most four).
+    fn hold_highlights(
+        &self,
+        state: &AppState,
+        cancel: &CancelToken,
+        ungraded: &Recipe,
+        grade: &ReferenceGrade,
+    ) -> AuraResult<(ReferenceGrade, Option<f32>, usize)> {
+        check_cancel(cancel)?;
+        let full = transfer::samples(
+            &rendered(state, &self.frame, ungraded)?,
+            transfer::TARGET_SAMPLES,
+        );
+        let (mut limited, mut from, mut renders) = (grade.clone(), None, 1);
+        for _ in 0..3 {
+            check_cancel(cancel)?;
+            let mut recipe = ungraded.clone();
+            grade_model::write(&mut recipe, &limited)?;
+            let image = rendered(state, &self.frame, &super::canonical(&recipe)?)?;
+            renders += 1;
+            let measured = (appearance::clipped(&image) - self.guard.clipped).max(0.0);
+            if measured <= transfer::MAX_NEW_CLIPPING {
+                break;
+            }
+            from.get_or_insert(measured);
+            let estimated = transfer::new_clipping(&limited, &full);
+            let target = transfer::MAX_NEW_CLIPPING * (estimated / measured).clamp(0.0, 1.0);
+            let (next, changed) = transfer::limit_highlights_to(limited.clone(), &full, target);
+            if changed.is_none() || next == limited {
+                break;
+            }
+            limited = next;
+        }
+        Ok((limited, from, renders))
     }
 
     fn fit_candidate(
@@ -225,6 +313,7 @@ impl Review {
                         after,
                         factor,
                         renders: 0,
+                        highlights_limited_from: None,
                     });
                 }
                 lower = factor;
@@ -305,7 +394,14 @@ impl Review {
             context,
             learned,
             original: sampled(&image),
+            regression: learned.is_none(),
         })
+    }
+
+    /// Require, or not, that a result comes closer to the reference's colour distribution.
+    pub(super) fn with_regression_check(mut self, required: bool) -> Self {
+        self.regression = required;
+        self
     }
 
     pub(super) fn check(
@@ -347,7 +443,7 @@ impl Review {
         }
         let after = super::measured(&self.reference, &image);
         check_cancel(cancel)?;
-        let checked = self.learned.is_some() || native_checks::non_regressing(self.before, after);
+        let checked = !self.regression || native_checks::non_regressing(self.before, after);
         if checked {
             state
                 .color_match_checks()

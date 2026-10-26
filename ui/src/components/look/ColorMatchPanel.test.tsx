@@ -83,6 +83,18 @@ it('shows separately verified tone and palette differences for the saved strengt
   expect(components.textContent).toContain('Tone difference: 8.00 → 4.00');
   expect(components.textContent).toContain('Colour palette difference: 6.00 → 2.00');
 });
+it('says when the look was held back in the highlights to keep their detail', async () => {
+  const distance = { tone: 5, palette: 0, cast: 1, chroma: 1, hue: 1, total: 2 };
+  vi.mocked(colorMatch.status).mockResolvedValue({ ...analysis, fullResolutionChecked: true, fitting: {
+    engine: 'reference-grade-transfer-v4-scene-tone', intent: 'natural', refinementCandidates: 4, uniqueRenders: 6,
+    cachedProposals: 0, nativeCandidateChecked: true, nativeBacktrackFactor: 1,
+    transfer: { renderedBefore: distance, renderedAfter: distance, highlightsLimitedFrom: 0.23 },
+  } });
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
+  const note = await screen.findByTestId('colour-match-highlights');
+  expect(note.textContent).toContain('held back in the brightest areas');
+  expect(note.textContent).toContain('23% of the photo');
+});
 it('says what tone the reference look implies and when the photo was finished first', async () => {
   const distance = { tone: 5, palette: 0, cast: 1, chroma: 1, hue: 1, total: 2 };
   vi.mocked(colorMatch.status).mockResolvedValue({ ...analysis, fullResolutionChecked: true, fitting: {
@@ -256,6 +268,26 @@ it('requires a new analysis when changing from natural look to reference palette
   fireEvent.click(screen.getByRole('button', { name: 'Analyse reference match' }));
   await waitFor(() => expect(colorMatch.prepare).toHaveBeenCalledWith('photo', 'ref', expect.any(String), 'precise', 'palette'));
   await waitFor(() => expect((screen.getByRole('button', { name: 'Apply colour strengths' }) as HTMLButtonElement).disabled).toBe(false));
+});
+
+it('analyses the exact colours of the reference when that goal is chosen, and says what it does', async () => {
+  vi.mocked(colorMatch.status).mockResolvedValue(analysis);
+  const exact = { ...analysis, sessionId: 'exact', fitting: {
+    engine: 'reference-exact-colours-v1', quality: 'precise' as const, intent: 'exact' as const,
+    refinementCandidates: 1, uniqueRenders: 2, cachedProposals: 0,
+  } };
+  vi.mocked(colorMatch.prepare).mockResolvedValue(exact);
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
+  await screen.findByTestId('colour-match-measurement');
+  fireEvent.change(screen.getByRole('combobox', { name: 'Matching goal' }), { target: { value: 'exact' } });
+  expect(screen.getByTestId('colour-match-exact-hint').textContent).toContain('repainted');
+  // A natural analysis does not serve the exact goal.
+  expect((screen.getByRole('button', { name: 'Apply colour strengths' }) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(screen.getByRole('button', { name: 'Analyse reference match' }));
+  await waitFor(() => expect(colorMatch.prepare).toHaveBeenCalledWith('photo', 'ref', expect.any(String), 'precise', 'exact'));
+  expect((await screen.findByTestId('colour-match-exact')).textContent).toContain('moved onto the reference');
+  // The exact colours are a stored grade: every strength slider applies to them.
+  expect((screen.getByRole('slider', { name: 'Match amount' }) as HTMLInputElement).max).toBe('200');
 });
 
 it.each(['reference-palette-transport-v4', 'reference-palette-transport-v5', 'reference-palette-transport-v6', 'reference-palette-transport-v7'])('refits saved %s sessions with continuous palette transport', async engine => {

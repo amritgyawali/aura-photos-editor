@@ -36,6 +36,7 @@ mod grade;
 mod library;
 mod lightroom;
 pub use lightroom::{generate as generate_lightroom_preset, PresetInput, PresetReport};
+mod exact;
 mod learned;
 mod matcher;
 mod native_checks;
@@ -279,6 +280,9 @@ pub struct MatchReport {
     /// rather than reporting a match.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub visible_change: Option<f32>,
+    /// The amount asked for, when it failed the native checks and a smaller share of it was saved.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reduced_from: Option<f32>,
 }
 
 fn read<T: DeserializeOwned>(state: &AppState, key: &str) -> AuraResult<Option<T>> {
@@ -417,6 +421,7 @@ fn persist_reference(
     check_cancel(cancel)?;
     let key = asset_key(&summary.id)?;
     let refreshed = transfer::remember(state, &summary.id, image)?;
+    exact::remember(state, &summary.id, image)?;
     if let Some(mut existing) = read::<Reference>(state, &key)? {
         if existing.engine == ENGINE {
             if !refreshed && existing.summary.thumbnail.is_some() {
@@ -576,6 +581,7 @@ fn report(
         fitting: session.fitting.clone(),
         reference_monochrome: session.reference_monochrome,
         visible_change: None,
+        reduced_from: None,
     }
 }
 
@@ -652,8 +658,8 @@ pub fn prepare(state: &AppState, input: &PrepareInput) -> IpcResult<MatchReport>
         if let Some(stats) = transfer::recall(state, &input.reference_id)? {
             return matcher::prepare(state, cancel, input, photo, reference, baseline, stats);
         }
-        if input.intent == MatchIntent::Palette {
-            return Err(invalid("Reference palette matching needs fresh colour measurements. Upload its edited photo again, then analyse the match. No edit was saved."));
+        if input.intent != MatchIntent::Natural {
+            return Err(invalid("Matching the reference's palette or exact colours needs fresh colour measurements. Upload its edited photo again, then analyse the match. No edit was saved."));
         }
         let observed_hash = baseline.observed_hash;
         let baseline = baseline.recipe;

@@ -9,6 +9,14 @@
 //! colour match turns a difference nobody could see into one anybody can, measured in `OKLab`
 //! times a hundred (about one CIELAB unit). Real edges and texture were never smooth, so they are
 //! never examined. These are authored quality limits, not a perceptual accuracy guarantee.
+//!
+//! Near black an 8-bit file's levels are far apart in `OKLab` - one level is a unit or more - so
+//! a dark gradient never looked smooth by that measure and was never examined; lifting it into the
+//! midtones then showed its levels, and a JPEG's 8 x 8 blocks, as steps (ADR-0182). So adjacent
+//! dark pairs within two levels on every channel are examined too, by their own rule: they fail
+//! when the step grew by a visible amount and sits between flat colour on both sides, so detail a
+//! lift legitimately reveals - bark in a shadow - is not mistaken for a band, and a difference a
+//! match left as it was is not counted however large it measures near black.
 use aura_raw::codec::Rgb8;
 use aura_raw::colour::curve::srgb_byte_to_linear;
 use aura_render::reference_grade::oklab_from_linear_srgb;
@@ -43,12 +51,22 @@ const BLOTCH: Scale = Scale {
     visible: 6.0,
     growth: 3.0,
 };
+/// Darker than this (largest channel, 8-bit), a pair within [`DARK_LEVELS`] counts as smooth.
+const DARK: u8 = 72;
+const DARK_LEVELS: u8 = 2;
+/// A dark pair fails at or above this difference after the match...
+const DARK_VISIBLE: f32 = 2.0;
+/// ...when it grew by at least this much...
+const DARK_RISE: f32 = 1.5;
+/// ...and the pairs either side of it stay below this difference: a step between flat colour.
+const FLAT: f32 = 1.5;
 /// The share of smooth pairs that may fail, per scale. Noise and a legitimately strong grade
 /// on a gradient cross the limits occasionally; a band or a patch crosses them in a cluster.
 const MAX_FRACTION: f32 = 0.005;
 
 #[derive(Debug, Default)]
 pub(super) struct Contours {
+    /// The full size of the photograph checked; pairs index its viewing-size copy.
     width: u32,
     height: u32,
     /// Smooth pairs per scale, with the original difference of each.
@@ -64,6 +82,27 @@ fn pixel(image: &Rgb8, index: usize) -> Option<[f32; 3]> {
     Some(oklab_from_linear_srgb(linear).map(|v| v * 100.0))
 }
 
+fn bytes(image: &Rgb8, index: usize) -> Option<[u8; 3]> {
+    match image
+        .data
+        .get(index.checked_mul(3)?..index.checked_mul(3)?.checked_add(3)?)?
+    {
+        [r, g, b] => Some([*r, *g, *b]),
+        _ => None,
+    }
+}
+
+/// Both pixels dark and within a couple of 8-bit levels on every channel.
+fn dark_neighbours(image: &Rgb8, [i, j]: [usize; 2]) -> bool {
+    match (bytes(image, i), bytes(image, j)) {
+        (Some(a), Some(b)) => {
+            a.iter().chain(&b).all(|&v| v <= DARK)
+                && a.iter().zip(&b).all(|(x, y)| x.abs_diff(*y) <= DARK_LEVELS)
+        }
+        _ => false,
+    }
+}
+
 fn difference(image: &Rgb8, [i, j]: [usize; 2]) -> Option<f32> {
     let (a, b) = (pixel(image, i)?, pixel(image, j)?);
     Some(
@@ -75,6 +114,48 @@ fn difference(image: &Rgb8, [i, j]: [usize; 2]) -> Option<f32> {
     )
 }
 
+/// The longest edge the check looks at. Bands and patches are large-scale defects, seen at the
+/// size a photograph is viewed; at full resolution sensor and compression noise inside every flat
+/// block would hide the step between two blocks from the flatness test.
+const VIEWING_EDGE: u32 = 1024;
+
+/// The image box-filtered to at most [`VIEWING_EDGE`] on its longer side.
+fn viewed(image: &Rgb8) -> Rgb8 {
+    let factor = image.width.max(image.height).div_ceil(VIEWING_EDGE).max(1) as usize;
+    if factor == 1 || !valid(image) {
+        return image.clone();
+    }
+    let (width, height) = (
+        image.width as usize / factor,
+        image.height as usize / factor,
+    );
+    let mut pixels = Vec::with_capacity(width * height * 3);
+    for y in 0..height {
+        for x in 0..width {
+            let mut sum = [0_u32; 3];
+            for dy in 0..factor {
+                for dx in 0..factor {
+                    if let Some(p) = bytes(
+                        image,
+                        (y * factor + dy) * image.width as usize + x * factor + dx,
+                    ) {
+                        for (s, v) in sum.iter_mut().zip(p) {
+                            *s += u32::from(v);
+                        }
+                    }
+                }
+            }
+            let n = (factor * factor) as u32;
+            pixels.extend(sum.map(|s| ((s + n / 2) / n) as u8));
+        }
+    }
+    Rgb8 {
+        width: width as u32,
+        height: height as u32,
+        data: pixels,
+    }
+}
+
 fn valid(image: &Rgb8) -> bool {
     (image.width as usize)
         .checked_mul(image.height as usize)
@@ -84,11 +165,14 @@ fn valid(image: &Rgb8) -> bool {
 
 impl Contours {
     pub(super) fn new(before: &Rgb8) -> Self {
+        let full = (before.width, before.height);
+        let before = &viewed(before);
         let mut result = Self {
             width: before.width,
             height: before.height,
             pairs: [Vec::new(), Vec::new()],
         };
+        (result.width, result.height) = full;
         if !valid(before) || before.width == 0 || before.height == 0 {
             return result;
         }
@@ -111,7 +195,9 @@ impl Contours {
                 .flatten()
                 {
                     if let Some(step) = difference(before, [i, j]) {
-                        if step < limits.smooth {
+                        if step < limits.smooth
+                            || (distance == 1 && dark_neighbours(before, [i, j]))
+                        {
                             scale.push(([i, j], step));
                         }
                     }
@@ -128,10 +214,27 @@ impl Contours {
         if after.width != self.width || after.height != self.height || !valid(after) {
             return false;
         }
+        // The pairs were taken at viewing size; read the result at the same size.
+        let after = &viewed(after);
+        let width = after.width as usize;
+        let count = after.data.len() / 3;
+        // The pairs either side of an adjacent pair, along its own direction, when they exist.
+        let flat_around = |[i, j]: [usize; 2]| {
+            let step = j.saturating_sub(i);
+            let horizontal = step == 1;
+            let before = (i >= step && (!horizontal || i % width > 0)).then(|| [i - step, i]);
+            let beyond = (j + step < count && (!horizontal || (j % width) + 1 < width))
+                .then(|| [j, j + step]);
+            [before, beyond].into_iter().all(|pair| {
+                pair.and_then(|pair| difference(after, pair))
+                    .is_some_and(|d| d <= FLAT)
+            })
+        };
         self.pairs
             .iter()
             .zip([BAND, BLOTCH])
-            .all(|(pairs, limits)| {
+            .enumerate()
+            .all(|(scale, (pairs, limits))| {
                 if pairs.len() < MIN_PAIRS {
                     return true;
                 }
@@ -139,7 +242,14 @@ impl Contours {
                     .iter()
                     .filter(|(pair, before)| {
                         difference(after, *pair).is_none_or(|now| {
-                            now >= limits.visible && now >= limits.growth * before.max(0.5)
+                            if scale > 0 || *before < limits.smooth {
+                                now >= limits.visible && now >= limits.growth * before.max(0.5)
+                            } else {
+                                // A dark pair, smooth by its levels rather than its difference.
+                                now >= DARK_VISIBLE
+                                    && now >= *before + DARK_RISE
+                                    && flat_around(*pair)
+                            }
                         })
                     })
                     .count();
@@ -232,6 +342,45 @@ mod tests {
         let guard = Contours::new(&floor(false));
         assert!(guard.accepts(&floor(false)));
         assert!(!guard.accepts(&floor(true)));
+    }
+
+    /// A dark frame: 8 x 8 blocks one or two levels apart, as a JPEG stores a near-black
+    /// backdrop, or per-pixel grain when `grain`.
+    fn dark(grain: bool, lift: impl Fn(u8) -> u8) -> Rgb8 {
+        let (width, height) = (256_u32, 128_u32);
+        let mut data = Vec::new();
+        for y in 0..height {
+            for x in 0..width {
+                let level = if grain {
+                    // Two levels from pixel to pixel: texture, not a gradient.
+                    3 + 2 * ((x * 7 + y * 13) % 3) as u8
+                } else {
+                    3 + (((x / 8) + (y / 8)) % 3) as u8
+                };
+                data.extend([lift(level), lift(level), lift(level) / 2 + 1]);
+            }
+        }
+        Rgb8 {
+            width,
+            height,
+            data,
+        }
+    }
+
+    #[test]
+    fn a_near_black_backdrop_lifted_into_blocks_is_refused() {
+        let guard = Contours::new(&dark(false, |v| v));
+        assert!(guard.pairs[0].len() >= MIN_PAIRS, "dark pairs are examined");
+        assert!(guard.accepts(&dark(false, |v| v)));
+        // Lifted into the midtones, each level becomes a visible step between flat blocks.
+        assert!(!guard.accepts(&dark(false, |v| 60 + v * 12)));
+    }
+
+    #[test]
+    fn grain_a_lift_reveals_is_not_a_band() {
+        let guard = Contours::new(&dark(true, |v| v));
+        // The same lift on per-pixel grain is texture coming into view, with no flat side.
+        assert!(guard.accepts(&dark(true, |v| 60 + v * 12)));
     }
 
     #[test]

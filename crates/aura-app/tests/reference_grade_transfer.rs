@@ -613,7 +613,7 @@ fn clipping_is_refused_even_when_it_would_match_reference_statistics() {
             .map_err(|e| aura_core::errors::db::statement_failed("inject clipped fit", &e))?;
         Ok(())
     }).expect("clipped fit");
-    let refused = color_match::apply(
+    let applied = color_match::apply(
         &state,
         &color_match::ApplyInput {
             photo_id: photo.to_db(),
@@ -621,18 +621,6 @@ fn clipping_is_refused_even_when_it_would_match_reference_statistics() {
             controls: color_match::Controls::default(),
             cancel_id: job(),
         },
-    )
-    .expect_err("a perfect white histogram cannot justify destroying target detail");
-    assert_eq!(refused.code, "AURA-ML-5146");
-    // Native quality checks now share a refusal covering smoothness, highlights and skin.
-    // Assert the refusal protocol here; unchanged recipe/history below are the safety proof.
-    assert!(
-        refused.message.contains("full-resolution") && refused.message.contains("highlight"),
-        "{refused:?}"
-    );
-    assert_eq!(
-        state.recipe_store().load(&photo).expect("unchanged"),
-        baseline
     );
     let after_history = state
         .catalog()
@@ -643,5 +631,32 @@ fn clipping_is_refused_even_when_it_would_match_reference_statistics() {
             .map_err(|e| aura_core::errors::db::statement_failed("history", &e))
         })
         .expect("history");
-    assert_eq!(before_history, after_history);
+    // A perfect white histogram cannot justify destroying target detail: the amount asked for is
+    // never saved. Apply may save a smaller share of it that passes every native check (it says
+    // so), or refuse when none does - and then nothing changes.
+    match applied {
+        Err(refused) => {
+            assert_eq!(refused.code, "AURA-ML-5146");
+            assert!(
+                refused.message.contains("full-resolution")
+                    && refused.message.contains("highlight"),
+                "{refused:?}"
+            );
+            assert_eq!(
+                state.recipe_store().load(&photo).expect("unchanged"),
+                baseline
+            );
+            assert_eq!(before_history, after_history);
+        }
+        Ok(saved) => {
+            assert_eq!(
+                saved.reduced_from,
+                Some(1.0),
+                "the full amount was not saved"
+            );
+            assert!(saved.controls.amount <= 0.75 + 1e-6, "{:?}", saved.controls);
+            assert!(saved.full_resolution_checked && saved.current);
+            assert_eq!(after_history, before_history + 1);
+        }
+    }
 }

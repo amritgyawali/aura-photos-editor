@@ -25,6 +25,16 @@ All notable changes to AURA. One entry per phase, newest first.
 - **Strength is a share of a safe match.** Collection matching checks the full-strength look first,
   so 50 % is half of a look that was safe at 100 %; an edited photo used as a reference is measured
   at full size.
+- **Exact colours of the reference.** A third matching goal gives your photo the reference's own
+  colours and tones - its tone curve, its palette in its proportions, its split tone, skin to skin -
+  and repaints a different scene to do it. On the 20-photo desktop test it moved photos closest to
+  the reference's colours (median distance 21.3 to 14.5; Palette 15.8, Natural 18.4). Where a full
+  copy would band, block up a dark backdrop or blow out highlights it stops short and says so
+  (ADR-0182).
+- **Apply saves the strongest strength that passes** instead of refusing when the amount asked for
+  fails one check, and says what was saved.
+- **No more hangs on small machines.** A colour match that captured its own edited preview waited
+  for itself forever with one image-work slot; the slot is now reentrant on its thread.
 - **Build green again.** The two Match a look accuracy gates now test what one reference of another
   scene can identify - its colour, which loses 51-54 % of its error - instead of failing on tone it
   cannot identify; TLS dependencies upgraded for three advisories, and the AI connection uses X25519

@@ -16,3 +16,10 @@ export function slightMessage(result: ColorMatchReport): string {
     + 'smoothness checks allowed only a slight change. For a stronger match choose Reference palette and tone, '
     + 'or add the reference\'s original to this collection so AURA can learn your exact edit.';
 }
+
+/** What to say first when the amount asked for failed this photo's checks and less was saved. */
+export function reducedNote(result: ColorMatchReport): string {
+  if (result.reducedFrom === undefined) return '';
+  return `Saved at ${Math.round(result.controls.amount * 100)}%: ${Math.round(result.reducedFrom * 100)}% failed this photo's `
+    + 'smoothness, highlight or skin-colour check. ';
+}

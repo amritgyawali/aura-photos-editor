@@ -82,8 +82,10 @@ mod sampling;
 pub(super) use sampling::samples;
 mod neutral;
 use neutral::neutral_axis;
+mod exact_grade;
 mod palette;
 mod quantile;
+pub(super) use exact_grade::fit_exact;
 pub(super) mod tone_prior;
 pub use tone_prior::ToneReading;
 
@@ -411,15 +413,17 @@ const MAX_TONE_DEVIATION: f32 = 0.35;
 /// Keep a tone curve smooth, rising, within a bounded distance of the identity, and with no
 /// segment flat enough to posterise or steep enough to tear a gradient.
 fn regularise_tone(nodes: Vec<f32>) -> Vec<f32> {
+    regularise_tone_within(nodes, MAX_TONE_DEVIATION, MAX_TONE_SLOPE)
+}
+
+/// [`regularise_tone`] with stated bounds on the distance from the identity and on the slope.
+fn regularise_tone_within(nodes: Vec<f32>, deviation: f32, max_slope: f32) -> Vec<f32> {
     let last = TONE_NODES - 1;
     let h = 1.0 / last as f32;
     let mut y: Vec<f32> = (0..TONE_NODES)
         .map(|i| {
             let x = i as f32 * h;
-            at(&nodes, i).clamp(
-                (x - MAX_TONE_DEVIATION).max(0.0),
-                (x + MAX_TONE_DEVIATION).min(1.0),
-            )
+            at(&nodes, i).clamp((x - deviation).max(0.0), (x + deviation).min(1.0))
         })
         .collect();
     let mut floor = 0.0_f32;
@@ -447,7 +451,7 @@ fn regularise_tone(nodes: Vec<f32>) -> Vec<f32> {
             0.25 * prev + 0.5 * at(&raw, i) + 0.25 * next
         })
         .collect();
-    let (lo, hi) = (MIN_TONE_SLOPE * h, MAX_TONE_SLOPE * h);
+    let (lo, hi) = (MIN_TONE_SLOPE * h, max_slope * h);
     for _ in 0..12 {
         for v in &mut inc {
             *v = v.clamp(lo, hi);
@@ -1174,12 +1178,36 @@ pub(super) fn limit_stretch(
     grade: ReferenceGrade,
     samples: &[Sample],
 ) -> (ReferenceGrade, Option<f32>) {
+    limit_stretch_to(grade, samples, MAX_STRETCH)
+}
+
+/// [`limit_stretch`] to a stated limit.
+fn limit_stretch_to(
+    grade: ReferenceGrade,
+    samples: &[Sample],
+    limit: f32,
+) -> (ReferenceGrade, Option<f32>) {
     let stride = (samples.len() / 2048).max(1);
     let probe: Vec<Sample> = samples.iter().step_by(stride).copied().collect();
     let first = stretch(&grade, &probe);
-    if first <= MAX_STRETCH {
+    if first <= limit {
         return (grade, None);
     }
+    (
+        shorten_until(&grade, first, limit, |g| stretch(g, &probe)),
+        Some(first),
+    )
+}
+
+/// Shrink whichever component of a look - tone, chroma, saturation, hue or cast - lowers
+/// `measure` most, a quarter at a time, until it is within `limit`; when no single component is
+/// responsible, the whole look is shortened. `first` is `measure` of `grade`.
+fn shorten_until(
+    grade: &ReferenceGrade,
+    first: f32,
+    limit: f32,
+    measure: impl Fn(&ReferenceGrade) -> f32,
+) -> ReferenceGrade {
     let identity = ReferenceGrade::identity();
     let shrink = |scales: &Scales, component: usize| {
         let mut next = *scales;
@@ -1201,27 +1229,111 @@ pub(super) fn limit_stretch(
     let mut scales = Scales::uniform(1.0);
     let (mut best, mut current) = (grade.clone(), first);
     for _ in 0..32 {
-        if current <= MAX_STRETCH {
+        if current <= limit {
             break;
         }
         let choice = (0..5)
             .map(|component| {
                 let trial = shrink(&scales, component);
-                let candidate = mix(&identity, &grade, &trial);
-                (stretch(&candidate, &probe), trial, candidate)
+                let candidate = mix(&identity, grade, &trial);
+                (measure(&candidate), trial, candidate)
             })
             .min_by(|a, b| a.0.total_cmp(&b.0));
         match choice {
-            Some((value, trial, candidate)) if value < current - 1e-3 => {
+            Some((value, trial, candidate)) if value < current - 1e-3 * limit.max(1e-3) => {
                 (scales, best, current) = (trial, candidate, value);
             }
             // No single component is responsible: shorten the whole look.
             _ => {
                 scales = (0..5).fold(scales, |s, component| shrink(&s, component));
-                best = mix(&identity, &grade, &scales);
-                current = stretch(&best, &probe);
+                best = mix(&identity, grade, &scales);
+                current = measure(&best);
             }
         }
+    }
+    best
+}
+
+/// The share of this photograph's own colours a transform newly clips: a channel reaching full
+/// scale (255 in the delivered file) where it did not before.
+pub(super) fn new_clipping(grade: &ReferenceGrade, samples: &[Sample]) -> f32 {
+    let full = aura_raw::colour::curve::srgb_decode(254.5 / 255.0);
+    let evaluator = Evaluator::new(grade);
+    let stride = (samples.len() / 8192).max(1);
+    let (mut clipped, mut total) = (0_usize, 0_usize);
+    for sample in samples.iter().step_by(stride) {
+        total += 1;
+        let before = sample.linear.iter().copied().fold(0.0_f32, f32::max);
+        if before >= full {
+            continue;
+        }
+        let after = evaluator
+            .linear_srgb(sample.linear)
+            .iter()
+            .copied()
+            .fold(0.0_f32, f32::max);
+        if after >= full {
+            clipped += 1;
+        }
+    }
+    clipped as f32 / total.max(1) as f32
+}
+
+/// The most new clipping a fitted look may cause: half of what the native check allows, so a
+/// strength between the steps the analysis tried does not land on the check's edge.
+pub(super) const MAX_NEW_CLIPPING: f32 = 0.005;
+
+/// Hold back only the highlights of a look that would clip them. Near white there is no room for
+/// colour - a cool cast on a bright backdrop drives its blue channel to full scale at the same
+/// lightness - and the native check refuses the clipping, after which the whole look used to be
+/// shortened until the photograph barely changed. Instead the cast, colourfulness and tone of the
+/// top of the range move a quarter of the way back toward the photograph's own at a time, more
+/// the brighter they are, until the new clipping is within `limit`; skin, midtones
+/// and shadows keep the whole look. Returns the clipping it started from when it had to.
+///
+/// `limit` is a share of what this transform alone does to the photograph's colours; the native
+/// check, which renders the whole pipeline, calibrates it against [`MAX_NEW_CLIPPING`].
+pub(super) fn limit_highlights_to(
+    grade: ReferenceGrade,
+    samples: &[Sample],
+    limit: f32,
+) -> (ReferenceGrade, Option<f32>) {
+    let first = new_clipping(&grade, samples);
+    if first <= limit {
+        return (grade, None);
+    }
+    let weight = |lightness: f32| smoothstep(0.55, 1.0, lightness);
+    // Each step moves the highlights toward the photograph's own, so it is kept even when the
+    // clipping has not fallen yet: clipping is a step function of the cast and stays flat until
+    // a channel comes back under full scale.
+    let (mut best, mut current) = (grade, first);
+    for _ in 0..24 {
+        if current <= limit {
+            break;
+        }
+        let mut next = best.clone();
+        for (k, (out, input)) in next.cast_out.iter_mut().zip(&best.cast_in).enumerate() {
+            let w = 0.25 * weight(k as f32 / (AXIS_NODES - 1) as f32);
+            out[0] += w * (input[0] - out[0]);
+            out[1] += w * (input[1] - out[1]);
+        }
+        for (z, gain) in next.zone_gain.iter_mut().enumerate() {
+            let w = 0.25 * weight(z as f32 / (ZONES - 1) as f32);
+            *gain += w * (1.0 - *gain);
+        }
+        for (i, v) in next.tone.iter_mut().enumerate() {
+            let x = i as f32 / (TONE_NODES - 1) as f32;
+            *v += 0.25 * weight(x) * (x - *v);
+        }
+        next.tone = regularise_tone(next.tone);
+        next = next.bounded();
+        current = new_clipping(&next, samples);
+        best = next;
+    }
+    // What is left is not in the highlights - a cast pushing bright, colourful pixels such as a
+    // pastel dress past full scale - so shorten whichever part of the look does it.
+    if current > limit {
+        best = shorten_until(&best, current, limit, |g| new_clipping(g, samples));
     }
     (best, Some(first))
 }

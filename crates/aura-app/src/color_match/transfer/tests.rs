@@ -636,5 +636,96 @@ fn stored_measurements_round_trip_and_reject_another_version() {
     assert!(!old.usable());
 }
 
+#[test]
+fn a_look_that_would_clip_a_bright_backdrop_is_held_back_in_the_highlights_only() {
+    // A studio frame: most of it a near-white backdrop, a mid-grey figure in front.
+    let frame = image(96, 64, |x, y| {
+        let n = ((x * 7 + y * 13) % 5) as f32 * 0.004;
+        if (30..66).contains(&x) && y > 12 {
+            [0.45 + n, 0.42 + n, 0.40 + n]
+        } else {
+            [0.95 + n, 0.95 + n, 0.94 + n]
+        }
+    });
+    let pixels = samples(&frame, usize::MAX);
+    // A strong cool cast at every lightness: on the backdrop it drives blue to full scale.
+    let mut grade = ReferenceGrade::identity();
+    grade.cast_out.fill([-0.03, -0.05]);
+    let before = new_clipping(&grade, &pixels);
+    assert!(before > 0.3, "the fixture must clip: {before}");
+    let (held, from) = limit_highlights_to(grade.clone(), &pixels, MAX_NEW_CLIPPING);
+    assert_eq!(from, Some(before));
+    assert!(new_clipping(&held, &pixels) <= MAX_NEW_CLIPPING);
+    // The figure in the midtones keeps the look: its cast is the fitted one.
+    let middle = (AXIS_NODES - 1) / 2;
+    assert_eq!(held.cast_out[middle - 1], grade.cast_out[middle - 1]);
+    held.validate().unwrap();
+    // A look that clips nothing is returned exactly.
+    let mild = ReferenceGrade::identity();
+    assert_eq!(
+        limit_highlights_to(mild.clone(), &pixels, MAX_NEW_CLIPPING),
+        (mild, None)
+    );
+}
+
+/// Mean per-channel distance between two `OKLab` distributions, times a hundred.
+fn distribution_gap(result: &[[f32; 3]], wanted: &[[f32; 3]]) -> f32 {
+    let mut total = 0.0;
+    for channel in 0..3 {
+        let sorted = |set: &[[f32; 3]]| {
+            let mut values: Vec<f32> = set.iter().map(|p| p[channel]).collect();
+            values.sort_by(f32::total_cmp);
+            values
+        };
+        let (mine, theirs) = (sorted(result), sorted(wanted));
+        for k in 0..256 {
+            let q = (k as f32 + 0.5) / 256.0;
+            let at = |values: &[f32]| values[(q * (values.len() - 1) as f32) as usize];
+            total += (at(&mine) - at(&theirs)).abs();
+        }
+    }
+    100.0 * total / (3.0 * 256.0)
+}
+
+#[test]
+fn the_exact_goal_gives_a_photograph_the_reference_colours() {
+    // Two different scenes with the continuous colour variation photographs have (painted flat
+    // regions cannot be spread into a palette without inventing texture, and the maps refuse to):
+    // a cool, soft photograph and a warm, contrasty reference.
+    let photograph = image(160, 120, |x, y| {
+        let (fx, fy) = (x as f32 / 160.0, y as f32 / 120.0);
+        [
+            0.25 + 0.4 * fx,
+            0.35 + 0.35 * fy,
+            0.45 + 0.25 * (fx * fy).sqrt(),
+        ]
+    });
+    let reference = image(150, 110, |x, y| {
+        let (fx, fy) = (x as f32 / 150.0, y as f32 / 110.0);
+        let t = (fx * 0.7 + fy * 0.3).powf(1.4);
+        [0.08 + 0.9 * t, 0.06 + 0.7 * t * t, 0.05 + 0.35 * fy * t]
+    });
+    let colours: Vec<[f32; 3]> = samples(&reference, usize::MAX)
+        .iter()
+        .map(|s| s.lab)
+        .collect();
+    let target = samples(&photograph, TARGET_SAMPLES);
+    let plain: Vec<[f32; 3]> = target.iter().map(|s| s.lab).collect();
+    let fit = fit_exact(
+        &reference_stats(&reference),
+        &target,
+        &colours,
+        &aura_core::progress::CancelToken::new(),
+    )
+    .unwrap();
+    fit.grade.validate().unwrap();
+    let before = distribution_gap(&plain, &colours);
+    let after = distribution_gap(&transformed(&fit.grade, &target), &colours);
+    println!("exact colours: distribution gap {before:.2} -> {after:.2}");
+    assert!(after < 0.15 * before, "{before:.2} -> {after:.2}");
+    assert!(stretch(&fit.grade, &target) <= exact_grade::MAX_EXACT_STRETCH + 0.05);
+    assert!(fit.after.total < fit.before.total);
+}
+
 #[cfg(test)]
 mod looks;

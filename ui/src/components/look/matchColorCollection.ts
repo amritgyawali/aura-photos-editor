@@ -1,7 +1,7 @@
 import { api } from '../../ipc/client';
 import { Refusal, reasonOf } from './refusal';
 import { colorMatch, type ColorMatchControls, type ColorMatchIntent } from '../../ipc/colorMatch';
-import { PALETTE_ENGINES } from './colorMatchEngines';
+import { engineServes } from './colorMatchEngines';
 
 export type ColorMatchOutcome = { photoId: string; name: string; outcome: 'matched' | 'unchanged' | 'failed' | 'stopped'; detail: string };
 
@@ -35,7 +35,7 @@ export async function matchColorCollection(projectId: string, referenceId: strin
       // Reuse the immutable baseline when changing strengths on a previous match.
       const sameQuality = (saved?.fitting?.quality ?? 'precise') === (options.quality ?? 'precise');
       const sameIntent = (saved?.fitting?.intent ?? 'natural') === (options.intent ?? 'natural');
-      const currentEngine = options.intent !== 'palette' || PALETTE_ENGINES.includes(saved?.fitting?.engine ?? '');
+      const currentEngine = engineServes(options.intent ?? 'natural', saved?.fitting?.engine);
       const analysis = saved?.current && saved.reference.id === referenceId && sameQuality && sameIntent && currentEngine ? saved
         : options.intent ? await colorMatch.prepare(photo.id, referenceId, cancelId, options.quality, options.intent)
           : options.quality ? await colorMatch.prepare(photo.id, referenceId, cancelId, options.quality)

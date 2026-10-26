@@ -88,6 +88,31 @@ that were smooth before, at any brightness: a sky or a white backdrop as well as
 requested strength would band or blotch them, AURA uses the strongest strength that does not,
 says so, or refuses and keeps your edit.
 
+### Exact colours of the reference
+
+Choose **Matching goal → Exact colours of the reference** when you want the reference's colours
+themselves, not only its edit. AURA moves your photo's colours and tones onto the reference's
+own: its tone curve, its palette in its proportions, and its split tone, with the reference's
+shadows colouring your shadows and its highlights your highlights. A different scene is repainted
+to do this: a blue sky can take the reference's warm tones. Skin goes to the reference's skin when
+both photos have people; when the reference has none, a face keeps its own colour rather than
+taking the colour of a leaf or a wall.
+
+The result is an ordinary saved look. Every strength slider works on it, Undo restores your photo
+exactly, and the Lightroom preset export carries it. It goes through the same full-resolution
+checks as any match, with a larger allowance for skin, and clipping up to what the reference
+itself clips. When the strength you asked for would band, block up a dark backdrop or blow out
+highlights on your photo, AURA saves the strongest share that passes and says so, for example
+"Saved at 60%: 80% failed this photo's smoothness, highlight or skin-colour check". It refuses
+only when no share passes.
+
+An exact copy is not always possible. Lifting a near-black JPEG backdrop to a bright reference's
+level would show the file's compression blocks, so on such a photo the match stops short and says
+so. Reference colours missing from your photo cannot appear in it. And the closest match to an
+edit, not just to the colours, still comes from the reference's own original: put the unedited
+photo in your collection and choose Natural. See
+[ADR-0182](adr/ADR-0182-exact-colours-of-the-reference.md).
+
 ### Tone from a reference of another scene
 
 A reference of a different scene mixes two things: what was in front of the camera

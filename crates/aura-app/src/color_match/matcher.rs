@@ -23,6 +23,10 @@ mod native;
 const ENGINE_NAME: &str = "reference-grade-transfer-v4-scene-tone";
 /// The engine of a look learned from the reference's own original (ADR-0161).
 const LEARNED_ENGINE: &str = "reference-original-calibrated-v1";
+const EXACT_ENGINE: &str = "reference-exact-colours-v1";
+/// How far the exact colours may move skin, in multiples of the native check's limits: they are
+/// the reference's colours, which is a larger change than a look, and still never an unchecked one.
+const EXACT_SKIN: f32 = 2.0;
 
 /// What a transfer session keeps between analysis and every later strength change.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -38,6 +42,10 @@ pub(super) struct TransferSession {
     /// `model.amount` is the strongest share of it that passed this photograph's native checks.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub learned: Option<super::learned::LearnedLook>,
+    /// How far the reference's exact colours may move skin and clipping (ADR-0182), so Apply
+    /// checks a strength by the same limits analysis did.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub allowance: Option<super::gallery_fit::Allowance>,
 }
 
 /// How the transfer fit went, for the report and the panel.
@@ -64,6 +72,10 @@ pub struct TransferDiagnostics {
     /// How far the fitted look stretched nearby colours before it was limited to avoid bands.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stretch_limited_from: Option<f32>,
+    /// The share of the photograph the look would newly have clipped before its highlights were
+    /// held back, when they had to be.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub highlights_limited_from: Option<f32>,
 }
 
 fn measured(reference: &transfer::GradeStats, image: &Rgb8) -> transfer::Distance {
@@ -71,7 +83,13 @@ fn measured(reference: &transfer::GradeStats, image: &Rgb8) -> transfer::Distanc
 }
 
 struct Observations {
-    native: Option<(transfer::Distance, transfer::Distance, f32, usize)>,
+    native: Option<(
+        transfer::Distance,
+        transfer::Distance,
+        f32,
+        usize,
+        Option<f32>,
+    )>,
     before: transfer::Distance,
     after: transfer::Distance,
     skin: transfer::SkinReview,
@@ -87,10 +105,10 @@ fn diagnostics(
     observation: Observations,
 ) -> FitDiagnostics {
     FitDiagnostics {
-        engine: if input.intent == MatchIntent::Palette {
-            "reference-palette-transport-v8"
-        } else {
-            ENGINE_NAME
+        engine: match input.intent {
+            MatchIntent::Palette => "reference-palette-transport-v8",
+            MatchIntent::Exact => EXACT_ENGINE,
+            MatchIntent::Natural => ENGINE_NAME,
         }
         .into(),
         intent: input.intent,
@@ -120,6 +138,7 @@ fn diagnostics(
             learned_from: None,
             original_refused: observation.refused,
             stretch_limited_from: fit.stretch_limited_from,
+            highlights_limited_from: observation.native.and_then(|v| v.4),
         }),
     }
 }
@@ -170,9 +189,14 @@ pub(super) fn prepare(
     let target_regions = appearance::analyse(&plain)?;
     let monochrome = reference_measurements.achromatic || reference.achromatic;
     // The reference's own original in this collection gives the photographer's actual edit,
-    // learned pixel for pixel; it is used whenever it is there, whatever the matching goal.
-    let project = photo_project(state, &photo)?;
-    let (learned, refused) = super::learned::find(state, cancel, &reference.summary.id, &project)?;
+    // learned pixel for pixel; it is used whenever it is there, for the Natural and Palette goals.
+    // The Exact goal asks for the reference's colours themselves (ADR-0182).
+    let (learned, refused) = if input.intent == MatchIntent::Exact {
+        (None, None)
+    } else {
+        let project = photo_project(state, &photo)?;
+        super::learned::find(state, cancel, &reference.summary.id, &project)?
+    };
     if let Some(learned) = learned {
         return prepare_learned(
             state,
@@ -194,15 +218,34 @@ pub(super) fn prepare(
     }
     let similarity = content::similarity(&reference.small_rgb, &plain);
     let target_samples = transfer::samples(&plain, input.quality.target_samples());
-    let mut fit = transfer::fit_with_intent_checkpoint(
-        &reference_measurements,
-        &target_samples,
-        similarity,
-        input.quality,
-        input.intent,
-        || check_cancel(cancel),
-    )?;
-    let skin = transfer::review_skin(&mut fit.grade, &plain, &target_regions, monochrome);
+    // The Exact goal gives the photograph the reference's colours themselves (ADR-0182); skin
+    // goes to the reference's skin inside the transfer, so the look-wide skin review does not
+    // apply, and the native checks allow it a larger move.
+    let mut allowance = None;
+    let (mut fit, skin) = if input.intent == MatchIntent::Exact {
+        let (colours, reference_clipped) =
+            super::exact::reference_colours(state, &reference.summary.id)?.ok_or_else(|| {
+                invalid("This reference has no stored colours. Upload its edited photo again, then match. No edit was saved.")
+            })?;
+        // The reference's own clipped highlights are part of its colours; more than that is not.
+        allowance = Some(super::gallery_fit::Allowance {
+            skin: EXACT_SKIN,
+            clipping: (reference_clipped - appearance::clipped(&plain)).max(0.0) + 0.01,
+        });
+        let fit = transfer::fit_exact(&reference_measurements, &target_samples, &colours, cancel)?;
+        (fit, transfer::SkinReview::default())
+    } else {
+        let mut fit = transfer::fit_with_intent_checkpoint(
+            &reference_measurements,
+            &target_samples,
+            similarity,
+            input.quality,
+            input.intent,
+            || check_cancel(cancel),
+        )?;
+        let skin = transfer::review_skin(&mut fit.grade, &plain, &target_regions, monochrome);
+        (fit, skin)
+    };
     check_cancel(cancel)?;
     // Both intents can move tone across an unrelated scene (Palette by distribution, Natural by
     // the scene-prior estimate), so find a native-safe endpoint before offering it at 100%: a
@@ -219,6 +262,7 @@ pub(super) fn prepare(
             reference: &reference_measurements,
             monochrome,
             grade: &mut fit.grade,
+            allowance,
         },
     )?;
     // The renderer is the instrument: report what the stage drew, not what the fit predicted.
@@ -265,6 +309,7 @@ pub(super) fn prepare(
             fitted: fit.grade,
             reference: reference_measurements,
             learned: None,
+            allowance,
         }),
     };
     save_analysis(state, &session)
@@ -324,6 +369,7 @@ fn learned_recipe(
 
 /// Analyse with the look learned from the reference's original: find the strongest share of it
 /// that passes this photograph's native checks, so 100% is an endpoint Apply accepts.
+#[allow(clippy::too_many_lines)]
 fn prepare_learned(
     state: &AppState,
     cancel: &CancelToken,
@@ -392,6 +438,7 @@ fn prepare_learned(
             learned_from: Some(learned.label.clone()),
             original_refused: None,
             stretch_limited_from: None,
+            highlights_limited_from: None,
         }),
     };
     drop(endpoint.recipe);
@@ -423,6 +470,7 @@ fn prepare_learned(
             fitted: ReferenceGrade::identity(),
             reference: measurements,
             learned: Some(learned),
+            allowance: None,
         }),
     };
     save_analysis(state, &session)
@@ -497,7 +545,17 @@ fn canonical(recipe: &Recipe) -> AuraResult<Recipe> {
         .map_err(|_| invalid("The fitted reference recipe could not be encoded."))
 }
 
+/// The refusal when no strength passes the native checks.
+const REFUSED: &str = "This strength failed the full-resolution smoothness, highlight or skin-colour check, or moved colour farther from the reference. Reduce the strengths and apply again. No edit was saved.";
+
+/// Shares of a requested amount tried, strongest first, when the amount itself fails the native
+/// checks. Those checks are not monotone in strength on every photograph - a clipped share can sit
+/// on its limit at 80 % and below it at 90 % - so a refusal at one amount says little about the
+/// amount just under it.
+const BACKOFF: [f32; 3] = [0.75, 0.5, 0.25];
+
 /// Native quality checks use the exact candidate, including extrapolated strength controls.
+/// `None` when the candidate fails them.
 fn verified_distances(
     state: &AppState,
     cancel: &CancelToken,
@@ -505,7 +563,7 @@ fn verified_distances(
     transfer: &TransferSession,
     photo: &PhotoId,
     candidate: &Recipe,
-) -> AuraResult<(transfer::Distance, transfer::Distance, bool, f32)> {
+) -> AuraResult<Option<(transfer::Distance, transfer::Distance, bool, f32)>> {
     let reference = &transfer.reference;
     let review = native::Review::new(
         state,
@@ -515,16 +573,21 @@ fn verified_distances(
         &session.target_regions,
         reference,
         session.reference_monochrome,
-        transfer.learned.as_ref().map(|learned| learned.allowance),
-    )?;
-    let checked = review.check(state, cancel, candidate)?.ok_or_else(|| invalid(
-        "This strength failed the full-resolution smoothness, highlight or skin-colour check, or moved colour farther from the reference. Reduce the strengths and apply again. No edit was saved."))?;
-    Ok((
-        review.before,
-        checked.after,
-        checked.reused,
-        checked.visible,
-    ))
+        transfer
+            .learned
+            .as_ref()
+            .map(|learned| learned.allowance)
+            .or(transfer.allowance),
+    )?
+    .with_regression_check(transfer.learned.is_none());
+    Ok(review.check(state, cancel, candidate)?.map(|checked| {
+        (
+            review.before,
+            checked.after,
+            checked.reused,
+            checked.visible,
+        )
+    }))
 }
 
 /// Apply explicit strengths from the saved baseline and measure the full-resolution result.
@@ -546,9 +609,25 @@ pub(super) fn apply(
             "This analysis needs fresh colour measurements. Upload its edited photo again, then analyse the match. No edit was saved.",
         ));
     }
-    let candidate = candidate(&session, &transfer, &input.controls)?;
-    let (before, after, reused, visible) =
-        verified_distances(state, cancel, &session, &transfer, &photo, &candidate)?;
+    // The amount asked for, then shares of it, until one passes; the panel says when the saved
+    // amount is less than the one asked for.
+    let mut controls = input.controls;
+    let mut found = None;
+    for share in std::iter::once(1.0).chain(BACKOFF) {
+        if share < 1.0 && input.controls.amount <= 0.0 {
+            break;
+        }
+        controls.amount = input.controls.amount * share;
+        let trial = candidate(&session, &transfer, &controls)?;
+        if let Some(distances) =
+            verified_distances(state, cancel, &session, &transfer, &photo, &trial)?
+        {
+            found = Some((trial, distances));
+            break;
+        }
+    }
+    let (candidate, (before, after, reused, visible)) = found.ok_or_else(|| invalid(REFUSED))?;
+    let reduced_from = (controls.amount < input.controls.amount).then_some(input.controls.amount);
     if let Some(fitting) = session.fitting.as_mut() {
         fitting.native_candidate_checked = true;
         fitting.cached_proposals += usize::from(reused);
@@ -584,7 +663,7 @@ pub(super) fn apply(
     check_cancel(cancel)?;
     let project = photo_project(state, &photo)?;
     if !changed.is_empty() {
-        let c = &input.controls;
+        let c = &controls;
         super::save_verified(
             state,
             &project,
@@ -609,7 +688,7 @@ pub(super) fn apply(
     } else {
         candidate_hash
     };
-    session.controls = input.controls;
+    session.controls = controls;
     session.checked_hash = Some(session.last_hash.clone());
     session.measured_before = Some(before.total);
     session.measured_after = Some(after.total);
@@ -619,6 +698,7 @@ pub(super) fn apply(
     let mut result = report(&session, changed.len(), 0, after.total, true, true);
     result.before_distance = before.total;
     result.visible_change = Some(visible);
+    result.reduced_from = reduced_from;
     Ok(result)
 }
 

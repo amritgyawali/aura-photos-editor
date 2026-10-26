@@ -61,6 +61,25 @@ def new_bands(before, after):
     return dict(pairs=bad, fraction=bad / max(smooth, 1))
 
 
+def new_steps(before, after):
+    """New steps between flat colour: adjacent pairs smooth before (CIE76 <= 1) that step after (> 3)
+    with smooth pairs (<= 1.5) on both sides - bands and posterised blocks, not texture a strong
+    look brings into view."""
+    a, b = metrics.lab(before), metrics.lab(after)
+    smooth = bad = 0
+    for axis in (0, 1):
+        da = np.linalg.norm(np.diff(a, axis=axis), axis=-1)
+        db = np.linalg.norm(np.diff(b, axis=axis), axis=-1)
+        n = db.shape[axis]
+        cut = lambda s, e: tuple(slice(s, e) if i == axis else slice(None) for i in range(2))
+        flat = np.zeros_like(db, dtype=bool)
+        flat[cut(2, n - 2)] = (db[cut(0, n - 4)] <= 1.5) & (db[cut(4, n)] <= 1.5)
+        mask = da <= 1.0
+        smooth += int(mask.sum())
+        bad += int((mask & (db > 3.0) & flat).sum())
+    return dict(pairs=bad, fraction=bad / max(smooth, 1))
+
+
 def save_report(out, report):
     (out / 'results.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
     parts = ['<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width">',
@@ -115,7 +134,7 @@ def main():
     parser.add_argument('--exe', type=Path, default=ROOT / 'target/desktop-launch/debug/aura-desktop.exe')
     parser.add_argument('--dataset', type=Path, default=ROOT / 'output/aura-twenty-color-match-2026-10-24/dataset')
     parser.add_argument('--limit', type=int, choices=range(1, 21), default=20)
-    parser.add_argument('--workflows', nargs='+', choices=['collection', 'natural', 'palette', 'learned'], default=['collection', 'natural', 'palette'])
+    parser.add_argument('--workflows', nargs='+', choices=['collection', 'natural', 'palette', 'learned', 'exact'], default=['collection', 'natural', 'palette'])
     parser.add_argument('--out-base', type=Path, default=ROOT / 'output/aura-main-match-twenty-2026-10-25',
                         help='Folder the run directory is created in.')
     parser.add_argument('--port', type=int, default=9397)
@@ -292,7 +311,8 @@ def main():
                                 if status and status['sessionId'] != previous_session and status['current'] and status['fullResolutionChecked']:
                                     assert status['reference']['id'] == ref['studio']['id']
                                     assert status['fitting'].get('intent', 'natural') == goal
-                                    assert abs(status['controls']['amount'] - .8) < .001
+                                    # Apply may save a smaller share when 80 % fails this photo's checks.
+                                    assert status['controls']['amount'] <= .8 + .001
                                     row['native'] = helpers.compact(status)
                                     break
                                 alerts = page.get_by_role('alert').all_text_contents()
@@ -354,7 +374,8 @@ def main():
                         row['originalChangedPixelFraction'] = float(np.any(np.asarray(after) != np.asarray(original), axis=2).mean())
                         row.update(oracle=metrics.oracle_error(after, expected), paletteAfter=metrics.distributions(after, distribution),
                                    jointAfter=float(np.abs(joint(after) - reference_joint).mean()), meanRgbChange=helpers.change(before, after), clippingAfter=helpers.clipping(after),
-                                   visibleChange=visible_change(before, after), newBands=new_bands(before, after))
+                                   visibleChange=visible_change(before, after), newBands=new_bands(before, after),
+                                   newSteps=new_steps(before, after))
                         transfer = (row.get('native') or {}).get('fitting', {}).get('transfer', {}) if isinstance(row.get('native'), dict) else {}
                         row['learnedFrom'] = transfer.get('learnedFrom')
                         row['originalRefused'] = transfer.get('originalRefused')
@@ -420,9 +441,14 @@ def main():
                                                   closeKnownEditChanged=sum(row['oracle']['closeKnownLook'] and row['visibleChange'] >= 1.0 for row in rows),
                                                   noVisibleChange=sum('error' not in row and row['visibleChange'] < 1.0 for row in rows),
                                                   withNewBands=sum(row['newBands']['fraction'] > 0.005 for row in rows),
+                                                  # The stricter count: steps between flat colour (assessment's banded sky: 0.0077).
+                                                  withNewSteps=sum(row['newSteps']['fraction'] > 0.001 for row in rows),
                                                   learnedFromOriginal=sum(bool(row.get('learnedFrom')) for row in rows),
                                                   medianKnownEditError=statistics.median(row['oracle']['meanDeltaE76'] for row in rows),
                                                   medianKnownEditBefore=statistics.median(row['oracleBefore']['meanDeltaE76'] for row in rows),
+                                                  # How close the photo's colours came to the reference's own (the Exact goal's aim).
+                                                  medianReferenceColorBefore=statistics.median(row['paletteBefore']['color'] for row in rows),
+                                                  medianReferenceColorAfter=statistics.median(row['paletteAfter']['color'] for row in rows),
                                                   medianApplySeconds=statistics.median(row['applyMilliseconds'] / 1000 for row in rows)))
                 report['completed'] = True
                 print(json.dumps(dict(completed=str(out), summary=report['summary'], checks=report['checks'])), flush=True)
