@@ -92,15 +92,23 @@ export function PortraitFinishPanel({ finish, disabled, liquify, onSave, onLiqui
   useEffect(() => { setTab(initialTab); }, [initialTab]);
   const [faces, setFaces] = useState<EvotoFace[] | null>(null);
   const [findingFaces, setFindingFaces] = useState(false);
-  useEffect(() => { setFaces(null); setFindingFaces(false); }, [subject]);
+  // Faces looked up and none found, as opposed to a lookup that failed.
+  const [noFace, setNoFace] = useState(false);
+  useEffect(() => { setFaces(null); setFindingFaces(false); setNoFace(false); }, [subject]);
   const findFaces = () => {
     if (!onFindFaces) return;
     const asked = subject;
     setFindingFaces(true);
-    onFindFaces().then(found => { if (current.current === asked) setFaces(found); })
-      .catch(() => { if (current.current === asked) setFaces([]); })
+    onFindFaces().then(found => { if (current.current === asked) { setFaces(found); setNoFace(found.length === 0); } })
+      .catch(() => { if (current.current === asked) { setFaces([]); setNoFace(false); } })
       .finally(() => { if (current.current === asked) setFindingFaces(false); });
   };
+  // Body and people tools act only on a person, and the evidence of one is a face: look once when
+  // their tab opens, so a photograph with nobody in it says so instead of moving no slider.
+  const peopleTab = tab === 'body' || tab === 'people';
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (peopleTab && faces === null && !findingFaces) findFaces(); }, [peopleTab, faces, findingFaces, subject]);
+  const noPerson = noFace && <p role="status" className="lr-notice">No face was found in this photograph, so body and people changes have no one to act on. Draw a missed face in Portrait retouch.</p>;
   const chosen = finish.faces ?? [];
   const isChosen = (face: EvotoFace) => chosen.some(p => Math.hypot(p[0] - face.centre[0], p[1] - face.centre[1]) < (face.bounds[2] - face.bounds[0]) * 0.5);
   const toggleFace = (face: EvotoFace) => {
@@ -157,6 +165,7 @@ export function PortraitFinishPanel({ finish, disabled, liquify, onSave, onLiqui
 
     {tab === 'body' && <div role="tabpanel" aria-label="Body shape">
       <p className="lr-hint">Applies to the main person. The background bends a little with a strong change, as in any reshaping tool.</p>
+      {noPerson}
       {BODY_SLIDERS.map(([key, label]) => <ShapeSlider key={key} label={label} value={finish.body[key]} disabled={disabled}
         onCommit={value => onSave({ ...finish, body: { ...finish.body, [key]: value } }, `Body: ${label}`)} />)}
       <SliderGroup title="More body shape" list={MORE_BODY_SLIDERS} values={finish.body} disabled={disabled}
@@ -239,6 +248,7 @@ export function PortraitFinishPanel({ finish, disabled, liquify, onSave, onLiqui
     </div>}
 
     {tab === 'people' && <div role="tabpanel" aria-label="People and scene">
+      {noPerson}
       <SliderGroup title="People" list={SUBJECT_SLIDERS} values={finish.subject} neutral={{ relightDirection: -45 }} disabled={disabled}
         onCommit={(key, value, label) => onSave({ ...finish, subject: { ...finish.subject, [key]: value } }, `People: ${label}`)} />
       <SliderGroup title="Background" list={SCENE_SLIDERS} values={finish.scene} disabled={disabled}
