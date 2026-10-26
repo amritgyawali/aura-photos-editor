@@ -777,7 +777,7 @@ pub fn render_hash(
 #[must_use]
 pub fn engine_string() -> String {
     format!(
-        "{}+profiles.{}+portrait.{}+display.{}+local.{}+raw.{}+clear.{}+matte.{}+undereye.{}+boundary.{}+skin.{}+labs.selected-v5+calibrated.2+background-repair.1",
+        "{}+profiles.{}+portrait.{}+display.{}+local.{}+raw.{}+clear.{}+matte.{}+undereye.{}+boundary.{}+skin.{}+labs.selected-v5+calibrated.2+hsl.2+faceless.1+background-repair.1",
         ENGINE,
         crate::profiles::PROFILES_VER,
         aura_portrait::PARSE_VER,

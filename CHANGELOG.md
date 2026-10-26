@@ -39,6 +39,15 @@ All notable changes to AURA. One entry per phase, newest first.
   scene can identify - its colour, which loses 51-54 % of its error - instead of failing on tone it
   cannot identify; TLS dependencies upgraded for three advisories, and the AI connection uses X25519
   key exchange only, so the fourth cannot reach a secret (ADR-0066 addendum, ADR-0181).
+- **Colour bands leave greys alone.** The eight HSL bands now fade in with a pixel's saturation
+  (none below 3 %, all of it from 15 %), so moving the orange luminance slider to -100 no longer
+  darkens a grey card with a trace of warm cast by 34-55 levels. The shader does the same.
+- **No body without a person.** On a photo with no face, the learned subject selection (which
+  finds the most prominent *thing* - a pot, a cake) no longer becomes a body for the slim, height,
+  legs, torso and subject light controls to warp or relight. It still separates the background.
+- **The in-app test of every tool** (`scripts/test-everything-gui.py`) reconnects when the window
+  swaps its web process, measures dehaze on the export render, and no longer clobbers the project
+  name it uses to reopen the library.
 
 ## A hundred measured portrait, attire, background and delivery tools - 2026-10-22
 
