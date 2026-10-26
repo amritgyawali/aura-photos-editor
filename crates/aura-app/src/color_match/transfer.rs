@@ -82,8 +82,13 @@ mod sampling;
 pub(super) use sampling::samples;
 mod neutral;
 use neutral::neutral_axis;
+mod exact_grade;
 mod palette;
 mod quantile;
+pub(super) use exact_grade::fit_exact;
+pub(super) mod tone_prior;
+pub use tone_prior::ToneReading;
+
 use quantile::QuantileMap;
 
 /// What a photograph's colour and tone are, as the fit compares them.
@@ -408,15 +413,17 @@ const MAX_TONE_DEVIATION: f32 = 0.35;
 /// Keep a tone curve smooth, rising, within a bounded distance of the identity, and with no
 /// segment flat enough to posterise or steep enough to tear a gradient.
 fn regularise_tone(nodes: Vec<f32>) -> Vec<f32> {
+    regularise_tone_within(nodes, MAX_TONE_DEVIATION, MAX_TONE_SLOPE)
+}
+
+/// [`regularise_tone`] with stated bounds on the distance from the identity and on the slope.
+fn regularise_tone_within(nodes: Vec<f32>, deviation: f32, max_slope: f32) -> Vec<f32> {
     let last = TONE_NODES - 1;
     let h = 1.0 / last as f32;
     let mut y: Vec<f32> = (0..TONE_NODES)
         .map(|i| {
             let x = i as f32 * h;
-            at(&nodes, i).clamp(
-                (x - MAX_TONE_DEVIATION).max(0.0),
-                (x + MAX_TONE_DEVIATION).min(1.0),
-            )
+            at(&nodes, i).clamp((x - deviation).max(0.0), (x + deviation).min(1.0))
         })
         .collect();
     let mut floor = 0.0_f32;
@@ -444,7 +451,7 @@ fn regularise_tone(nodes: Vec<f32>) -> Vec<f32> {
             0.25 * prev + 0.5 * at(&raw, i) + 0.25 * next
         })
         .collect();
-    let (lo, hi) = (MIN_TONE_SLOPE * h, MAX_TONE_SLOPE * h);
+    let (lo, hi) = (MIN_TONE_SLOPE * h, max_slope * h);
     for _ in 0..12 {
         for v in &mut inc {
             *v = v.clamp(lo, hi);
@@ -788,6 +795,10 @@ pub(super) struct Fit {
     pub after: Distance,
     pub iterations: usize,
     pub content: f32,
+    /// The scene-prior tone estimate, when the reference's scene is not this photograph's.
+    pub tone: Option<ToneReading>,
+    /// How far the fit stretched colour differences before it was limited, when it had to be.
+    pub stretch_limited_from: Option<f32>,
 }
 
 /// The evidence available for a fit. Similarity is structural correspondence, not confidence.
@@ -950,6 +961,22 @@ pub(super) fn fit_with_intent_checkpoint(
     similarity: Option<f32>,
     quality: super::MatchQuality,
     intent: super::MatchIntent,
+    checkpoint: impl FnMut() -> AuraResult<()>,
+) -> AuraResult<Fit> {
+    fit_tones(
+        reference, target, similarity, quality, intent, true, checkpoint,
+    )
+}
+
+/// The fit, with or without the scene-prior tone; only the looks harness turns it off, to
+/// measure against the fit as it was before ADR-0180.
+fn fit_tones(
+    reference: &GradeStats,
+    target: &[Sample],
+    similarity: Option<f32>,
+    quality: super::MatchQuality,
+    intent: super::MatchIntent,
+    scene_tone: bool,
     mut checkpoint: impl FnMut() -> AuraResult<()>,
 ) -> AuraResult<Fit> {
     checkpoint()?;
@@ -971,6 +998,8 @@ pub(super) fn fit_with_intent_checkpoint(
             after: before,
             iterations: 0,
             content,
+            tone: None,
+            stretch_limited_from: None,
         });
     }
     // A colour reference cannot restore colours absent from a genuinely grey target.
@@ -1005,18 +1034,308 @@ pub(super) fn fit_with_intent_checkpoint(
     if fitter.palette && !fitter.monochrome && reference.palette_samples.len() >= MIN_SAMPLES {
         best = palette::refine(reference, target, best, quality, &mut checkpoint)?;
     }
+    // Across different scenes the reference's lightness histogram is mostly its scene, so
+    // matching it is wrong and ignoring it loses every matte, airy, moody or contrasty look. The
+    // scene prior estimates the part of it that is an edit, and how far this photograph itself
+    // sits from an ordinary finished one, and the tone moves by the difference (ADR-0180). It is
+    // a posterior mean already, so the distribution score does not get to undo it.
+    let mut tone = None;
+    if !fitter.corresponding() && !fitter.palette && scene_tone {
+        checkpoint()?;
+        if let Some((curve, reading)) =
+            tone_prior::for_target(&reference.lightness, &start.lightness, TONE_NODES)
+        {
+            best.1.tone = regularise_tone(curve);
+            best.1 = best.1.clone().bounded();
+            best.0 = distance(reference, &measure(&transformed(&best.1, target)));
+            tone = Some(reading);
+        }
+    }
+    // Bound how steeply the transform stretches nearby colours, at the colours this photograph
+    // contains: a steep spot is a band in a sky or a patch on a floor (ADR-0181).
+    // The same picture edited is a real edit to recover, and real edits can be steeper; the limit
+    // applies where the scenes differ.
+    checkpoint()?;
+    let (limited, stretch_limited_from) = if fitter.content >= SAME_SCENE {
+        (best.1, None)
+    } else {
+        limit_stretch(best.1, target)
+    };
+    best.1 = limited;
+    if stretch_limited_from.is_some() {
+        best.0 = distance(reference, &measure(&transformed(&best.1, target)));
+    }
     Ok(Fit {
         grade: best.1,
         before,
         after: best.0,
         iterations,
         content,
+        tone,
+        stretch_limited_from,
     })
 }
 
 #[cfg(test)]
 fn fit(reference: &GradeStats, target: &[Sample], similarity: Option<f32>) -> Fit {
     fit_with_checkpoint(reference, target, similarity, || Ok(())).unwrap()
+}
+
+/// The Natural fit without the scene-prior tone, as it was before ADR-0180.
+#[cfg(test)]
+fn fit_without_scene_tone(
+    reference: &GradeStats,
+    target: &[Sample],
+    similarity: Option<f32>,
+) -> Fit {
+    fit_tones(
+        reference,
+        target,
+        similarity,
+        super::MatchQuality::Precise,
+        super::MatchIntent::Natural,
+        false,
+        || Ok(()),
+    )
+    .unwrap()
+}
+
+/// How much a transform stretches small colour differences at the colours a photograph contains:
+/// the 99th percentile, over up to 4,096 of its samples, of the largest local gain in six `OKLab`
+/// directions. A look stretches by a bounded, smooth amount everywhere - a contrast curve by its
+/// slope; a transform that would band a sky or blotch a floor has a spike, where colours a hair
+/// apart land far apart. Measured on the function, not on noisy pixels, so a strong look on a
+/// noisy shadow is not mistaken for a band (ADR-0181).
+pub(super) fn stretch(grade: &ReferenceGrade, samples: &[Sample]) -> f32 {
+    const STEP: f32 = 0.006;
+    let evaluator = Evaluator::new(grade);
+    let stride = (samples.len() / 4096).max(1);
+    let mut gains: Vec<f32> = samples
+        .iter()
+        .step_by(stride)
+        .filter_map(|sample| {
+            let from = oklab_from_linear_srgb(evaluator.linear_srgb(sample.linear));
+            let mut worst = 0.0_f32;
+            for axis in 0..3 {
+                for sign in [-1.0_f32, 1.0] {
+                    let mut lab = sample.lab;
+                    if let Some(v) = lab.get_mut(axis) {
+                        *v += sign * STEP;
+                    }
+                    let linear = aura_render::reference_grade::linear_srgb_from_oklab(lab);
+                    if linear.iter().any(|v| !(0.0..=1.0).contains(v)) {
+                        continue;
+                    }
+                    let moved = oklab_from_linear_srgb(linear);
+                    let input = (0..3)
+                        .map(|c| {
+                            (moved.get(c).copied().unwrap_or(0.0)
+                                - sample.lab.get(c).copied().unwrap_or(0.0))
+                            .powi(2)
+                        })
+                        .sum::<f32>()
+                        .sqrt();
+                    if input < 1e-4 {
+                        continue;
+                    }
+                    let to = oklab_from_linear_srgb(evaluator.linear_srgb(linear));
+                    let output = (0..3)
+                        .map(|c| {
+                            (to.get(c).copied().unwrap_or(0.0)
+                                - from.get(c).copied().unwrap_or(0.0))
+                            .powi(2)
+                        })
+                        .sum::<f32>()
+                        .sqrt();
+                    worst = worst.max(output / input);
+                }
+            }
+            (worst > 0.0).then_some(worst)
+        })
+        .collect();
+    if gains.is_empty() {
+        return 1.0;
+    }
+    gains.sort_by(f32::total_cmp);
+    gains
+        .get(((gains.len() - 1) as f32 * 0.99).round() as usize)
+        .copied()
+        .unwrap_or(1.0)
+}
+
+/// The most a fitted transform may stretch small colour differences. Real looks learned from
+/// their own originals stretch the assessment photographs by at most 3.2 (a strong contrast and
+/// saturation look) and Natural fits by about 1.1; unconstrained palette fits reached 4 to 42 and
+/// banded skies and blotched floors. Limits of 4, 2.5 and 2 left new bands in 10, 3 and 2 of 20
+/// palette results, and the tightest was also the closest to the true looks (ADR-0181), so only an
+/// explicitly requested palette transfer is ever shortened by it.
+pub(super) const MAX_STRETCH: f32 = 2.0;
+
+/// Bring a transform within [`MAX_STRETCH`] by shrinking whichever component - tone, chroma,
+/// saturation, hue or cast - is making it steep, a quarter at a time, rather than weakening the
+/// whole look. Returns the stretch it started from when it had to.
+pub(super) fn limit_stretch(
+    grade: ReferenceGrade,
+    samples: &[Sample],
+) -> (ReferenceGrade, Option<f32>) {
+    limit_stretch_to(grade, samples, MAX_STRETCH)
+}
+
+/// [`limit_stretch`] to a stated limit.
+fn limit_stretch_to(
+    grade: ReferenceGrade,
+    samples: &[Sample],
+    limit: f32,
+) -> (ReferenceGrade, Option<f32>) {
+    let stride = (samples.len() / 2048).max(1);
+    let probe: Vec<Sample> = samples.iter().step_by(stride).copied().collect();
+    let first = stretch(&grade, &probe);
+    if first <= limit {
+        return (grade, None);
+    }
+    (
+        shorten_until(&grade, first, limit, |g| stretch(g, &probe)),
+        Some(first),
+    )
+}
+
+/// Shrink whichever component of a look - tone, chroma, saturation, hue or cast - lowers
+/// `measure` most, a quarter at a time, until it is within `limit`; when no single component is
+/// responsible, the whole look is shortened. `first` is `measure` of `grade`.
+fn shorten_until(
+    grade: &ReferenceGrade,
+    first: f32,
+    limit: f32,
+    measure: impl Fn(&ReferenceGrade) -> f32,
+) -> ReferenceGrade {
+    let identity = ReferenceGrade::identity();
+    let shrink = |scales: &Scales, component: usize| {
+        let mut next = *scales;
+        match component {
+            0 => next.tone = next.tone.map(|t| t * 0.75),
+            1 => next.chroma *= 0.75,
+            2 => next.saturation *= 0.75,
+            3 => {
+                next.hue *= 0.75;
+                next.hue_light *= 0.75;
+            }
+            _ => {
+                next.temperature *= 0.75;
+                next.tint *= 0.75;
+            }
+        }
+        next
+    };
+    let mut scales = Scales::uniform(1.0);
+    let (mut best, mut current) = (grade.clone(), first);
+    for _ in 0..32 {
+        if current <= limit {
+            break;
+        }
+        let choice = (0..5)
+            .map(|component| {
+                let trial = shrink(&scales, component);
+                let candidate = mix(&identity, grade, &trial);
+                (measure(&candidate), trial, candidate)
+            })
+            .min_by(|a, b| a.0.total_cmp(&b.0));
+        match choice {
+            Some((value, trial, candidate)) if value < current - 1e-3 * limit.max(1e-3) => {
+                (scales, best, current) = (trial, candidate, value);
+            }
+            // No single component is responsible: shorten the whole look.
+            _ => {
+                scales = (0..5).fold(scales, |s, component| shrink(&s, component));
+                best = mix(&identity, grade, &scales);
+                current = measure(&best);
+            }
+        }
+    }
+    best
+}
+
+/// The share of this photograph's own colours a transform newly clips: a channel reaching full
+/// scale (255 in the delivered file) where it did not before.
+pub(super) fn new_clipping(grade: &ReferenceGrade, samples: &[Sample]) -> f32 {
+    let full = aura_raw::colour::curve::srgb_decode(254.5 / 255.0);
+    let evaluator = Evaluator::new(grade);
+    let stride = (samples.len() / 8192).max(1);
+    let (mut clipped, mut total) = (0_usize, 0_usize);
+    for sample in samples.iter().step_by(stride) {
+        total += 1;
+        let before = sample.linear.iter().copied().fold(0.0_f32, f32::max);
+        if before >= full {
+            continue;
+        }
+        let after = evaluator
+            .linear_srgb(sample.linear)
+            .iter()
+            .copied()
+            .fold(0.0_f32, f32::max);
+        if after >= full {
+            clipped += 1;
+        }
+    }
+    clipped as f32 / total.max(1) as f32
+}
+
+/// The most new clipping a fitted look may cause: half of what the native check allows, so a
+/// strength between the steps the analysis tried does not land on the check's edge.
+pub(super) const MAX_NEW_CLIPPING: f32 = 0.005;
+
+/// Hold back only the highlights of a look that would clip them. Near white there is no room for
+/// colour - a cool cast on a bright backdrop drives its blue channel to full scale at the same
+/// lightness - and the native check refuses the clipping, after which the whole look used to be
+/// shortened until the photograph barely changed. Instead the cast, colourfulness and tone of the
+/// top of the range move a quarter of the way back toward the photograph's own at a time, more
+/// the brighter they are, until the new clipping is within `limit`; skin, midtones
+/// and shadows keep the whole look. Returns the clipping it started from when it had to.
+///
+/// `limit` is a share of what this transform alone does to the photograph's colours; the native
+/// check, which renders the whole pipeline, calibrates it against [`MAX_NEW_CLIPPING`].
+pub(super) fn limit_highlights_to(
+    grade: ReferenceGrade,
+    samples: &[Sample],
+    limit: f32,
+) -> (ReferenceGrade, Option<f32>) {
+    let first = new_clipping(&grade, samples);
+    if first <= limit {
+        return (grade, None);
+    }
+    let weight = |lightness: f32| smoothstep(0.55, 1.0, lightness);
+    // Each step moves the highlights toward the photograph's own, so it is kept even when the
+    // clipping has not fallen yet: clipping is a step function of the cast and stays flat until
+    // a channel comes back under full scale.
+    let (mut best, mut current) = (grade, first);
+    for _ in 0..24 {
+        if current <= limit {
+            break;
+        }
+        let mut next = best.clone();
+        for (k, (out, input)) in next.cast_out.iter_mut().zip(&best.cast_in).enumerate() {
+            let w = 0.25 * weight(k as f32 / (AXIS_NODES - 1) as f32);
+            out[0] += w * (input[0] - out[0]);
+            out[1] += w * (input[1] - out[1]);
+        }
+        for (z, gain) in next.zone_gain.iter_mut().enumerate() {
+            let w = 0.25 * weight(z as f32 / (ZONES - 1) as f32);
+            *gain += w * (1.0 - *gain);
+        }
+        for (i, v) in next.tone.iter_mut().enumerate() {
+            let x = i as f32 / (TONE_NODES - 1) as f32;
+            *v += 0.25 * weight(x) * (x - *v);
+        }
+        next.tone = regularise_tone(next.tone);
+        next = next.bounded();
+        current = new_clipping(&next, samples);
+        best = next;
+    }
+    // What is left is not in the highlights - a cast pushing bright, colourful pixels such as a
+    // pastel dress past full scale - so shorten whichever part of the look does it.
+    if current > limit {
+        best = shorten_until(&best, current, limit, |g| new_clipping(g, samples));
+    }
+    (best, Some(first))
 }
 
 /// What the skin review found.

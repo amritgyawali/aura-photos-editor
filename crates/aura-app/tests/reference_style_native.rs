@@ -792,10 +792,7 @@ fn unrelated_references_transfer_eight_distinct_looks_and_replace_the_previous_t
             reference_style::apply_reference(&state, &input).unwrap();
             let half = render(&state, project, photo);
             assert_ne!(half, baseline_pixels);
-            assert!(
-                half != pixels,
-                "Half and full strength must produce different native pixels"
-            );
+            assert_ne!(half, pixels);
             input.strength = 1.0;
             reference_style::apply_reference(&state, &input).unwrap();
             assert_eq!(

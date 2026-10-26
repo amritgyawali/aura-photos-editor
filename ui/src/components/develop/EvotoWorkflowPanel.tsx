@@ -9,7 +9,7 @@ export type EvotoWorkflowPanelProps = {
   photoId: string;
   disabled: boolean;
   /** Run a change to the photograph's recipe through the editor, which refreshes the preview. */
-  onWrite: (action: () => Promise<unknown>) => Promise<void>;
+  onWrite: (action: () => Promise<unknown>) => Promise<unknown>;
   /** Open a photograph the blink check flagged. */
   onOpenPhoto?: (photoId: string) => void;
 };

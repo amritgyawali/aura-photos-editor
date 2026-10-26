@@ -42,6 +42,44 @@ def joint(image):
     return np.sort(pixels[indices] @ np.stack([np.cos(angles), np.sin(angles)]), axis=0)
 
 
+def visible_change(before, after):
+    """Mean CIE76 difference between the photograph before and after: below 1.0 nobody sees it."""
+    return float(np.linalg.norm(metrics.lab(before) - metrics.lab(after), axis=-1).mean())
+
+
+def new_bands(before, after):
+    """Adjacent pixel pairs that were smooth (CIE76 <= 1) and now step (> 3): bands and patches a
+    colour match made, anywhere in the frame. Fraction of the smooth pairs, and their count."""
+    a, b = metrics.lab(before), metrics.lab(after)
+    smooth = bad = 0
+    for axis in (0, 1):
+        da = np.linalg.norm(np.diff(a, axis=axis), axis=-1)
+        db = np.linalg.norm(np.diff(b, axis=axis), axis=-1)
+        mask = da <= 1.0
+        smooth += int(mask.sum())
+        bad += int((mask & (db > 3.0)).sum())
+    return dict(pairs=bad, fraction=bad / max(smooth, 1))
+
+
+def new_steps(before, after):
+    """New steps between flat colour: adjacent pairs smooth before (CIE76 <= 1) that step after (> 3)
+    with smooth pairs (<= 1.5) on both sides - bands and posterised blocks, not texture a strong
+    look brings into view."""
+    a, b = metrics.lab(before), metrics.lab(after)
+    smooth = bad = 0
+    for axis in (0, 1):
+        da = np.linalg.norm(np.diff(a, axis=axis), axis=-1)
+        db = np.linalg.norm(np.diff(b, axis=axis), axis=-1)
+        n = db.shape[axis]
+        cut = lambda s, e: tuple(slice(s, e) if i == axis else slice(None) for i in range(2))
+        flat = np.zeros_like(db, dtype=bool)
+        flat[cut(2, n - 2)] = (db[cut(0, n - 4)] <= 1.5) & (db[cut(4, n)] <= 1.5)
+        mask = da <= 1.0
+        smooth += int(mask.sum())
+        bad += int((mask & (db > 3.0) & flat).sum())
+    return dict(pairs=bad, fraction=bad / max(smooth, 1))
+
+
 def save_report(out, report):
     (out / 'results.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
     parts = ['<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width">',
@@ -58,10 +96,9 @@ def save_report(out, report):
         original_file = f'{row["targetIndex"]:02}.original.png'
         if (out / original_file).exists():
             pictures.append((original_file, 'Unedited native original'))
-        pictures.extend([
-                            (f'{stem}.before.png', 'Native workflow baseline'),
-                            (f'{stem}.matched.png', 'Actual saved AURA result'),
-                            (f'{stem}.expected.png', 'Declared known 80% edit')])
+        pictures.extend([(f'{stem}.before.png', 'Native workflow baseline'),
+                         (f'{stem}.matched.png', 'Actual saved AURA result'),
+                         (f'{stem}.expected.png', 'Declared known 80% edit')])
         for path, label in pictures:
             parts.append(f'<figure><a href="{path}"><img loading="lazy" src="{path}"></a><figcaption>{label}</figcaption></figure>')
         parts.append('</div>')
@@ -97,11 +134,14 @@ def main():
     parser.add_argument('--exe', type=Path, default=ROOT / 'target/desktop-launch/debug/aura-desktop.exe')
     parser.add_argument('--dataset', type=Path, default=ROOT / 'output/aura-twenty-color-match-2026-10-24/dataset')
     parser.add_argument('--limit', type=int, choices=range(1, 21), default=20)
-    parser.add_argument('--workflows', nargs='+', choices=['collection', 'natural', 'palette'], default=['collection', 'natural', 'palette'])
+    parser.add_argument('--workflows', nargs='+', choices=['collection', 'natural', 'palette', 'learned', 'exact'], default=['collection', 'natural', 'palette'])
+    parser.add_argument('--out-base', type=Path, default=ROOT / 'output/aura-main-match-twenty-2026-10-25',
+                        help='Folder the run directory is created in.')
     parser.add_argument('--port', type=int, default=9397)
     parser.add_argument('--resume', type=Path, help='Continue this harness\'s own isolated run, retaining completed cases.')
     args = parser.parse_args()
-    base = ROOT / 'output/aura-main-match-twenty-2026-10-25'
+    base = args.out_base.resolve()
+    base.mkdir(parents=True, exist_ok=True)
     out = args.resume.resolve() if args.resume else base / ('run-' + uuid.uuid4().hex[:8])
     assert out.parent == base.resolve() and out.name.startswith('run-')
     (out / 'references').mkdir(parents=True, exist_ok=bool(args.resume))
@@ -199,6 +239,19 @@ def main():
                         reference['collection'] = call('analyse_reference_style', address=reference['style'], folder=reference['path'], cancelId=str(uuid.uuid4()), export=False)
                         reference['studio'] = call('import_color_reference', path=reference['path'], cancelId=str(uuid.uuid4()))
                         assert not reference['collection'].get('calibration'), 'Unpaired test must not receive original reference pixels'
+                if 'learned' in args.workflows and not report.get('learnedReferences'):
+                    report['learnedReferences'] = {}
+                    for target in targets:
+                        source = targets[target['index'] % len(targets)]
+                        style = STYLES[(target['index'] - 1) % len(STYLES)]
+                        stem = Path(source['input']['path']).stem
+                        path = out / 'references' / f'{stem}-Edit.png'
+                        if not path.exists():
+                            metrics.grade(Image.open(dataset / source['input']['path']), style).save(path)
+                        studio = call('import_color_reference', path=str(path), cancelId=str(uuid.uuid4()))
+                        report['learnedReferences'][str(target['index'])] = dict(style=style, path=str(path), studio=studio,
+                                                                                original=Path(source['input']['path']).name,
+                                                                                photoId=source['photoId'], sha256=digest(path))
                 save_report(out, report)
                 for workflow in args.workflows:
                     if sum(row['workflow'] == workflow for row in report['pairs']) == len(targets) and any(item['workflow'] == workflow for item in report['deliveries']):
@@ -207,7 +260,8 @@ def main():
                         if any(row['workflow'] == workflow and row['targetIndex'] == target['index'] for row in report['pairs']):
                             continue
                         style = STYLES[(target['index'] - 1) % len(STYLES)]
-                        ref = reference_map[style]
+                        ref = reference_map[style] if workflow != 'learned' else report['learnedReferences'][str(target['index'])]
+                        goal = 'natural' if workflow == 'learned' else workflow
                         photo = target['auraPhotoId']
                         call('history_step', projectId=project, photoId=photo, action='reset_original')
                         if workflow == 'collection':
@@ -244,7 +298,7 @@ def main():
                             live = panel.get_by_role('checkbox', name='Real-Time Color Adjustments')
                             expect(live).not_to_be_checked()
                             panel.get_by_label('Matching mode', exact=True).select_option('precise')
-                            panel.get_by_label('Matching goal', exact=True).select_option(workflow)
+                            panel.get_by_label('Matching goal', exact=True).select_option(goal)
                             panel.get_by_role('slider', name='Match amount', exact=True).evaluate("el=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,'80');el.dispatchEvent(new Event('input',{bubbles:true}));}")
                             previous = raw('color_match_status', photoId=photo)
                             previous_session = previous['sessionId'] if previous else None
@@ -256,8 +310,9 @@ def main():
                                 status = raw('color_match_status', photoId=photo)
                                 if status and status['sessionId'] != previous_session and status['current'] and status['fullResolutionChecked']:
                                     assert status['reference']['id'] == ref['studio']['id']
-                                    assert status['fitting'].get('intent', 'natural') == workflow
-                                    assert abs(status['controls']['amount'] - .8) < .001
+                                    assert status['fitting'].get('intent', 'natural') == goal
+                                    # Apply may save a smaller share when 80 % fails this photo's checks.
+                                    assert status['controls']['amount'] <= .8 + .001
                                     row['native'] = helpers.compact(status)
                                     break
                                 alerts = page.get_by_role('alert').all_text_contents()
@@ -269,10 +324,32 @@ def main():
                             else:
                                 raise AssertionError(f'GUI match did not finish: {workflow}, target {target["index"]}')
                             expect(button).to_be_enabled()
+                            if 'error' not in row:
+                                # The app measures how different the saved result looks from the
+                                # original. A result nobody can see must be reported as such, and a
+                                # visible one must not be.
+                                messages = panel.get_by_role('status').all_text_contents()
+                                visible = row['native'].get('visibleChange')
+                                slight = any('looks almost the same' in message for message in messages)
+                                claims_match = any(message.startswith('Matched ') for message in messages)
+                                row['panelMessages'] = messages
+                                row['appVisibleChange'] = visible
+                                row['slightReportedHonestly'] = visible is not None and (slight == (visible < 0.45)) and not (slight and claims_match)
+                                assert row['slightReportedHonestly'], f'Panel did not report the visible change honestly: {visible} {messages}'
                             if 'error' in row:
                                 row['terminalUiProgress'] = panel.get_by_role('status').all_text_contents()
                                 row['refusalClearsMatchingProgress'] = not any('Matching the selected reference' in message for message in row['terminalUiProgress'])
                                 assert row['refusalClearsMatchingProgress'], 'Refused match retained a running progress message'
+                                # The panel itself must say why nothing was saved, in its own words,
+                                # and no refusal may reach the photographer as a generic failure.
+                                for _ in range(40):
+                                    panel_alerts = panel.get_by_role('alert').all_text_contents()
+                                    if panel_alerts:
+                                        break
+                                    time.sleep(.25)
+                                row['panelRefusal'] = ' '.join(panel_alerts)
+                                row['refusalExplained'] = bool(row['panelRefusal']) and not any('unexpected problem' in text for text in page.get_by_role('alert').all_text_contents())
+                                assert row['refusalExplained'], f'Refusal not explained: {page.get_by_role("alert").all_text_contents()}'
                             if target['index'] in [1, 11, 17, 20]:
                                 panel.scroll_into_view_if_needed()
                                 page.screenshot(path=str(out / f'{stem}.ui.png'), full_page=True)
@@ -296,11 +373,18 @@ def main():
                         row['originalMeanChromaChange'] = original_metrics['meanChromaPlaneError']
                         row['originalChangedPixelFraction'] = float(np.any(np.asarray(after) != np.asarray(original), axis=2).mean())
                         row.update(oracle=metrics.oracle_error(after, expected), paletteAfter=metrics.distributions(after, distribution),
-                                   jointAfter=float(np.abs(joint(after) - reference_joint).mean()), meanRgbChange=helpers.change(before, after), clippingAfter=helpers.clipping(after))
-                        row['verdict'] = ('refused safely' if 'error' in row else 'unchanged' if row['meanRgbChange'] == 0 else 'close known edit' if row['oracle']['closeKnownLook'] else 'partial match')
+                                   jointAfter=float(np.abs(joint(after) - reference_joint).mean()), meanRgbChange=helpers.change(before, after), clippingAfter=helpers.clipping(after),
+                                   visibleChange=visible_change(before, after), newBands=new_bands(before, after),
+                                   newSteps=new_steps(before, after))
+                        transfer = (row.get('native') or {}).get('fitting', {}).get('transfer', {}) if isinstance(row.get('native'), dict) else {}
+                        row['learnedFrom'] = transfer.get('learnedFrom')
+                        row['originalRefused'] = transfer.get('originalRefused')
+                        row['verdict'] = ('refused safely' if 'error' in row else 'unchanged' if row['meanRgbChange'] == 0
+                                          else 'no visible change' if row['visibleChange'] < 1.0
+                                          else 'close known edit' if row['oracle']['closeKnownLook'] else 'partial match')
                         report['pairs'].append(row)
                         save_report(out, report)
-                        print(json.dumps(dict(workflow=workflow, target=target['index'], style=style, verdict=row['verdict'], colorBefore=round(row['paletteBefore']['color'], 3), colorAfter=round(row['paletteAfter']['color'], 3), knownEditError=round(row['oracle']['meanDeltaE76'], 3), seconds=round(row['applyMilliseconds'] / 1000, 2), error=row.get('error'))), flush=True)
+                        print(json.dumps(dict(workflow=workflow, target=target['index'], style=style, verdict=row['verdict'], colorBefore=round(row['paletteBefore']['color'], 3), colorAfter=round(row['paletteAfter']['color'], 3), knownEditBefore=round(row['oracleBefore']['meanDeltaE76'], 3), knownEditError=round(row['oracle']['meanDeltaE76'], 3), visibleChange=round(row['visibleChange'], 2), newBandPairs=row['newBands']['pairs'], learnedFrom=row.get('learnedFrom'), seconds=round(row['applyMilliseconds'] / 1000, 2), error=row.get('error'))), flush=True)
                     destination = out / 'delivery' / workflow
                     delivery = call('export_run', projectId=project, destination=str(destination), destinationKind='folder',
                                     sets=[dict(name='Match verification', imageIds=[x['auraPhotoId'] for x in targets], format='png', quality=95, colour='srgb', bitDepth=8, resize='full', sharpen='none', naming='{seq}_{original}', sidecar=False)],
@@ -331,8 +415,10 @@ def main():
                                        differentReferences=all(row['photoId'] != row['referencePhotoId'] for row in report['pairs']),
                                        previewExportEqual=all(row['previewExportMeanDifference'] == 0 for row in report['pairs']),
                                        originalsUnchanged=all(digest(path) == value for path, value in hashes.items()),
-                                       referenceFilesUnchanged=all(digest(ref['path']) == ref['sha256'] for ref in report['references']),
-                                       allDeliveriesVerified=len(report['deliveries']) == len(args.workflows), noPageErrors=not report['pageErrors'])
+                                       referenceFilesUnchanged=all(digest(ref['path']) == ref['sha256'] for ref in list(report['references']) + list(report.get('learnedReferences', {}).values())),
+                                       allDeliveriesVerified=len(report['deliveries']) == len(args.workflows), noPageErrors=not report['pageErrors'],
+                                       visibleChangeReportedHonestly=all(row.get('slightReportedHonestly', True) for row in report['pairs']),
+                                       refusalsExplained=all(row.get('refusalExplained', True) for row in report['pairs']))
                 assert all(report['checks'].values())
                 # These are product requirements under test, independent of file/workflow
                 # integrity. Record failures rather than hiding unchanged/refused photos.
@@ -352,6 +438,17 @@ def main():
                                                   knownEditImproved=sum(row['oracle']['meanDeltaE76'] + 1e-4 < row['oracleBefore']['meanDeltaE76'] for row in rows),
                                                   closeKnownEdit=sum(row['oracle']['closeKnownLook'] for row in rows),
                                                   originalChanged=sum(not row['originalPixelIdentical'] for row in rows),
+                                                  closeKnownEditChanged=sum(row['oracle']['closeKnownLook'] and row['visibleChange'] >= 1.0 for row in rows),
+                                                  noVisibleChange=sum('error' not in row and row['visibleChange'] < 1.0 for row in rows),
+                                                  withNewBands=sum(row['newBands']['fraction'] > 0.005 for row in rows),
+                                                  # The stricter count: steps between flat colour (assessment's banded sky: 0.0077).
+                                                  withNewSteps=sum(row['newSteps']['fraction'] > 0.001 for row in rows),
+                                                  learnedFromOriginal=sum(bool(row.get('learnedFrom')) for row in rows),
+                                                  medianKnownEditError=statistics.median(row['oracle']['meanDeltaE76'] for row in rows),
+                                                  medianKnownEditBefore=statistics.median(row['oracleBefore']['meanDeltaE76'] for row in rows),
+                                                  # How close the photo's colours came to the reference's own (the Exact goal's aim).
+                                                  medianReferenceColorBefore=statistics.median(row['paletteBefore']['color'] for row in rows),
+                                                  medianReferenceColorAfter=statistics.median(row['paletteAfter']['color'] for row in rows),
                                                   medianApplySeconds=statistics.median(row['applyMilliseconds'] / 1000 for row in rows)))
                 report['completed'] = True
                 print(json.dumps(dict(completed=str(out), summary=report['summary'], checks=report['checks'])), flush=True)

@@ -2,13 +2,16 @@
 use serde::{Deserialize, Serialize};
 
 /// Natural estimates a photographic look; Palette explicitly requests distribution matching.
-/// Neither can recover an unknown editing operation from an unrelated photograph.
+/// Neither can recover an unknown editing operation from an unrelated photograph. Exact gives the
+/// photograph the reference's colours themselves - its colour distribution, palette and tone -
+/// and repaints a different scene to do it (ADR-0182).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MatchIntent {
     #[default]
     Natural,
     Palette,
+    Exact,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]

@@ -2,7 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { api } from '../../ipc/client';
 import { colorMatch, type ColorMatchReport } from '../../ipc/colorMatch';
 import { matchColorCollection } from './matchColorCollection';
-vi.mock('../../ipc/client', () => ({ api: { listImages: vi.fn() }, asIpcError: (e: Error) => ({ message: e.message }) }));
+vi.mock('../../ipc/client', () => ({ api: { listImages: vi.fn() }, asIpcError: (error: unknown) => (typeof error === 'object' && error !== null && 'runbookUrl' in error ? error : { message: 'AURA hit an unexpected problem and stopped safely.' }) }));
 vi.mock('../../ipc/colorMatch', () => ({ colorMatch: { status: vi.fn(), prepare: vi.fn(), apply: vi.fn() } }));
 const controls = { amount: 0.7, tone: 0.5, color: 0.8, whiteBalance: 0.3 };
 const result = (id: string): ColorMatchReport => ({ photoId: id, sessionId: `session-${id}`, reference: { id: 'ref', name: 'Reference', width: 100, height: 100, convertedIcc: false, regions: [] },

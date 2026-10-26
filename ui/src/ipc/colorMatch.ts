@@ -4,7 +4,8 @@ import type { FineMatchControls } from './colorMatchDetails';
 export type ColorMatchControls = { amount: number; tone: number; color: number; whiteBalance: number; detail?: FineMatchControls };
 export const DEFAULT_MATCH_CONTROLS: ColorMatchControls = { amount: 1, tone: 1, color: 1, whiteBalance: 1 };
 export type ColorMatchQuality = 'quick' | 'precise';
-export type ColorMatchIntent = 'natural' | 'palette';
+/** `exact` gives the photo the reference's colours themselves, repainting a different scene (ADR-0182). */
+export type ColorMatchIntent = 'natural' | 'palette' | 'exact';
 export type ColorReference = {
   id: string; name: string; width: number; height: number; convertedIcc: boolean; regions: string[];
   group?: string; favorite?: boolean; defaultControls?: ColorMatchControls; thumbnail?: string; preview?: string;
@@ -15,6 +16,9 @@ export type LightroomPreset = {
   xml: string; fileName: string; name: string; recipeHash: string; tableFingerprint: string; tableEdge: number;
   meanTableError: number; p95TableError: number; maxTableError: number; warnings: string[];
 };
+/** What the scene-prior tone estimate concluded (ADR-0180): where the look puts black and
+ *  white, and where this photo's own ends sat relative to an ordinary finished photo. */
+export type ColorMatchTone = { lookBlack: number; lookWhite: number; ownBlack: number; ownWhite: number };
 export type ColorMatchReport = {
   sessionId: string; photoId: string; reference: ColorReference; controls: ColorMatchControls;
   matchedRegions: string[]; beforeDistance: number; afterDistance: number; changed: number;
@@ -23,8 +27,19 @@ export type ColorMatchReport = {
     quality?: ColorMatchQuality; intent?: ColorMatchIntent; targetSamples?: number; maxIterations?: number;
     gradeCandidates?: number; nativeCandidateChecked?: boolean; nativeBacktrackFactor?: number;
     structureSimilarity?: number | null; regularizationWeight?: number;
-    transfer?: { renderedBefore: ColorMatchDistance; renderedAfter: ColorMatchDistance } };
+    transfer?: { renderedBefore: ColorMatchDistance; renderedAfter: ColorMatchDistance; toneEstimate?: ColorMatchTone;
+      /** The reference's own original in the collection that the look was learned from (ADR-0161). */
+      learnedFrom?: string;
+      /** Why a photo that looked like the reference's original could not be learned from. */
+      originalRefused?: string;
+      /** Share of the photo the look would newly have clipped before its highlights were held back. */
+      highlightsLimitedFrom?: number } };
   referenceMonochrome?: boolean;
+  /** After a native apply: mean OKLab x100 difference between the photo as it was and the saved
+   *  result. Below about 0.45 the change is hard to see. */
+  visibleChange?: number;
+  /** The amount asked for, when it failed the native checks and a smaller share of it was saved. */
+  reducedFrom?: number;
 };
 export const colorMatch = {
   generatePreset: (photoId: string, sessionId: string, name: string, cancelId: string) =>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { api, asIpcError, inTauri } from '../../ipc/client';
+import { api, inTauri } from '../../ipc/client';
+import { Refusal, reasonOf } from './refusal';
 import { colorMatch, DEFAULT_MATCH_CONTROLS, pickColorReference, pickColorReferences, type ColorMatchControls,
   type ColorMatchIntent, type ColorMatchReport, type ColorReference, type ReferenceMetadata } from '../../ipc/colorMatch';
 import { matchColorCollection, type ColorMatchOutcome } from './matchColorCollection';
@@ -8,6 +9,9 @@ import { ColorReferenceLibrary } from './ColorReferenceLibrary';
 import { RegionalColorMatchPanel } from './RegionalColorMatchPanel';
 import { ReferenceLibraryManager } from './ReferenceLibraryManager';
 import { LightroomPresetExport } from './LightroomPresetExport';
+import { toneSentence } from './toneSentence';
+import { EXACT_ENGINE, engineServes } from './colorMatchEngines';
+import { barelyChanged, reducedNote, slightMessage } from './visibleChange';
 import { COLOR_MATCH_PREFERENCES, matchPreference, preferenceOf, recommendedReferences } from './colorMatchPreferences';
 import './colorMatchWorkspace.css';
 
@@ -19,7 +23,9 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
   photoId: string; projectId?: string; disabled: boolean; revision?: string;
   active?: boolean; selectedPhotoIds?: readonly string[];
   onReferenceChange?: (reference: ColorReference | null) => void;
-  onApply: (action: () => Promise<unknown>) => Promise<void>;
+  /** Saves through the editor. Resolves to a reason when nothing was saved (a refusal, or
+   *  another edit still saving); older callers that resolve to nothing are treated as saved. */
+  onApply: (action: () => Promise<unknown>) => Promise<unknown>;
 }): JSX.Element {
   const [references, setReferences] = useState<ColorReference[]>([]);
   const [selected, setSelected] = useState('');
@@ -70,7 +76,7 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
   const stop = () => {
     ++intent.current; pendingLive.current = false; stopped.current = true;
     liveEnabled.current = false; setLive(false);
-    if (job.current) void api.cancelJob(job.current).catch(cause => { if (mounted.current) setError(asIpcError(cause).message); });
+    if (job.current) void api.cancelJob(job.current).catch(cause => { if (mounted.current) setError(reasonOf(cause)); });
   };
 
   useEffect(() => {
@@ -92,7 +98,7 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
     pendingLive.current = false; ++intent.current;
     if (job.current) {
       stopped.current = true;
-      void api.cancelJob(job.current).catch(cause => { if (mounted.current) setError(asIpcError(cause).message); });
+      void api.cancelJob(job.current).catch(cause => { if (mounted.current) setError(reasonOf(cause)); });
     }
   }, [photoId]);
   useEffect(() => {
@@ -112,9 +118,15 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
         const reference = items.find(item => item.id === activeReference.current) ?? items[0];
         if (!pendingLive.current) { setSelected(reference?.id || ''); setControls(reference?.defaultControls ?? { ...DEFAULT_MATCH_CONTROLS }); }
       }
-    }).catch(cause => { if (mounted.current && token === generation.current) setError(asIpcError(cause).message); });
+    }).catch(cause => { if (mounted.current && token === generation.current) setError(reasonOf(cause)); });
   }, [photoId, revision]);
 
+  // A save the editor refused ends this panel's work as a refusal, with its own message, so the
+  // panel never keeps a progress line for a match that was not saved.
+  const save = async (action: () => Promise<void>) => {
+    const outcome = await onApply(action);
+    if (typeof outcome === 'string' && outcome) throw new Refusal(outcome);
+  };
   const run = async (action: (id: string, current: () => boolean) => Promise<void>) => {
     if (running.current || disabledRef.current || !visible.current || !inTauri()) return;
     running.current = true; ++generation.current; setBusy(true); setError(null); setMessage(null);
@@ -122,22 +134,11 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
     const id = crypto.randomUUID(); job.current = id;
     const current = () => mounted.current && visible.current && activePhoto.current === photoId && !stopped.current;
     try { await action(id, current); }
-    catch (cause) { if (current()) { setMessage(null); setError(asIpcError(cause).message); } }
+    catch (cause) { if (current()) { setMessage(null); setError(reasonOf(cause)); } }
     finally { job.current = null; running.current = false; if (mounted.current) {
       setBusy(false);
       if (stopped.current && activePhoto.current === photoId) setMessage('Stopped. Completed changes remain saved.');
     } }
-  };
-  // The editor displays save errors and may resolve its wrapper after handling them.
-  // Retain the rejected operation here so matching also reaches a terminal error state.
-  const save = async (action: () => Promise<unknown>) => {
-    let rejected = false;
-    let failure: unknown;
-    await onApply(async () => {
-      try { return await action(); }
-      catch (cause) { rejected = true; failure = cause; throw cause; }
-    });
-    if (rejected) throw failure;
   };
   useEffect(() => {
     if (!live || !active || disabled || busy || regionalBusy || !pendingLive.current || !selected || !inTauri()) return;
@@ -158,14 +159,14 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
         }
         if (!analysis || analysis.reference.id !== referenceId || (analysis.fitting?.quality ?? 'precise') !== mode ||
             (analysis.fitting?.intent ?? 'natural') !== purpose ||
-            (purpose === 'palette' && analysis.fitting?.engine !== 'reference-palette-transport-v8')) {
+            !engineServes(purpose, analysis.fitting?.engine)) {
           analysis = purpose === 'natural' ? await colorMatch.prepare(photoId, referenceId, id, mode)
             : await colorMatch.prepare(photoId, referenceId, id, mode, purpose);
           if (!current()) return;
           acceptReport(analysis);
         }
         if (!latest()) return;
-        if (!analysis.current || analysis.photoId !== photoId) throw new Error('The analysis is no longer current. Analyse this photo again.');
+        if (!analysis.current || analysis.photoId !== photoId) throw new Refusal('The analysis is no longer current. Analyse this photo again.');
         if (disabledRef.current) { pendingLive.current = true; return; }
         const session = analysis.sessionId;
         ownWrite.current = true;
@@ -175,10 +176,10 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
             const result = await colorMatch.apply(photoId, session, next, id);
             if (!current()) return;
             if (!result.current || !result.fullResolutionChecked || result.photoId !== photoId || result.reference.id !== referenceId) {
-              throw new Error('This photo returned no current native-resolution colour check. Analyse the reference again.');
+              throw new Refusal('This photo returned no current native-resolution colour check. Analyse the reference again.');
             }
             acceptReport(result);
-            if (latest()) { setControls(result.controls); setMessage('Real-time colour strengths saved. Use Undo to compare.'); }
+            if (latest()) { setControls(result.controls); setMessage(reducedNote(result) + 'Real-time colour strengths saved. Use Undo to compare.'); }
           });
         } finally { ownWrite.current = false; }
       });
@@ -197,7 +198,7 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
     setMessage('Reference saved. Analyse its colour treatment against this photo.');
   });
   const analyse = () => run(async (id, current) => {
-    const result = matchIntent === 'palette' ? await colorMatch.prepare(photoId, selected, id, quality, matchIntent)
+    const result = matchIntent !== 'natural' ? await colorMatch.prepare(photoId, selected, id, quality, matchIntent)
       : quality === 'precise' ? await colorMatch.prepare(photoId, selected, id) : await colorMatch.prepare(photoId, selected, id, quality);
     if (!current()) return;
     acceptReport(result);
@@ -216,10 +217,10 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
       const analysis = await colorMatch.prepare(photoId, referenceId, id, mode, purpose);
       if (!latest()) return;
       if (!analysis.current || analysis.photoId !== photoId || analysis.reference.id !== referenceId) {
-        throw new Error('The reference or photo changed. Match this photo again.');
+        throw new Refusal('The reference or photo changed. Match this photo again.');
       }
       acceptReport(analysis);
-      if (disabledRef.current) throw new Error('Another edit is running. Match this photo again when it finishes.');
+      if (disabledRef.current) throw new Refusal('Another edit is running. Match this photo again when it finishes.');
       ownWrite.current = true;
       try {
         await save(async () => {
@@ -227,13 +228,15 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
           const result = await colorMatch.apply(photoId, analysis.sessionId, strengths, id);
           if (!current()) return;
           if (!result.current || !result.fullResolutionChecked || result.photoId !== photoId || result.reference.id !== referenceId) {
-            throw new Error('This photo returned no current native-resolution colour check. Match this photo again.');
+            throw new Refusal('This photo returned no current native-resolution colour check. Match this photo again.');
           }
           acceptReport(result); setControls(result.controls);
-          setMessage(result.afterDistance >= result.beforeDistance - 0.0001
+          setMessage(reducedNote(result) + (barelyChanged(result) ? slightMessage(result)
+            : result.afterDistance >= result.beforeDistance - 0.0001 && !result.fitting?.transfer?.learnedFrom
+              && result.fitting?.engine !== EXACT_ENGINE
             ? 'No closer colour match passed this photo’s safety checks. No stronger match was saved.'
             : result.changed ? `Matched ${result.reference.name} to this photo. Use Undo to compare.`
-              : 'This photo already has the selected reference match saved.');
+              : 'This photo already has the selected reference match saved.'));
         });
       } finally { ownWrite.current = false; }
     });
@@ -245,10 +248,11 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
       const result = await colorMatch.apply(photoId, report.sessionId, next, id);
       if (!current()) return;
       if (!result.current || !result.fullResolutionChecked || result.photoId !== photoId || result.reference.id !== selected) {
-        throw new Error('This photo returned no current native-resolution colour check. Analyse the reference again.');
+        throw new Refusal('This photo returned no current native-resolution colour check. Analyse the reference again.');
       }
       acceptReport(result); setControls(result.controls);
-      setMessage(result.changed ? 'Colour strengths saved. Use Undo to compare.' : 'These strengths did not change the saved edit.');
+      setMessage(reducedNote(result) + (barelyChanged(result) ? slightMessage(result)
+        : result.changed ? 'Colour strengths saved. Use Undo to compare.' : 'These strengths did not change the saved edit.'));
     });
   });
   const choose = (reference: ColorReference) => {
@@ -281,7 +285,7 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
         if (!current()) break;
         imported.push(reference);
         setReferences(items => [reference, ...items.filter(item => item.id !== reference.id)]);
-      } catch (cause) { if (current()) failures.push(asIpcError(cause).message); }
+      } catch (cause) { if (current()) failures.push(reasonOf(cause)); }
     }
     if (!current()) return;
     if (imported[0]) choose(imported[0]);
@@ -296,7 +300,7 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
         () => !current(),
         value => { if (current()) setMessage(value); },
         result => { if (current()) setOutcomes(items => [...items, result]); },
-        { quality, ...(matchIntent === 'palette' ? { intent: matchIntent } : {}), ...(scope === 'selected' ? { photoIds: selectedPhotoIds.filter(value => value !== photoId) } : {}) });
+        { quality, ...(matchIntent !== 'natural' ? { intent: matchIntent } : {}), ...(scope === 'selected' ? { photoIds: selectedPhotoIds.filter(value => value !== photoId) } : {}) });
       if (!current()) return;
       const saved = await colorMatch.status(photoId);
       if (current() && saved) { acceptReport(saved); setControls(saved.controls); }
@@ -310,7 +314,13 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
   const removedSession = !libraryReference && report?.reference.id === selected;
   const ready = Boolean(report?.current && report.photoId === photoId && report.reference.id === selected &&
     (report.fitting?.quality ?? 'precise') === quality && (report.fitting?.intent ?? 'natural') === matchIntent &&
-    (matchIntent !== 'palette' || report.fitting?.engine === 'reference-palette-transport-v8'));
+    engineServes(matchIntent, report.fitting?.engine));
+  const learnedFrom = report?.current && report.photoId === photoId && report.reference.id === selected
+    ? report.fitting?.transfer?.learnedFrom : undefined;
+  const exactColours = Boolean(report?.current && report.photoId === photoId && report.reference.id === selected
+    && report.fitting?.engine === EXACT_ENGINE);
+  // A learned edit is one operation: Amount alone scales it.
+  const amountOnly = Boolean(learnedFrom);
   const savedStrengths = Boolean(report && SLIDERS.every(([key]) => controls[key] === report.controls[key]) &&
     FINE_MATCH_FIELDS.every(([key]) => (controls.detail?.[key] ?? 1) === (report.controls.detail?.[key] ?? 1)));
   return <section className="lr-panel color-match-panel" aria-label="Reference colour matching" aria-busy={busy || regionalBusy}>
@@ -335,10 +345,13 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
       <button type="button" disabled={locked || !captureName.trim()} onClick={capture}>Create colour reference from this edit</button>
     </details>}
     <label>Matching goal<select aria-label="Matching goal" value={matchIntent} disabled={strengthsLocked} onChange={event => {
-      const next = event.target.value === 'palette' ? 'palette' : 'natural';
+      const value = event.target.value;
+      const next = value === 'palette' || value === 'exact' ? value : 'natural';
       matchIntentRef.current = next; setMatchIntent(next); requestLive();
-    }}><option value="natural">Natural look</option><option value="palette">Reference palette and tone</option></select></label>
+    }}><option value="natural">Natural look</option><option value="palette">Reference palette and tone</option>
+      <option value="exact">Exact colours of the reference</option></select></label>
     <p className="lr-hint">Natural look keeps a different scene's tonal balance. Reference palette and tone makes a stronger match to the reference's colour distribution, with native skin and highlight protection. Scene content can affect the result.</p>
+    {matchIntent === 'exact' && <p className="lr-hint" data-testid="colour-match-exact-hint">Exact colours gives this photo the reference&apos;s own colours and tones: its palette in its proportions and its tone curve. A different scene is repainted in them, so a blue sky can take the reference&apos;s warm tones. Bands, extra clipping and large skin changes are still refused.</p>}
     <label>Matching mode<select aria-label="Matching mode" value={quality} disabled={strengthsLocked} onChange={event => {
       const next = event.target.value === 'quick' ? 'quick' : 'precise';
       qualityRef.current = next; setQuality(next); requestLive();
@@ -381,11 +394,13 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
     <p className="lr-hint">AURA strengths: Subtle 50%, Standard 100%, Strong 150%, Extreme 200%. Tone, colour and warmth are 100%. Native skin and highlight checks remain active.</p>
     <fieldset disabled={strengthsLocked || !selected || Boolean(report && !report.current)}>
       <legend>Colour matching strengths</legend>
+      {learnedFrom && <p className="lr-hint" data-testid="colour-match-learned-controls">Amount scales your own edit up to 100%. Tone, colour, warmth and the fine controls have no separate part in a learned edit.</p>}
       {SLIDERS.map(([key, label]) => <label key={key}>{label} ({Math.round(controls[key] * 100)}%)
-        <input type="range" aria-label={label} min="0" max="200" step="1" value={Math.round(controls[key] * 100)}
+        <input type="range" aria-label={label} min="0" max={amountOnly && key === 'amount' ? '100' : '200'} step="1"
+          disabled={amountOnly && key !== 'amount'} value={Math.round(controls[key] * 100)}
           onChange={event => changeControls({ ...controlsRef.current, [key]: Number(event.target.value) / 100 })}/>
       </label>)}
-      <details><summary>Fine matching controls</summary>
+      <details hidden={amountOnly}><summary>Fine matching controls</summary>
         <p className="lr-hint">Adjust each part of the matched look. These strengths act within the overall tone, colour and warmth settings. Stronger settings still pass the native highlight and skin-colour checks.</p>
         {FINE_MATCH_FIELDS.map(([key, label]) => <label key={key}>{label} ({Math.round((controls.detail?.[key] ?? 1) * 100)}%)
           <input type="range" aria-label={label} min="0" max="200" step="1" value={Math.round((controls.detail?.[key] ?? 1) * 100)}
@@ -430,8 +445,14 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
         <p data-testid="colour-match-components">Tone difference: {report.fitting.transfer.renderedBefore.tone.toFixed(2)} → {report.fitting.transfer.renderedAfter.tone.toFixed(2)}.
           {report.fitting.intent === 'palette' && <> Colour palette difference: {report.fitting.transfer.renderedBefore.palette.toFixed(2)} → {report.fitting.transfer.renderedAfter.palette.toFixed(2)}.</>}
           {' '}Lower means closer to the reference.</p>}
-      {report.fitting?.intent === 'palette' && (report.fitting.nativeBacktrackFactor ?? 1) < 1 &&
-        <p className="lr-hint">Colour, smoothness, skin and highlight checks limited the fitted palette to {Math.round((report.fitting.nativeBacktrackFactor ?? 1) * 100)}% of the unconstrained fit. Your strengths adjust this protected endpoint.</p>}
+      {report.visibleChange !== undefined && <p className="lr-hint" data-testid="colour-match-visible">Visible change from your original: {report.visibleChange.toFixed(1)} (below about 0.45 is hard to see).</p>}
+      {learnedFrom && <p role="status" data-testid="colour-match-learned">Learned from your own edit of {learnedFrom}. AURA applies that same colour and tone operation to this photo, checked at native resolution.</p>}
+      {exactColours && <p role="status" data-testid="colour-match-exact">Exact colours of {report.reference.name}: this photo&apos;s colours and tones were moved onto the reference&apos;s own, checked at native resolution.</p>}
+      {!learnedFrom && report.fitting?.transfer?.originalRefused && <p className="lr-hint" data-testid="colour-match-original-refused">{report.fitting.transfer.originalRefused} The look was estimated from the edited photo alone.</p>}
+      {!learnedFrom && report.fitting?.transfer?.highlightsLimitedFrom !== undefined && <p className="lr-hint" data-testid="colour-match-highlights">The look's colour was held back in the brightest areas, which it would have clipped ({Math.round(report.fitting.transfer.highlightsLimitedFrom * 100)}% of the photo), so they keep their detail.</p>}
+      {report.fitting?.transfer?.toneEstimate && <p className="lr-hint" data-testid="colour-match-tone">{toneSentence(report.fitting.transfer.toneEstimate)}</p>}
+      {report.fitting?.nativeCandidateChecked && (report.fitting.nativeBacktrackFactor ?? 1) < 1 &&
+        <p className="lr-hint">Colour, smoothness, skin and highlight checks limited the fitted {report.fitting.intent === 'palette' ? 'palette' : 'look'} to {Math.round((report.fitting.nativeBacktrackFactor ?? 1) * 100)}% of the unconstrained fit. Your strengths adjust this protected endpoint.</p>}
     </>}
     {busy && <><p role="status">{message ?? 'Measuring colour and checking the image…'}</p>
       <button type="button" onClick={stop}>Stop colour matching</button></>}

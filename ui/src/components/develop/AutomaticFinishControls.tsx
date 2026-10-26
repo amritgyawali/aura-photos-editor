@@ -4,7 +4,7 @@ import { automaticStrength, AUTOMATIC_CATEGORIES, type AutomaticFinish, type Fin
 
 export function AutomaticFinishControls({ projectId, photoId, revision, disabled, onApply }: {
   projectId: string; photoId: string; revision: string; disabled: boolean;
-  onApply: (action: () => Promise<unknown>) => Promise<void>;
+  onApply: (action: () => Promise<unknown>) => Promise<unknown>;
 }): JSX.Element {
   const [report, setReport] = useState<AutomaticFinish | null>(null);
   const [draft, setDraft] = useState<FinishStrengths>({ overall: 1, categories: {} });

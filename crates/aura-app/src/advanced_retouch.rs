@@ -1731,12 +1731,55 @@ fn changed(a: &Recipe, b: &Recipe) -> AuraResult<bool> {
     Ok(aura_recipe::recipe_hash(&a)? != aura_recipe::recipe_hash(b)?)
 }
 
+/// The box quality control renders into, unless a face needs more pixels to be checked.
+const QC_SIZE: RenderLevel = RenderLevel::Screen(1600, 1200);
+/// The longest screen render: anything larger is drawn from the 2048 px preview and so adds
+/// no detail; past it only the full-resolution render has more pixels.
+const QC_PREVIEW_EDGE: f32 = 2048.0;
+/// Eye-to-eye distance, in QC pixels, a face is rendered up to: the contour check needs 20.
+const QC_FACE_IOD: f32 = 24.0;
+
+/// The render at which every retouched face is large enough for its contours to be checked.
+/// A guest seated across a stage is retouched like the person at the lectern, so a face too
+/// small at `QC_SIZE` is not a reason to leave it unchecked: the render grows until the
+/// smallest face reaches `QC_FACE_IOD`, through a larger screen box to the full resolution an
+/// export is made at. `w` and `h` are the dimensions of the render at `QC_SIZE`.
+fn qc_level(faces: &[PortraitFace], w: usize, h: usize) -> RenderLevel {
+    let smallest = faces
+        .iter()
+        .map(|f| {
+            let [a, b] = [f.landmarks[0], f.landmarks[1]];
+            ((a[0] - b[0]) * w as f32).hypot((a[1] - b[1]) * h as f32)
+        })
+        .filter(|iod| iod.is_finite() && *iod > 0.0)
+        .reduce(f32::min);
+    let Some(smallest) = smallest.filter(|iod| *iod < QC_FACE_IOD) else {
+        return QC_SIZE;
+    };
+    let edge = w.max(h) as f32 * QC_FACE_IOD / smallest;
+    if edge > QC_PREVIEW_EDGE {
+        return RenderLevel::Full;
+    }
+    let edge = edge.ceil() as u32;
+    RenderLevel::Screen(edge, edge)
+}
+
 /// Pixels of a recipe at screen size with crop, rotation, grain, vignette and sharpening
 /// switched off, so two renders line up pixel for pixel and only the retouch differs.
 pub(crate) fn qc_render(
     state: &AppState,
     photo: PhotoId,
     recipe: &Recipe,
+) -> AuraResult<(Vec<u8>, usize, usize)> {
+    qc_render_at(state, photo, recipe, QC_SIZE)
+}
+
+/// `qc_render` at a level of the caller's choosing.
+fn qc_render_at(
+    state: &AppState,
+    photo: PhotoId,
+    recipe: &Recipe,
+    level: RenderLevel,
 ) -> AuraResult<(Vec<u8>, usize, usize)> {
     let mut recipe = recipe.clone();
     recipe.geometry = aura_recipe::Geometry::default();
@@ -1745,7 +1788,7 @@ pub(crate) fn qc_render(
     let result = state.render()?.render(aura_render::RenderRequest {
         image_id: photo,
         recipe,
-        level: RenderLevel::Screen(1600, 1200),
+        level,
         // Measured, so nothing may be skipped.
         purpose: aura_render::RenderPurpose::Analysis,
         output: aura_render::OutputSpec {
@@ -1967,15 +2010,22 @@ pub fn run(
     let mut quality = QualityReport::default();
     let mut qc_notes = Vec::new();
     let mut qc_changes = Vec::new();
-    let renders = qc_render(state, photo, &base).and_then(|original| {
+    let renders = qc_render(state, photo, &base).and_then(|first| {
+        let size = qc_level(&planned.faces, first.1, first.2);
+        let original = if size == QC_SIZE {
+            first
+        } else {
+            qc_render_at(state, photo, &base, size)?
+        };
         Ok((
             original,
-            qc_render(state, photo, &foundation)?,
-            qc_render(state, photo, &current)?,
+            qc_render_at(state, photo, &foundation, size)?,
+            qc_render_at(state, photo, &current, size)?,
+            size,
         ))
     });
     match renders {
-        Ok(((original, ow, oh), (before, w, h), (after, aw, ah))) => {
+        Ok(((original, ow, oh), (before, w, h), (after, aw, ah), size)) => {
             quality.analysis_width = w;
             quality.analysis_height = h;
             let contours = |pixels: &[u8]| {
@@ -2041,7 +2091,7 @@ pub fn run(
                     &corrected,
                     &all_mattes(&current, &planned)?,
                 )?;
-                if let Ok((pixels, rw, rh)) = qc_render(state, photo, &proposal) {
+                if let Ok((pixels, rw, rh)) = qc_render_at(state, photo, &proposal, size) {
                     if (rw, rh) == (w, h) {
                         let (r2, s2) = measure_after(&pixels);
                         let candidate_contours = contours(&pixels);
@@ -2108,7 +2158,11 @@ pub fn run(
                 ),
                 None => "Texture: no measurable segmented face skin.".into(),
             });
-            qc_notes.push(format!("Measured at {w} x {h} pixels with geometry, grain, vignette and sharpening disabled; this is not a full-resolution export inspection."));
+            qc_notes.push(if size == RenderLevel::Full {
+                format!("Measured at the full {w} x {h} pixels, because a face was too small to check at screen size, with geometry, grain, vignette and sharpening disabled.")
+            } else {
+                format!("Measured at {w} x {h} pixels with geometry, grain, vignette and sharpening disabled; this is not a full-resolution export inspection.")
+            });
             for reading in &quality.contours {
                 qc_notes.push(format!("Face {} and adjacent neck: {} new seam pairs, {} weakened source-edge pairs of {} source edges ({} sampled pairs). {}", reading.face + 1, reading.new_seam_pairs, reading.weakened_edge_pairs, reading.source_edge_pairs, reading.sampled_pairs, if reading.review { "Review contours; these are heuristic warnings, not a diagnosis." } else { "Within the pilot contour limits at this resolution." }));
                 for region in &reading.regions {
@@ -2350,6 +2404,31 @@ mod tests {
         assert!(Stage::GlobalDodgeBurn < Stage::SkinColour);
         assert!(Stage::BackgroundToning < Stage::ColourGrade);
         assert!(Stage::Grain < Stage::OutputSharpening);
+    }
+
+    #[test]
+    fn quality_control_renders_large_enough_to_check_a_small_face() {
+        let face = |eye_gap: f32| PortraitFace {
+            bounds: [0.4, 0.4, 0.4 + eye_gap * 2.0, 0.4 + eye_gap * 2.5],
+            landmarks: [
+                [0.45, 0.45],
+                [0.45 + eye_gap, 0.45],
+                [0.47, 0.5],
+                [0.46, 0.52],
+                [0.48, 0.52],
+            ],
+            confidence: 0.9,
+        };
+        // A face at the lectern: 64 px between the eyes at the usual size.
+        assert_eq!(qc_level(&[face(0.04)], 1600, 788), QC_SIZE);
+        assert_eq!(qc_level(&[], 1600, 788), QC_SIZE);
+        // 21.6 px: a larger screen render reaches 24.
+        let RenderLevel::Screen(edge, _) = qc_level(&[face(0.04), face(0.0135)], 1600, 788) else {
+            panic!("a screen render is enough")
+        };
+        assert!(edge > 1600 && edge <= 2048, "{edge}");
+        // 13 px needs more than the preview has: the full-resolution render.
+        assert_eq!(qc_level(&[face(0.0082)], 1600, 788), RenderLevel::Full);
     }
 
     #[test]

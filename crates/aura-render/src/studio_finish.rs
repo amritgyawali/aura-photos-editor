@@ -625,9 +625,17 @@ fn with_subject(
             (top + (bottom - top) * ty).clamp(0.0, 1.0)
         })
         .collect();
+    // The learned selection finds the most prominent *thing*, and on a frame with no face that
+    // is a cake, a pot or a chair rather than a person. It may still tell the background from
+    // the rest, which needs no face; it must never become a body for the people tools to warp,
+    // light or recolour - the parse's own rule that only sky and background exist without a face.
+    let people = !map.faces.is_empty();
     let mut out = map.clone();
     for (region, plane) in &mut out.planes {
         if plane.values.len() != pw * ph {
+            continue;
+        }
+        if !people && region.needs_a_face() {
             continue;
         }
         match region {
@@ -2409,6 +2417,31 @@ mod tests {
         apply(&mut rgb, 16, 8, &recipe, None);
         assert_eq!(rgb, before);
         assert!(!wants(&recipe));
+    }
+
+    #[test]
+    fn a_subject_selection_is_never_a_person_on_a_frame_with_no_face() {
+        let canvas =
+            aura_portrait::Canvas::from_srgb8(&vec![120; 3 * 96 * 64], 96, 64, 1024).unwrap();
+        let map = aura_portrait::analyse(&canvas, &[]);
+        assert!(map.faces.is_empty());
+        // The learned selection found a thing in the middle of the frame.
+        let mut alpha = vec![0u8; 16 * 16];
+        for y in 4..12 {
+            for x in 4..12 {
+                alpha[y * 16 + x] = 255;
+            }
+        }
+        let matte = aura_recipe::retouch_tools::Matte::encode([0.0, 0.0, 1.0, 1.0], 16, 16, &alpha);
+        let merged = with_subject(&map, &matte).unwrap();
+        for region in aura_portrait::ALL_REGIONS {
+            if region.needs_a_face() {
+                let coverage = merged.plane(region).unwrap().coverage();
+                assert!(coverage < 1e-6, "{region:?} covers {coverage}");
+            }
+        }
+        // The background still steps around the thing.
+        assert!(merged.plane(Region::Background).unwrap().coverage() < 0.9);
     }
 
     #[test]

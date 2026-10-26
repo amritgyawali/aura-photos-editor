@@ -31,6 +31,13 @@
 //! silent interception - the right way round for a product that sends
 //! photographs of other people's weddings.
 //!
+//! **The key exchange is X25519 only.** The provider also offers P-256 and P-384,
+//! whose secret-dependent arithmetic runs through `crypto-bigint` 0.5, which is not
+//! constant-time (RUSTSEC-2026-0387) and cannot be upgraded under this provider.
+//! X25519 does not use it, and every vendor in [`crate::catalog`] offers it, so the
+//! ephemeral secret of every handshake stays out of that code. What remains of the
+//! P-256 dependency verifies server signatures, which handles public values only.
+//!
 //! **Plain HTTP still works, and is still what a local model uses.** The
 //! transport picks a connector by scheme, so Ollama on `127.0.0.1` does not go
 //! through any of this.
@@ -97,6 +104,15 @@ impl TlsConnector {
 
 /// The shared client configuration.
 ///
+/// The pure-Rust provider, offering X25519 as its only key exchange (see the module notes).
+fn provider() -> rustls::crypto::CryptoProvider {
+    let mut provider = rustls_rustcrypto::provider();
+    provider
+        .kx_groups
+        .retain(|group| group.name() == rustls::NamedGroup::X25519);
+    provider
+}
+
 /// Built once. Assembling it parses several hundred root certificates and
 /// negotiates the cipher suite list, and doing that per request on a run that
 /// makes seventy calls is a measurable waste for no benefit - the configuration
@@ -113,12 +129,11 @@ fn client_config() -> Option<Arc<ClientConfig>> {
             let roots = RootCertStore {
                 roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
             };
-            let built =
-                ClientConfig::builder_with_provider(Arc::new(rustls_rustcrypto::provider()))
-                    .with_safe_default_protocol_versions()
-                    .ok()?
-                    .with_root_certificates(roots)
-                    .with_no_client_auth();
+            let built = ClientConfig::builder_with_provider(Arc::new(provider()))
+                .with_safe_default_protocol_versions()
+                .ok()?
+                .with_root_certificates(roots)
+                .with_no_client_auth();
             Some(Arc::new(built))
         })
         .clone()
@@ -189,6 +204,12 @@ mod tests {
             client_config().is_some(),
             "the pure-Rust crypto provider refused to produce a client configuration"
         );
+    }
+
+    #[test]
+    fn the_only_key_exchange_is_x25519() {
+        let groups: Vec<_> = provider().kx_groups.iter().map(|g| g.name()).collect();
+        assert_eq!(groups, vec![rustls::NamedGroup::X25519]);
     }
 
     #[test]

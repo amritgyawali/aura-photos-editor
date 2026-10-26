@@ -174,12 +174,19 @@ def launch(exe, port):
                AURA_TEST_CATALOG=str(OUT / 'catalog' / 'catalog.sqlite'))
     (OUT / 'catalog').mkdir(parents=True, exist_ok=True)
     proc = subprocess.Popen([str(exe)], cwd=str(ROOT), env=env)
+    # Wait for this app's own page, not merely for a debugging port: another AURA on the machine
+    # (another harness, or the photographer's own window) must never be driven by mistake.
     for _ in range(180):
+        if proc.poll() is not None:
+            raise RuntimeError(f'AURA exited during start-up (code {proc.returncode})')
         try:
-            urllib.request.urlopen(f'http://127.0.0.1:{port}/json/version', timeout=1)
-            return proc
+            with urllib.request.urlopen(f'http://127.0.0.1:{port}/json/list', timeout=1) as reply:
+                pages = json.loads(reply.read())
+            if any(p.get('type') == 'page' and 'tauri' in p.get('url', '') for p in pages):
+                return proc
         except Exception:  # noqa: BLE001
-            time.sleep(1)
+            pass
+        time.sleep(1)
     proc.terminate()
     raise RuntimeError('AURA did not start')
 
@@ -217,14 +224,22 @@ def main():
 
 
 def run(pw, port, inputs, chosen, only):
-    browser = pw.chromium.connect_over_cdp(f'http://127.0.0.1:{port}')
+    # WebView2 swaps processes when it navigates to the app's page; a connection made just before
+    # the swap stays attached to a blank target, so reconnect until the app's page is seen.
     page = None
-    for _ in range(120):
-        found = [p for c in browser.contexts for p in c.pages]
-        page = next((p for p in found if 'localhost' in p.url or 'tauri' in p.url), None)
+    for _ in range(8):
+        browser = pw.chromium.connect_over_cdp(f'http://127.0.0.1:{port}')
+        for _ in range(15):
+            found = [p for c in browser.contexts for p in c.pages]
+            page = next((p for p in found if 'localhost' in p.url or 'tauri' in p.url), None)
+            if page:
+                break
+            time.sleep(1)
         if page:
             break
-        time.sleep(1)
+        browser.close()
+    if page is None:
+        raise RuntimeError(f'no AURA page on port {port}: {[p.url for c in browser.contexts for p in c.pages]}')
     page.set_default_timeout(600000)
     expect.set_options(timeout=600000)
     page.wait_for_function('() => !!window.__TAURI_INTERNALS__')
@@ -240,8 +255,8 @@ def run(pw, port, inputs, chosen, only):
     def want(group):
         return only is None or group in only
 
-    def proxy(photo):
-        r = call('render_image', photoId=photo, level='proxy2048', purpose='interactive')
+    def proxy(photo, purpose='interactive'):
+        r = call('render_image', photoId=photo, level='proxy2048', purpose=purpose)
         return np.frombuffer(base64.b64decode(r['rgbBase64']), dtype=np.uint8).reshape(r['height'], r['width'], 3)
 
     def recipe_hash(photo):
@@ -436,14 +451,25 @@ def run(pw, port, inputs, chosen, only):
         history(chart, 'reset_original')
         base = proxy(chart)
 
-        def apply_and_check(changes, check, label):
+        def apply_and_check(changes, check, label, purpose='interactive'):
             """Set each (path, value), run `check(after)`, then undo every step and require the
-            photograph back exactly."""
+            photograph back exactly. Dehaze is measured on the export render: the interactive
+            preview skips it by design and says so."""
             for path, value in changes:
                 call('set_param', projectId=project, photoId=chart, path=path, value=value, label='Test ' + label)
-            after = proxy(chart)
+            after = proxy(chart, purpose)
+            base_here = base if purpose == 'interactive' else None
             try:
-                if np.array_equal(after, base):
+                if base_here is None:
+                    for _ in changes:
+                        history(chart, 'undo')
+                    before = proxy(chart, purpose)
+                    for path, value in changes:
+                        call('set_param', projectId=project, photoId=chart, path=path, value=value,
+                             label='Test ' + label)
+                else:
+                    before = base_here
+                if np.array_equal(after, before):
                     raise AssertionError('no visible change at this value')
                 return check(after)
             finally:
@@ -558,8 +584,8 @@ def run(pw, port, inputs, chosen, only):
                                 lambda a, row=row: grey_luma(a, row) < grey_luma(base, row) - 1, 'darker'))
             directional.append((f'grade {wheel} luminance +100', [(f'global.colour_grade.{wheel}.luminance', 100)],
                                 lambda a, row=row: grey_luma(a, row) > grey_luma(base, row) + 1, 'brighter'))
-        for check_name, changes, holds, meaning in directional:
-            def directed(changes=changes, holds=holds, meaning=meaning, check_name=check_name):
+        for case_name, changes, holds, meaning in directional:
+            def directed(changes=changes, holds=holds, meaning=meaning):
                 def check(after):
                     if not holds(after):
                         raise AssertionError(f'expected {meaning}; warmth {warmth(base):.1f}->{warmth(after):.1f}, '
@@ -567,8 +593,8 @@ def run(pw, port, inputs, chosen, only):
                                              f'saturation {mean_sat(base):.3f}->{mean_sat(after):.3f}, '
                                              f'mid grey {grey_luma(base, mid):.1f}->{grey_luma(after, mid):.1f}')
                     return f'{meaning}; Undo exact'
-                return apply_and_check(changes, check, check_name)
-            case('colour-values', check_name, directed)
+                return apply_and_check(changes, check, case_name)
+            case('colour-values', case_name, directed)
 
         # Every other colour control at both ends: it must act and undo exactly.
         others = [(f'global.calibration.{f}', v) for f in ('shadows_tint', 'red_hue', 'red_saturation', 'green_hue',
@@ -580,9 +606,10 @@ def run(pw, port, inputs, chosen, only):
                    ('global.effects.grain.amount', 100)]
         for path, value in others:
             def plain(path=path, value=value):
-                return apply_and_check([(path, value)], lambda after: 'acts; Undo exact', path)
+                purpose = 'export' if path == 'global.dehaze' else 'interactive'
+                return apply_and_check([(path, value)], lambda after: 'acts; Undo exact', path, purpose)
             case('colour-values', f'{path} {value:+}', plain)
-        for check_name, extra in [('grade blending 0', ('global.colour_grade.blending', 0)),
+        for case_name, extra in [('grade blending 0', ('global.colour_grade.blending', 0)),
                             ('grade blending 100', ('global.colour_grade.blending', 100)),
                             ('grade balance -100', ('global.colour_grade.balance', -100)),
                             ('grade balance +100', ('global.colour_grade.balance', 100))]:
@@ -606,7 +633,7 @@ def run(pw, port, inputs, chosen, only):
                         history(chart, 'undo')
                     if not np.array_equal(proxy(chart), base):
                         raise AssertionError('Undo did not restore the photograph exactly')
-            case('colour-values', check_name, blend)
+            case('colour-values', case_name, blend)
 
     # ----------------------------------------------------- face and body values
     if want('finish-values'):
@@ -736,9 +763,10 @@ def run(pw, port, inputs, chosen, only):
         base = proxy(rt)
         quiet = {'red_eye', 'eye_glow_fix', 'eye_clean', 'teeth', 'auto_blemish', 'acne_clear', 'frequency_heal',
                  'defringe', 'vein_reduce', 'glare', 'stretch_marks', 'texture_graft', 'mattify', 'lip_gloss', 'halation',
-                 'under_eye', 'chroma_key', 'local_white_balance'}
-        # Tools for scenery rather than people act on smooth gradients: tried on open water.
-        scenery = {'deband'}
+                 'under_eye', 'chroma_key', 'local_white_balance', 'body_hair_soften', 'shadow_remove'}
+        # Tools for scenery rather than people act on smooth gradients, a colour spill or bright
+        # highlights: tried on open water.
+        scenery = {'deband', 'color_despill', 'highlight_compress'}
         water = bride
         history(water, 'reset_original')
         call('native_retouch_edit', projectId=project, photoId=water, action='clear', edits=[], id=None)
@@ -756,6 +784,13 @@ def run(pw, port, inputs, chosen, only):
                             tone=.6, warmth=.4 if warps else .25, tint=.1, targetColor=[.6, .3, .2])
                 if tool == 'acne_clear':
                     edit['mask'] = {'strokes': [{'erase': False, 'radius': .03, 'opacity': 1, 'points': [[spot[0], spot[1], 1]]}]}
+                # Tools that act only on a chosen colour or above a threshold, set as a photographer
+                # would for the open-water spot: the spill colour sampled from the water itself, and
+                # a compression threshold its highlights reach.
+                if tool == 'color_despill':
+                    edit.update(targetColor=[.13, .59, .76], tone=.5)
+                if tool == 'highlight_compress':
+                    edit.update(tone=.25, texture=1.6)
                 saved = call('native_retouch_edit', projectId=project, photoId=rt, action='append', edits=[edit], id=None)
                 after = proxy(rt)
                 changed = int((np.abs(after.astype(int) - base.astype(int)).max(axis=2) > 1).sum())
@@ -824,7 +859,7 @@ def run(pw, port, inputs, chosen, only):
         if ok:
             for label in presets:
                 def preset_case(label=label):
-                    # Auto advanced retouch offers a style with the same name in its own group.
+                    # Auto advanced retouch offers a preset of the same name in its own group.
                     radio = page.get_by_role('radiogroup', name='Retouch preset').get_by_role('radio', name=label, exact=True)
                     radio.click()
                     button = page.get_by_role('button', name=re.compile(r'^Auto retouch'))
@@ -864,6 +899,9 @@ def run(pw, port, inputs, chosen, only):
             case('auto-retouch', 'retouch strength sliders', strength)
 
             def portrait_button():
+                # From the original: once a retouch has been chosen the button deliberately adds
+                # only the global enhance, which the presets above have already saved.
+                history(bride_jpeg, 'reset_original')
                 before = recipe_hash(bride_jpeg)
                 page.get_by_role('button', name='Auto portrait', exact=True).click()
                 deadline = time.monotonic() + 600
@@ -879,7 +917,10 @@ def run(pw, port, inputs, chosen, only):
             if len(stages) != 18:
                 raise AssertionError(f'{len(stages)} stages')
             applied = sum(s['outcome'] == 'applied' for s in stages)
-            return f"18 stages, {applied} applied; quality passed={r['report']['quality'].get('passed')}"
+            q = r['report']['quality']
+            reasons = q.get('incompleteReasons') or q.get('incomplete_reasons') or []
+            return (f"18 stages, {applied} applied; quality passed={q.get('passed')}"
+                    + (f"; not complete because: {reasons}" if reasons else ''))
         case('auto-retouch', 'Auto advanced retouch (18 stages)', advanced)
         case('auto-retouch', 'analyse portrait', lambda: str(call('analyse_portrait', photoId=bride_jpeg))[:160])
         for style in ['natural', 'soft', 'polished']:

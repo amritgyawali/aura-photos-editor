@@ -190,16 +190,20 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
     return () => { active = false; };
   }, [photoId, projectId, refresh, revision, inRetouch]);
 
-  const write = useCallback(async (action: () => Promise<unknown>) => {
-    if (writing.current) return;
+  /** Run one saving action. Resolves to null when it saved, or to the reason it did not, so a
+   *  tool that started the save can end its own progress state instead of reporting success. */
+  const write = useCallback(async (action: () => Promise<unknown>): Promise<string | null> => {
+    if (writing.current) return 'Another edit is still being saved. No edit was saved; try again when it finishes.';
     writing.current = true;
     setBusy(true); setWriteError(null);
-    try { await action(); setRefresh(value => value + 1); }
+    try { await action(); setRefresh(value => value + 1); return null; }
     catch (cause) {
-      setWriteError(asIpcError(cause).message);
+      const message = asIpcError(cause).message;
+      setWriteError(message);
       // Reconcile with saved state even if an operation failed after a partial
       // write. A rejected edit does not make the preview unreadable.
       setRefresh(value => value + 1);
+      return message;
     }
     finally { writing.current = false; setBusy(false); }
   }, []);

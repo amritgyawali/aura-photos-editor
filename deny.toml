@@ -16,6 +16,11 @@ ignore  = [
   { id = "RUSTSEC-2026-0098", reason = "webpki 0.102 URI name constraints; path validation is webpki 0.103 in rustls" },
   { id = "RUSTSEC-2026-0099", reason = "webpki 0.102 wildcard name constraints; path validation is webpki 0.103 in rustls" },
   { id = "RUSTSEC-2026-0104", reason = "webpki 0.102 CRL parsing panic; this build parses no CRL with 0.102" },
+  { id = "RUSTSEC-2026-0382", reason = "webpki 0.102 distrusted emSign intermediates; path validation is webpki 0.103.16 in rustls, which is patched" },
+  # crypto-bigint 0.5 arrives through p256/p384 in the provider and is not constant-time.
+  # aura-cloud offers X25519 as its only key exchange (`tls::provider`, pinned by a test),
+  # so no handshake secret reaches it; the remaining P-256 use verifies public signatures.
+  { id = "RUSTSEC-2026-0387", reason = "crypto-bigint timing; key exchange is X25519 only, P-256 only verifies public signatures" },
   # Marvin is a timing leak of an RSA *private* key during decryption or signing.
   # aura-cloud is a TLS client built `with_no_client_auth`, so it only verifies
   # server signatures with public keys and never performs a private-key operation.

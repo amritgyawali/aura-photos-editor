@@ -215,7 +215,9 @@ fn stage_hsl(@builtin(global_invocation_id) id: vec3<u32>) {
     if (index >= frame.width * frame.height) { return; }
     var rgb = load(index);
     let hsv = to_hsv(rgb);
-    if (hsv.y <= 1e-4) { return; }
+    // Bands fade in with saturation, as `tonemap::hsl_presence` does: none on a neutral.
+    let presence = smoothstep(0.03, 0.15, hsv.y);
+    if (presence <= 0.0) { return; }
 
     var total = 0.0;
     var h_shift = 0.0;
@@ -233,11 +235,9 @@ fn stage_hsl(@builtin(global_invocation_id) id: vec3<u32>) {
         s_shift = s_shift / total;
         l_shift = l_shift / total;
     }
-    // A near-grey's hue is noise; the shifts fade in with colourfulness (tonemap::hsl).
-    let colourful = smoothstep(0.0, 0.2, hsv.y);
-    h_shift = h_shift * colourful;
-    s_shift = s_shift * colourful;
-    l_shift = l_shift * colourful;
+    h_shift = h_shift * presence;
+    s_shift = s_shift * presence;
+    l_shift = l_shift * presence;
 
     let l = luma(rgb);
     let saturated = mix(vec3<f32>(l), rgb, 1.0 + s_shift / 100.0);

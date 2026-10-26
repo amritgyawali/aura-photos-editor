@@ -2,7 +2,7 @@
 
 Date: 2026-10-25. Status: completed. The running Windows desktop was tested on 20 real targets against six reference looks through three matching paths, for 360 distinct combinations. The final saved states of all 20 photos also passed exact pixel checks after a fresh application restart.
 
-Follow-up: [first quality fixes and their validation](AURA-reference-match-quality-fixes-2026-10-25.md). The measurements below remain the original assessment of the recorded executable, before those fixes.
+Follow-ups: [first quality fixes and their validation](AURA-reference-match-quality-fixes-2026-10-25.md), and the fixes recorded in [Update: fixes and re-measurement](#update-fixes-and-re-measurement) below ([ADR-0181](../adr/ADR-0181-match-a-look-assessment-fixes.md)), which resolve every confirmed failure on the same desktop test. The measurements in the other sections remain the original assessment of the recorded executable, before any fix.
 
 ## Finding
 
@@ -11,6 +11,54 @@ Follow-up: [first quality fixes and their validation](AURA-reference-match-quali
 The running desktop app reproduced the reported mismatch. It also accepted visible colour banding in a desert sky and blotchy colours on a portrait's pale floor. These are photographic quality failures, even though the internal reference-distance objective improved. Natural mode sometimes refuses a requested result or produces no change. Its weaker transfer can preserve a scene better while failing to reproduce the reference treatment.
 
 This report distinguishes measurements, direct visual observations, explanations supported by the implementation, and proposed work. Proposed fixes and research models have not been implemented or qualified by this assessment.
+
+## Update: fixes and re-measurement
+
+Later on 2026-10-25 every confirmed failure in this report was fixed, and the same desktop harness
+was re-run on the same 20 photographs, the same six edited references and the same 80 % strength,
+through the real window (before: `run-988159e9`; after: `F:/aura-look-bank-data/gui/run-13fafaae`, confirmed
+unchanged by `run-bebd1969` (final visible-change threshold) and `run-f25aae97` (final build); the first quality fixes' own retest is `run-eae10e64`). The harness
+gained three measurements: **visible change** (mean CIE76 between the photo before and after; below
+1.0 nobody can see it), **new bands** (adjacent pixel pairs that were smooth, CIE76 ≤ 1, and now
+step, > 3, anywhere in the frame) and, for a new **learned** workflow, whether the reference's own
+original was found. The "before" column re-measures the original run's saved images with the same
+new metrics.
+
+| Workflow | Closer to declared edit | Median known-edit CIE76 | Photos with new bands | Refused | No visible change |
+|---|---:|---:|---:|---:|---:|
+| Collection reference | 12 → **18** | 8.10 → **6.10** | 3 → **0** | 0 → 0 | 0 → 2 |
+| Single-photo Natural | 14 → **17** | 6.09 → **5.91** | 0 → 0 | 3 → **1** | 2 → 3 |
+| Single-photo Palette | 10 → **16** | 9.84 → **5.99** | 6 → **0** | 0 → 0 | 1 → **0** |
+| **Learned from the reference's own original** (new) | **19 / 20** | **0.71** (from 7.62) | **0** | 1 | **0** |
+
+In the learned workflow each target is matched to a known edit of *another* photograph of the same
+collection, exported as `<name>-Edit.png`; the panel found that original in 19 of 20 cases and 14
+results are close known edits (13 of them visibly changed). All integrity checks still hold: native
+preview equals export pixel for pixel, all 80 deliveries are verified and equal to the saved render,
+source and reference hashes are unchanged, undo/redo restores exact pixels, no page errors, and the
+panel's report of visible change agreed with the measurement in every case (it said "looks almost
+the same" for two Natural results, targets 1 and 13, both measured below one CIE76 unit by the app).
+
+| Report item | What was wrong | Fix | Re-measured |
+|---|---|---|---|
+| 1. Banded desert sky | The collection route scored unrelated scenes by colour-distribution resemblance (half the weight), so the candidate that repainted the sky in the fruit reference's colours won; the transform's steep spots then banded it | Unrelated scenes are matched as a look (Natural with scene-prior tone), never by palette; every fitted transform is limited to stretch nearby colours at most twofold, measured on the function | Collection: 0 photos with new bands (was 3). Target 9 sky no longer turns yellow |
+| 2. Blotchy pale floor | Same scoring, plus chroma and per-hue gains up to 9-36 times on near-neutral colours | Same two fixes | No new bands or patches on target 20 in any workflow |
+| 3. Subject colours confused with the treatment | Whole-image colour proportions were the objective for unrelated scenes | Unrelated scenes no longer use them; explicit Palette keeps them but under the stretch limit | Collection closer to the declared edit in 18 of 20 (was 12) |
+| 4. Native and independent metrics disagree | They measure different things | Reported as such; the panel now also shows the measured visible change; a learned look is checked against the photographer's own operation, not the reference's histogram | Unchanged by design |
+| 5. Stale "Matching..." after a refused save | The editor's save wrapper swallowed the refusal, so the panel never left its progress state | The wrapper returns the reason; the panel ends in its own refusal, clears progress and re-enables controls; a save skipped because another was running is also a refusal now | Unit tests for both; desktop run asserted no stale progress after every refusal |
+| P0 smoothness blind spot | Only pixels darker than 96/255, raw RGB steps | Perceptual check at every lightness and two scales (bands and patches); plus the transform stretch limit, which a pixel rule alone could not do (it refused the true warm-punch look on a noisy dim studio while passing every banded palette result) | Palette results with new bands 6 → 0 |
+| P1 two routes, two contracts | Different policies for unrelated scenes | Both match unrelated scenes as a natural look, both use one smoothness guard, both learn from the reference's original when it is in the collection | See table above |
+| Comparison with the first quality fixes (`run-eae10e64`, same cases) | Its stricter pixel guard avoids bands mostly by refusing: Natural refused 8 of 20 and Palette 7 | This update limits how steep the fitted transform may be instead, so the look is still applied | Natural closer to the declared edit 17 (first fixes 10), Palette 16 (12), Collection 18 (16); refusals 1, 0, 0 (8, 7, 0) |
+| A refusal shown as "AURA hit an unexpected problem" (found in the final run) | The panel's own refusal sentences were plain exceptions, which the IPC error helper replaces with a generic sentence; test mocks hid it | Shown as written (`Refusal`); mocks now behave like the real helper; collection preparation no longer calls an unchanged photo "matched" | Desktop harness fails any refusal the panel does not explain |
+| A saved "match" nobody can see | Results with no visible change were reported as matches | Every native check measures the visible change; below about one CIE76 unit the panel says the photo looks almost the same, why, and how to get a stronger match | Desktop run: panel honest in every case |
+
+Still not solved, and why: one unrelated reference cannot identify its edit, so Natural still changes
+some photographs only slightly when the reference's look is mild (now stated in the panel). A learned
+look generalises less well when its original is darker or narrower in colour than the target
+(targets 16 and 20); a cropped or retouched export cannot be learned from, and the panel names the
+photo it found and says why. Semantic region correspondence and a trained predictor (P1, P2 below)
+were not built: with palette transport off unrelated scenes, the region confusion they were meant to
+address no longer appears in this run, and there is no training data for a predictor.
 
 ## Evidence and reproducibility
 

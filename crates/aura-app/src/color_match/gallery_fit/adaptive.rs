@@ -105,17 +105,24 @@ pub(super) fn fit(
     let mut reference = evidence
         .select(request.lighting, request.lighting_confidence)
         .clone();
-    reference.palette_matching = true;
     let baseline = candidate(request, &StyleDelta::neutral(), &[0.0; 6], 0.0)?;
     let small_frame = reduced(request.full)?;
     let small = rendered(state, &small_frame, &baseline)?;
     let objective = Objective::new(request.target, request.thumbnail, &small);
     let native = rendered(state, request.full, &baseline)?;
     check_cancel(request.cancel)?;
-    let before = measured(&reference, &native);
     let spatial = (!request.thumbnail.is_empty())
         .then(|| evidence.corresponding(&native))
         .flatten();
+    // An unrelated scene is matched as a look, not as a colour distribution. Scoring it by how
+    // closely its colour proportions match the reference's rewards repainting the scene - a blue
+    // sky turned the colour of the reference's fruit, a white floor the green of its forest - and
+    // measured worse at reproducing a known look than leaving the photograph alone (ADR-0180,
+    // deep assessment 2026-10-25). Only a registered or corresponding scene, where the reference
+    // is the same picture, is scored by its whole palette.
+    let unrelated = spatial.is_none() && !objective.corresponding();
+    reference.palette_matching = !unrelated;
+    let before = measured(&reference, &native);
     let aligned_before = if let Some(spatial) = spatial {
         spatial.distance(&native)
     } else if objective.corresponding() {
@@ -191,7 +198,12 @@ pub(super) fn fit(
                 .flatten()
         };
         let mut seen = BTreeMap::new();
-        for intent in [MatchIntent::Natural, MatchIntent::Palette] {
+        let intents: &[MatchIntent] = if unrelated {
+            &[MatchIntent::Natural]
+        } else {
+            &[MatchIntent::Natural, MatchIntent::Palette]
+        };
+        for &intent in intents {
             if aligned && best_score <= REGISTERED_TOLERANCE {
                 break;
             }
