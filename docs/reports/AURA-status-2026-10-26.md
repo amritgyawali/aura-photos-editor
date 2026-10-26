@@ -42,17 +42,22 @@ Found by running every tool and every value in the real window:
 |---|---|---|
 | Moving a colour band (e.g. orange luminance to -100) changed neutral greys by 34-55 levels. | A band applied in full to any pixel with saturation above 0.0001, and a grey card always carries a trace of cast. | The eight HSL bands fade in with saturation: nothing below 3 %, all of it from 15 %. CPU and shader changed together; engine string `+hsl.2`. Test: `hsl_barely_moves_a_nearly_neutral_pixel`. |
 | On a photo with nobody in it, body slim/height/legs/torso and subject exposure/warmth/clarity changed 8-96 % of the pixels. | The learned subject selection finds the most prominent *thing* (here a pot of offerings) and was written into the body region, so the people tools warped and relit it. | On a frame with no face, the selection may separate the background only; every region that needs a face stays empty, as the portrait parse already guarantees. Engine string `+faceless.1`. Test: `a_subject_selection_is_never_a_person_on_a_frame_with_no_face`. |
+| Auto advanced retouch reported its quality check as not passed on a wide stage photo. | It retouched four faces but checked only one: at the 1600 px check size the three seated guests' eyes were 13-18 px apart, below the 20 px the contour check needs. | When a retouched face is too small, quality control renders larger - a bigger screen render, or the full resolution an export is made at - until every face's eyes are 24 px apart. On that photo all four faces are now checked at 3600 x 1772 and the check passes (35 s instead of 33 s). Test: `quality_control_renders_large_enough_to_check_a_small_face`. |
+| Test: the Auto portrait button reported "no change". | After the presets, the photo already carries a chosen retouch, so the button deliberately adds only the global enhance, which was already saved. | The test resets the photo first; the button then saves a change. |
 | Test: dehaze reported "no change". | Interactive previews skip dehaze by design (and say so). | Dehaze is measured on the export render. |
 | Test: "open the Retouch workspace" failed. | A loop reused the variable holding the project's name, so the library button could not be found. | Loop variable renamed. |
 | Test: Auto retouch preset "Beauty & Fashion" matched two radios. | Auto advanced retouch offers a preset of the same name. | The test picks it inside the "Retouch preset" group. |
 | Test: two retouch tools reported failing on the test spot. | Body-hair softening and shadow removal have nothing to act on in a patch of sky. | Listed as tools expected to find nothing there. |
 | Test: the run crashed or saw a blank page. | Another AURA was on the same debugging port, and WebView2 swaps its process when it navigates. | Own port (9391); the test waits for the AURA page and reconnects. |
 
-**Result of the in-app run after the fixes** (partial while this was written; see section 7): library
-17/17, auto edit 16/16, develop 51 pass + 3 expected warnings, colour values **122/122** (4 failures
-before), finish values 154 pass + 51 skips + 20 expected warnings, **0 failures** (7 before), retouch
-tools 130 pass + 7 expected warnings, **0 failures** (2 before), auto retouch 23 pass + the one test
-locator fixed above.
+**Result of the full in-app run after the fixes:** 721 checks - 637 pass, 51 skips, 32 expected
+warnings, 1 failure (the Beauty & Fashion test locator, fixed above; the auto-retouch group was then
+run again and passed 34 of 34, including every preset, the strength sliders, the Auto portrait button
+and Auto advanced retouch). By group: library 17/17, auto edit 16/16, develop 51 + 3 warnings, colour
+values **122/122** (4 failures before), finish values 154 + 51 skips + 20 warnings, **0 failures**
+(7 before), retouch tools 130 + 7 warnings, **0 failures** (2 before), masks 14/14, looks 4/4,
+analysis 49/49, export 7/7, one-click 1/1, system 14/14, UI 26/26. No page errors; every original
+byte-identical after the run.
 
 ## 4. Warnings that are expected (not defects)
 
@@ -108,5 +113,5 @@ locator fixed above.
 - **Speed**: a 1,000-photo folder takes about two hours; the target is under one.
 - **Real camera files and a photographed colour chart**, which reopen phase 02's colour criteria.
 
-The final counts of the in-app run are in `.work-checks/everything/results.json` and the run log; if
-any check after the auto-retouch group fails, it is listed in the pull request.
+The in-app results are written to `.work-checks/everything/results.json` by
+`scripts/test-everything-gui.py --port 9391` (use a port no other AURA is using).

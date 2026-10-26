@@ -45,6 +45,9 @@ All notable changes to AURA. One entry per phase, newest first.
 - **No body without a person.** On a photo with no face, the learned subject selection (which
   finds the most prominent *thing* - a pot, a cake) no longer becomes a body for the slim, height,
   legs, torso and subject light controls to warp or relight. It still separates the background.
+- **Every retouched face is checked.** Auto advanced retouch's quality control now renders larger
+  - up to the full resolution - when a retouched face is too small to check at screen size, so the
+  guests seated across a stage are checked like the speaker, not left out of the report.
 - **The in-app test of every tool** (`scripts/test-everything-gui.py`) reconnects when the window
   swaps its web process, measures dehaze on the export render, and no longer clobbers the project
   name it uses to reopen the library.

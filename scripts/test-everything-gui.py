@@ -853,6 +853,9 @@ def run(pw, port, inputs, chosen, only):
             case('auto-retouch', 'retouch strength sliders', strength)
 
             def portrait_button():
+                # From the original: once a retouch has been chosen the button deliberately adds
+                # only the global enhance, which the presets above have already saved.
+                history(bride_jpeg, 'reset_original')
                 before = recipe_hash(bride_jpeg)
                 page.get_by_role('button', name='Auto portrait', exact=True).click()
                 deadline = time.monotonic() + 600
@@ -868,7 +871,10 @@ def run(pw, port, inputs, chosen, only):
             if len(stages) != 18:
                 raise AssertionError(f'{len(stages)} stages')
             applied = sum(s['outcome'] == 'applied' for s in stages)
-            return f"18 stages, {applied} applied; quality passed={r['report']['quality'].get('passed')}"
+            q = r['report']['quality']
+            reasons = q.get('incompleteReasons') or q.get('incomplete_reasons') or []
+            return (f"18 stages, {applied} applied; quality passed={q.get('passed')}"
+                    + (f"; not complete because: {reasons}" if reasons else ''))
         case('auto-retouch', 'Auto advanced retouch (18 stages)', advanced)
         case('auto-retouch', 'analyse portrait', lambda: str(call('analyse_portrait', photoId=bride_jpeg))[:160])
         for style in ['natural', 'soft', 'polished']:
