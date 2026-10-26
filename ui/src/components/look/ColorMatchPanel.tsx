@@ -128,6 +128,17 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
       if (stopped.current && activePhoto.current === photoId) setMessage('Stopped. Completed changes remain saved.');
     } }
   };
+  // The editor displays save errors and may resolve its wrapper after handling them.
+  // Retain the rejected operation here so matching also reaches a terminal error state.
+  const save = async (action: () => Promise<unknown>) => {
+    let rejected = false;
+    let failure: unknown;
+    await onApply(async () => {
+      try { return await action(); }
+      catch (cause) { rejected = true; failure = cause; throw cause; }
+    });
+    if (rejected) throw failure;
+  };
   useEffect(() => {
     if (!live || !active || disabled || busy || regionalBusy || !pendingLive.current || !selected || !inTauri()) return;
     const timer = window.setTimeout(() => {
@@ -147,7 +158,7 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
         }
         if (!analysis || analysis.reference.id !== referenceId || (analysis.fitting?.quality ?? 'precise') !== mode ||
             (analysis.fitting?.intent ?? 'natural') !== purpose ||
-            (purpose === 'palette' && analysis.fitting?.engine !== 'reference-palette-transport-v7')) {
+            (purpose === 'palette' && analysis.fitting?.engine !== 'reference-palette-transport-v8')) {
           analysis = purpose === 'natural' ? await colorMatch.prepare(photoId, referenceId, id, mode)
             : await colorMatch.prepare(photoId, referenceId, id, mode, purpose);
           if (!current()) return;
@@ -159,7 +170,7 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
         const session = analysis.sessionId;
         ownWrite.current = true;
         try {
-          await onApply(async () => {
+          await save(async () => {
             if (!latest()) return;
             const result = await colorMatch.apply(photoId, session, next, id);
             if (!current()) return;
@@ -211,7 +222,7 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
       if (disabledRef.current) throw new Error('Another edit is running. Match this photo again when it finishes.');
       ownWrite.current = true;
       try {
-        await onApply(async () => {
+        await save(async () => {
           if (!latest()) return;
           const result = await colorMatch.apply(photoId, analysis.sessionId, strengths, id);
           if (!current()) return;
@@ -230,7 +241,7 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
   const apply = (next = controls) => run(async (id, current) => {
     if (!report || !report.current || report.photoId !== photoId || report.reference.id !== selected ||
         (report.fitting?.quality ?? 'precise') !== quality || (report.fitting?.intent ?? 'natural') !== matchIntent) return;
-    await onApply(async () => {
+    await save(async () => {
       const result = await colorMatch.apply(photoId, report.sessionId, next, id);
       if (!current()) return;
       if (!result.current || !result.fullResolutionChecked || result.photoId !== photoId || result.reference.id !== selected) {
@@ -280,7 +291,7 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
   const collection = (scope: 'selected' | 'collection' = 'collection') => run(async (id, current) => {
     if (!projectId || !selected) return;
     setOutcomes([]);
-    await onApply(async () => {
+    await save(async () => {
       await matchColorCollection(projectId, selected, { ...controls }, id,
         () => !current(),
         value => { if (current()) setMessage(value); },
@@ -299,7 +310,7 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
   const removedSession = !libraryReference && report?.reference.id === selected;
   const ready = Boolean(report?.current && report.photoId === photoId && report.reference.id === selected &&
     (report.fitting?.quality ?? 'precise') === quality && (report.fitting?.intent ?? 'natural') === matchIntent &&
-    (matchIntent !== 'palette' || report.fitting?.engine === 'reference-palette-transport-v7'));
+    (matchIntent !== 'palette' || report.fitting?.engine === 'reference-palette-transport-v8'));
   const savedStrengths = Boolean(report && SLIDERS.every(([key]) => controls[key] === report.controls[key]) &&
     FINE_MATCH_FIELDS.every(([key]) => (controls.detail?.[key] ?? 1) === (report.controls.detail?.[key] ?? 1)));
   return <section className="lr-panel color-match-panel" aria-label="Reference colour matching" aria-busy={busy || regionalBusy}>

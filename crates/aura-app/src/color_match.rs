@@ -40,6 +40,7 @@ mod matcher;
 mod native_checks;
 pub use matcher::TransferDiagnostics;
 pub(crate) use native_checks::NativeChecks;
+mod reduction;
 mod refine;
 mod transfer;
 pub use library::{
@@ -357,7 +358,7 @@ fn session_key(photo: &str) -> AuraResult<String> {
 /// Unsupported input/profile, allocation bounds, cancellation or analysis failure.
 pub fn import_reference(state: &AppState, input: &ImportInput) -> IpcResult<ReferenceSummary> {
     job(state, &input.cancel_id, |cancel| {
-        let decoded = reference_image::decode(Path::new(&input.path))?;
+        let decoded = reference_image::decode_native(Path::new(&input.path))?;
         let name = Path::new(&input.path)
             .file_name()
             .map_or_else(|| "Reference".into(), |s| s.to_string_lossy().into_owned());
@@ -402,10 +403,10 @@ fn persist_reference(
 ) -> AuraResult<ReferenceSummary> {
     check_cancel(cancel)?;
     let key = asset_key(&summary.id)?;
-    transfer::remember(state, &summary.id, image)?;
+    let refreshed = transfer::remember(state, &summary.id, image)?;
     if let Some(mut existing) = read::<Reference>(state, &key)? {
         if existing.engine == ENGINE {
-            if existing.summary.thumbnail.is_some() {
+            if !refreshed && existing.summary.thumbnail.is_some() {
                 let mut updated = false;
                 if existing.small_rgb.len() != content::BYTES {
                     existing.small_rgb = content::thumbnail(image);

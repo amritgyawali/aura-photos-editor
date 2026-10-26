@@ -74,7 +74,7 @@ it('rejects a native result for a different reference', async () => {
   const results = await matchColorCollection('project', 'ref', controls, 'job', () => false, vi.fn(), vi.fn());
   expect(results.map(r => r.outcome)).toEqual(['failed', 'matched']);
 });
-it.each(['reference-grade-transfer-v3', 'reference-palette-transport-v4', 'reference-palette-transport-v5'])('refits %s palette sessions with the colour nonregression engine', async engine => {
+it.each(['reference-grade-transfer-v3', 'reference-palette-transport-v4', 'reference-palette-transport-v5', 'reference-palette-transport-v6', 'reference-palette-transport-v7'])('refits %s palette sessions with the colour nonregression engine', async engine => {
   vi.mocked(colorMatch.status).mockImplementation(async photo => ({ ...result(photo), fitting: {
     engine, quality: 'precise', intent: 'palette',
     refinementCandidates: 4, uniqueRenders: 3, cachedProposals: 0,

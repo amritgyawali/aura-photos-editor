@@ -591,3 +591,56 @@ fn stored_measurements_round_trip_and_reject_another_version() {
     old.version = 2;
     assert!(!old.usable());
 }
+
+#[test]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+fn studio_import_keeps_native_fabric_colours_and_reimport_upgrades_preview_evidence() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("fabric.png");
+    image::RgbImage::from_fn(768, 512, |x, _| {
+        image::Rgb(if x.is_multiple_of(2) {
+            [200, 50, 40]
+        } else {
+            [40, 50, 200]
+        })
+    })
+    .save(&path)
+    .unwrap();
+    let state = AppState::open(&directory.path().join("catalog.sqlite")).unwrap();
+    let import = || {
+        crate::color_match::import_reference(
+            &state,
+            &crate::color_match::ImportInput {
+                path: path.to_string_lossy().into_owned(),
+                cancel_id: uuid::Uuid::new_v4().to_string(),
+            },
+        )
+        .unwrap()
+    };
+    let summary = import();
+    let native = recall(&state, &summary.id).unwrap().unwrap();
+    assert_eq!(native.reference_sampling, REFERENCE_SAMPLING);
+    let preview = crate::color_match::reference_image::decode(&path).unwrap();
+    let mut legacy = measure_image(&preview.image);
+    assert_ne!(
+        native.chroma, legacy.chroma,
+        "Resizing should blend the distinct fabric colours"
+    );
+    legacy.reference_sampling = 0;
+    crate::color_match::store(&state, &stats_key(&summary.id).unwrap(), &legacy).unwrap();
+    assert_eq!(
+        recall(&state, &summary.id).unwrap().unwrap(),
+        legacy,
+        "Legacy saved evidence remains readable until reimport"
+    );
+    assert_eq!(
+        import().id,
+        summary.id,
+        "Reimport must retain library identity"
+    );
+    assert_eq!(
+        recall(&state, &summary.id).unwrap().unwrap(),
+        native,
+        "Reimport must replace the old preview evidence with native observations"
+    );
+}

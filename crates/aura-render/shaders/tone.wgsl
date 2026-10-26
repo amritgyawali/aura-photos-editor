@@ -233,6 +233,11 @@ fn stage_hsl(@builtin(global_invocation_id) id: vec3<u32>) {
         s_shift = s_shift / total;
         l_shift = l_shift / total;
     }
+    // A near-grey's hue is noise; the shifts fade in with colourfulness (tonemap::hsl).
+    let colourful = smoothstep(0.0, 0.2, hsv.y);
+    h_shift = h_shift * colourful;
+    s_shift = s_shift * colourful;
+    l_shift = l_shift * colourful;
 
     let l = luma(rgb);
     let saturated = mix(vec3<f32>(l), rgb, 1.0 + s_shift / 100.0);

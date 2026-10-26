@@ -37,6 +37,7 @@ use super::AppState;
 /// Bump when [`measure`] changes; a stored measurement of another version is re-taken.
 pub(super) const STATS_VERSION: u32 = 3;
 const STATS: &str = "colour_reference_grade_v1:";
+const REFERENCE_SAMPLING: u32 = 1;
 const LIGHT_QUANTILES: usize = 65;
 const CHROMA_QUANTILES: usize = 33;
 /// A photograph is fitted from this many pixels, sub-sampled on a grid so the distribution is
@@ -90,6 +91,9 @@ use quantile::QuantileMap;
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct GradeStats {
     pub version: u32,
+    /// Zero means legacy/unspecified pixels; one means native stratified reference import.
+    #[serde(default)]
+    pub reference_sampling: u32,
     pub samples: u32,
     pub lightness: Vec<f32>,
     pub axis: Vec<[f32; 2]>,
@@ -112,6 +116,7 @@ pub(super) struct GradeStats {
 impl GradeStats {
     pub(super) fn usable(&self) -> bool {
         self.version == STATS_VERSION
+            && self.reference_sampling <= REFERENCE_SAMPLING
             && self.lightness.len() == LIGHT_QUANTILES
             && self.axis.len() == AXIS_NODES
             && self.axis_weight.len() == AXIS_NODES
@@ -278,6 +283,7 @@ pub(super) fn measure(labs: &[[f32; 3]]) -> GradeStats {
     let achromatic = !labs.is_empty() && labs.iter().all(|l| l[1].hypot(l[2]) < 0.004);
     GradeStats {
         version: STATS_VERSION,
+        reference_sampling: 0,
         samples: labs.len() as u32,
         lightness,
         axis,
@@ -302,6 +308,13 @@ pub(super) fn measure_image(image: &Rgb8) -> GradeStats {
         .map(|s| s.lab)
         .collect();
     measure(&labs)
+}
+
+pub(super) fn sample_labs(image: &Rgb8, limit: usize) -> Vec<[f32; 3]> {
+    samples(image, limit)
+        .iter()
+        .map(|sample| sample.lab)
+        .collect()
 }
 
 /// How far two photographs' colour and tone are apart, in `OKLab` units times a hundred - close
@@ -1101,21 +1114,26 @@ fn stats_key(id: &str) -> AuraResult<String> {
 
 /// Measure a reference once, when it enters the library, and keep the measurement by content.
 /// A reference imported before this engine is measured the next time it is imported or captured.
-pub(super) fn remember(state: &AppState, id: &str, image: &Rgb8) -> AuraResult<()> {
+pub(super) fn remember(state: &AppState, id: &str, image: &Rgb8) -> AuraResult<bool> {
     let key = stats_key(id)?;
-    if super::read::<GradeStats>(state, &key)?
-        .is_some_and(|s| s.usable() && s.palette_samples.len() >= MIN_SAMPLES)
-    {
-        return Ok(());
+    if super::read::<GradeStats>(state, &key)?.is_some_and(|s| {
+        s.usable()
+            && s.palette_samples.len() >= MIN_SAMPLES
+            && s.reference_sampling == REFERENCE_SAMPLING
+    }) {
+        return Ok(false);
     }
     let labs: Vec<[f32; 3]> = samples(image, REFERENCE_SAMPLES)
         .iter()
         .map(|s| s.lab)
         .collect();
     if labs.len() < MIN_SAMPLES {
-        return Ok(());
+        return Ok(false);
     }
-    super::store(state, &key, &measure(&labs))
+    let mut measured = measure(&labs);
+    measured.reference_sampling = REFERENCE_SAMPLING;
+    super::store(state, &key, &measured)?;
+    Ok(true)
 }
 
 /// The stored measurement of a reference, when it has one this build can use.

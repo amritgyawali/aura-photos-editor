@@ -21,7 +21,18 @@ pub(super) struct Decoded {
     pub converted_icc: bool,
 }
 
+#[cfg(test)]
 pub(super) fn decode(path: &Path) -> AuraResult<Decoded> {
+    decode_with_edge(path, Some(512))
+}
+
+/// Preserve native reference colours and spatial samples for the reference-first fitter.
+/// A small resized preview cannot describe the separate colours in finely patterned fabric.
+pub(super) fn decode_native(path: &Path) -> AuraResult<Decoded> {
+    decode_with_edge(path, None)
+}
+
+fn decode_with_edge(path: &Path, edge: Option<u32>) -> AuraResult<Decoded> {
     let file =
         std::fs::File::open(path).map_err(|_| invalid("Cannot open the reference image."))?;
     let mut bytes = Vec::new();
@@ -71,13 +82,14 @@ pub(super) fn decode(path: &Path) -> AuraResult<Decoded> {
     drop(bytes);
     decoded.apply_orientation(orientation);
     let (width, height) = (decoded.width(), decoded.height());
-    let reduced = if decoded.width() > 512 || decoded.height() > 512 {
-        let reduced = decoded.resize(512, 512, image::imageops::FilterType::Triangle);
-        drop(decoded);
-        reduced
-    } else {
-        decoded
-    };
+    let reduced =
+        if let Some(edge) = edge.filter(|&edge| decoded.width().max(decoded.height()) > edge) {
+            let reduced = decoded.resize(edge, edge, image::imageops::FilterType::Triangle);
+            drop(decoded);
+            reduced
+        } else {
+            decoded
+        };
     if reduced.color().has_alpha()
         && reduced
             .to_rgba16()
@@ -89,15 +101,22 @@ pub(super) fn decode(path: &Path) -> AuraResult<Decoded> {
         ));
     }
     let converted_icc = icc.is_some();
-    let rgb = to_srgb(&reduced, icc)?;
+    let (image_width, image_height) = (reduced.width(), reduced.height());
+    // Most camera JPEGs and plain PNGs are already RGB8 sRGB. Reuse their native
+    // buffer instead of materialising an additional full-resolution RGB16 image.
+    let rgb = if icc.is_none() && reduced.color() == image::ColorType::Rgb8 {
+        reduced.into_rgb8().into_raw()
+    } else {
+        to_srgb(&reduced, icc)?
+            .into_iter()
+            .map(|v| ((u32::from(v) + 128) / 257) as u8)
+            .collect()
+    };
     Ok(Decoded {
         image: Rgb8 {
-            width: reduced.width(),
-            height: reduced.height(),
-            data: rgb
-                .into_iter()
-                .map(|v| ((u32::from(v) + 128) / 257) as u8)
-                .collect(),
+            width: image_width,
+            height: image_height,
+            data: rgb,
         },
         hash,
         width,
@@ -139,6 +158,25 @@ fn to_srgb(reduced: &DynamicImage, icc: Option<Vec<u8>>) -> AuraResult<Vec<u16>>
 mod tests {
     use super::*;
     use image::ImageEncoder;
+
+    #[test]
+    fn native_reference_evidence_keeps_fine_colours_and_preview_decode_remains_bounded() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("striped-reference.png");
+        let source = image::RgbImage::from_fn(768, 512, |x, _| {
+            image::Rgb(if x.is_multiple_of(2) {
+                [200, 50, 40]
+            } else {
+                [40, 50, 200]
+            })
+        });
+        source.save(&path).unwrap();
+        let native = decode_native(&path).unwrap();
+        assert_eq!((native.image.width, native.image.height), (768, 512));
+        assert_eq!(native.image.data, source.into_raw());
+        let preview = decode(&path).unwrap();
+        assert!(preview.image.width.max(preview.image.height) <= 512);
+    }
 
     #[test]
     fn sixteen_bit_tiff_and_png_decode_without_matching_target_dimensions() {

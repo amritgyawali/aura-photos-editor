@@ -345,7 +345,12 @@ pub fn hsl(rgb: [f32; 3], bands: &BTreeMap<String, HslShift>) -> [f32; 3] {
         // A neutral pixel has no hue to band, and shifting one would tint the greys.
         return rgb;
     }
-    let weights = band_weights(hue);
+    // A near-grey's hue is noise: the faintest tint picked up anywhere upstream gives it one,
+    // and without this weight a grey would take the full luminance shift of whichever band that
+    // noise lands in. The shifts fade in with colourfulness and act fully from a fifth.
+    let t = (sat / 0.2).clamp(0.0, 1.0);
+    let colourful = t * t * (3.0 - 2.0 * t);
+    let weights = band_weights(hue).map(|w| w * colourful);
 
     let mut h_shift = 0.0f32;
     let mut s_shift = 0.0f32;
@@ -615,6 +620,27 @@ mod tests {
         );
         let grey = [0.35; 3];
         assert!(same(hsl(grey, &bands), grey));
+    }
+
+    #[test]
+    fn hsl_barely_moves_a_faintly_tinted_grey() {
+        let mut bands = BTreeMap::new();
+        bands.insert(
+            "orange".to_string(),
+            HslShift {
+                h: 100,
+                s: 100,
+                l: -100,
+            },
+        );
+        // Warm by a fraction of a per cent, as a grey can come out of any camera matrix.
+        let grey = [0.352, 0.35, 0.348];
+        let out = hsl(grey, &bands);
+        let moved = (luma(out) - luma(grey)).abs() / luma(grey);
+        assert!(moved < 0.01, "a near-grey moved by {moved}");
+        // A properly coloured orange still takes the whole shift.
+        let orange = [0.6, 0.35, 0.15];
+        assert!(luma(hsl(orange, &bands)) < 0.75 * luma(orange));
     }
 
     #[test]

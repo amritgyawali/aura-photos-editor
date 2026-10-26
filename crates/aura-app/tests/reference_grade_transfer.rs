@@ -591,8 +591,11 @@ fn clipping_is_refused_even_when_it_would_match_reference_statistics() {
         },
     )
     .expect_err("a perfect white histogram cannot justify destroying target detail");
+    assert_eq!(refused.code, "AURA-ML-5146");
+    // Native quality checks now share a refusal covering smoothness, highlights and skin.
+    // Assert the refusal protocol here; unchanged recipe/history below are the safety proof.
     assert!(
-        refused.message.contains("full-resolution highlight"),
+        refused.message.contains("full-resolution") && refused.message.contains("highlight"),
         "{refused:?}"
     );
     assert_eq!(

@@ -370,3 +370,70 @@ fn background_repair_refuses_a_frame_without_a_detected_subject() {
     .finish
     .is_identity());
 }
+
+#[test]
+fn background_repair_uses_the_saved_subject_matte_and_rechecks_a_changed_selection() {
+    let dir = tempfile::tempdir().expect("temp");
+    let path = dir.path().join("manual-subject.jpg");
+    std::fs::write(
+        &path,
+        encode_jpeg(
+            &Rgb8 {
+                width: 64,
+                height: 64,
+                data: vec![110; 64 * 64 * 3],
+            },
+            95,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let f = import(&path, dir);
+    let mut alpha = vec![0; 64 * 64];
+    for y in 16..48 {
+        for x in 16..48 {
+            alpha[y * 64 + x] = 255;
+        }
+    }
+    let mut finish = StudioFinish {
+        background_repair: 100.0,
+        subject_matte: Some(aura_recipe::retouch_tools::Matte::encode(
+            [0.0, 0.0, 1.0, 1.0],
+            64,
+            64,
+            &alpha,
+        )),
+        ..StudioFinish::default()
+    };
+    let save = |finish: &StudioFinish| {
+        finish_commands::save_studio_finish(
+            &f.state,
+            &SaveStudioFinishInput {
+                project_id: f.project.clone(),
+                photo_id: f.photo.clone(),
+                finish: finish.clone(),
+                label: None,
+            },
+        )
+    };
+    let saved = save(&finish).expect("an explicit subject selection must agree with the renderer");
+    finish.subject_matte = Some(aura_recipe::retouch_tools::Matte::encode(
+        [0.0, 0.0, 1.0, 1.0],
+        64,
+        64,
+        &vec![255; 64 * 64],
+    ));
+    assert!(
+        save(&finish).is_err(),
+        "changing the selection must recheck foreground/background support"
+    );
+    let unchanged = finish_commands::studio_finish(
+        &f.state,
+        &StudioFinishInput {
+            project_id: f.project,
+            photo_id: f.photo,
+        },
+    )
+    .unwrap();
+    assert_eq!(unchanged.recipe.recipe_hash, saved.recipe.recipe_hash);
+}

@@ -42,7 +42,7 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
   const [edits,setEdits] = useState<NativeRetouchEdit[]>([]);
   const [recipe,setRecipe] = useState<RecipeDto|null>(null);
   const [analysing,setAnalysing] = useState(false);
-  const [draft,setDraft] = useState(() => feature === 'glare' ? { ...freshRetouch(), tool: 'glare' as const, amount: .5 } : freshRetouch());
+  const [draft,setDraft] = useState(() => feature === 'glare' ? { ...freshRetouch(), tool: 'glare' as const, amount: .85, feather: .3 } : freshRetouch());
   const [selected,setSelected] = useState<string|null>(null);
   const [compare,setCompare] = useState(false);
   const [split,setSplit] = useState(false);
@@ -61,7 +61,7 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
   const [busy,setBusy] = useState(true);
   const [error,setError] = useState<string|null>(null);
   const [dirty,setDirty] = useState(false);
-  const [live,setLive] = useState(false);
+  const [live,setLive] = useState(feature === 'glare');
   const [mode,setMode] = useState<RetouchMode>('ellipse');
   const [inspectionView,setInspectionView] = useState<SkinInspectionView>('color');
   const [collectionRunning,setCollectionRunning] = useState(false);
@@ -131,6 +131,14 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
     }));
     setDirty(true);setCompare(false);setCoverageView(false);
   };
+  // Glare feature: find every lens reflection and add one glare edit per lens, in one step.
+  const [glareNote,setGlareNote]=useState<string|null>(null);
+  const findGlare=()=>void save(async()=>{
+    setGlareNote('Looking for lens reflections…');
+    const found=await nativeRetouch.findGlare(projectId,photoId);
+    if(found.regions.length)await nativeRetouch.edit(projectId,photoId,'append',found.regions.map(r=>({...freshRetouch(),tool:'glare' as const,amount:.85,feather:.3,region:r.region})));
+    if(mounted.current)setGlareNote(found.message);
+  });
   const autoPortrait=()=>void save(async()=>{
     setAnalysing(true);
     try { await nativeRetouch.autoPortrait(photoId); }
@@ -221,7 +229,11 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
     event.preventDefault();
   }}>
     <div className="studio-toolbar"><div><span className="eyebrow">NATIVE RETOUCH</span><h2>{feature === 'skin' ? 'Face Freckles & Acne' : feature === 'glare' ? 'Remove Glasses Glare' : 'Precision, at your pace.'}</h2></div>{!feature && <button type="button" disabled={busy||disabled} onClick={()=>{if(dirty)setError('Apply your changes or choose Discard draft before leaving Retouch.');else onClose();}}>Back to Develop</button>}</div>
-    {feature === 'glare' && <p className="feature-instructions">Glare softening is selected. Place a small ellipse over each reflection, or paint only the lens glare. Preview, adjust Amount, then Apply retouch. Detail hidden by fully opaque glare needs a clear source photograph; softening cannot reconstruct it.</p>}
+    {feature === 'glare' && <p className="feature-instructions">Glare removal is selected with live preview. Place an ellipse over each reflection (it may be generous) or paint the lens glare. AURA estimates what the lens shows underneath from the surrounding pixels and subtracts the reflection, including a green or purple coating tint, while pupils, lashes and frames are kept. Adjust Amount, compare, then Apply retouch. Detail hidden by fully opaque glare needs a clear source photograph; removal cannot reconstruct it.</p>}
+    {feature === 'glare' && <div className="retouch-blemish-brush">
+      <button type="button" className="retouch-primary" disabled={blocked||dirty} onClick={findGlare}>Find and remove reflections</button>
+      <p className="lr-hint" aria-live="polite">{glareNote ?? 'Finds reflections on spectacle lenses for every face and removes each as its own saved operation, which you can adjust or undo. Reflections that do not stand out, or faces AURA cannot find, still need an ellipse placed by hand.'}</p>
+    </div>}
     {feature === 'skin' && <p className="feature-instructions">Start with Acne · keep freckles, or choose Acne & freckles to include dark marks. Run automatic retouch, compare at full size, then use the Blemish brush for remaining spots. Keep moles and pore texture are enabled by default.</p>}
     {collectionMessage&&<section aria-label="Collection cleanup results"><p role="status">{collectionMessage}</p>
       {collectionRunning&&<button type="button" onClick={()=>{stopCollection.current=true;}}>Stop after current photo</button>}

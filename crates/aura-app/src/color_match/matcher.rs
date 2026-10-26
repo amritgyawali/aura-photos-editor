@@ -95,7 +95,7 @@ fn diagnostics(
 ) -> FitDiagnostics {
     FitDiagnostics {
         engine: if input.intent == MatchIntent::Palette {
-            "reference-palette-transport-v7"
+            "reference-palette-transport-v8"
         } else {
             ENGINE_NAME
         }

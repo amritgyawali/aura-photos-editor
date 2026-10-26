@@ -14,11 +14,15 @@ pub(super) struct Region {
 }
 
 fn describe(image: &Rgb8) -> LookAggregate {
-    aggregate::fold(&[&measure::read_at(
-        "colour-match",
-        image,
-        image.width.max(image.height),
-    )])
+    // Native safety review can receive a camera master with tens of millions of pixels.
+    // Bound whole-image statistics; compact skin/region sample strips retain every point.
+    let longest = image.width.max(image.height);
+    let edge = if u64::from(image.width) * u64::from(image.height) <= 512 * 512 {
+        longest
+    } else {
+        longest.min(512)
+    };
+    aggregate::fold(&[&measure::read_at("colour-match", image, edge)])
 }
 
 fn selected_region(image: &Rgb8, name: &str, mattes: &[&skin::Matte]) -> Option<Region> {

@@ -434,16 +434,10 @@ pub fn plan(recipe: &Recipe, purpose: RenderPurpose, input: InputKind, caps: Cap
         SkipReason::NotRequested,
         None
     );
-    push!(
-        Stage::Dehaze,
-        g.dehaze != 0 && !skip_heavy,
-        if g.dehaze != 0 {
-            SkipReason::InteractivePath
-        } else {
-            SkipReason::NotRequested
-        },
-        None,
-    );
+    // Dehaze reads the same small frame-wide base as Clarity and Shadows/Highlights (ADR-0126),
+    // so it is no heavier than they are and runs on the interactive path too: a slider that only
+    // showed its effect once the full-quality render arrived looked like a slider that did nothing.
+    push!(Stage::Dehaze, g.dehaze != 0, SkipReason::NotRequested, None,);
     push!(
         Stage::Vibrance,
         g.vibrance != 0 || g.saturation != 0,
@@ -777,7 +771,7 @@ pub fn render_hash(
 #[must_use]
 pub fn engine_string() -> String {
     format!(
-        "{}+profiles.{}+portrait.{}+display.{}+local.{}+raw.{}+clear.{}+matte.{}+undereye.{}+boundary.{}+skin.{}+labs.selected-v5+calibrated.2+background-repair.1",
+        "{}+profiles.{}+portrait.{}+display.{}+local.{}+raw.{}+clear.{}+matte.{}+undereye.{}+boundary.{}+skin.{}+labs.selected-v5+calibrated.2+background-repair.2+glare.3+hsl-neutral.1+people-gate.1",
         ENGINE,
         crate::profiles::PROFILES_VER,
         aura_portrait::PARSE_VER,
@@ -884,27 +878,30 @@ mod tests {
     fn the_interactive_path_skips_heavy_stages_and_the_export_path_never_does() {
         let mut recipe = fixtures::reference();
         recipe.global.dehaze = 40;
+        recipe.restoration.deblur = 50;
+        let caps = Capabilities {
+            restoration: true,
+            ..Capabilities::default()
+        };
         let interactive = plan(
             &recipe,
             RenderPurpose::Interactive,
             InputKind::Working,
-            Capabilities::default(),
+            caps,
         );
-        assert!(!interactive.stages.contains(&Stage::Dehaze));
+        // Restoration is heavy and waits for the full render; dehaze reads the small frame base
+        // and is shown while the slider moves.
+        assert!(!interactive.stages.contains(&Stage::Restoration));
+        assert!(interactive.stages.contains(&Stage::Dehaze));
         assert!(interactive
             .notes
             .iter()
             .any(|n| n.reason == SkipReason::InteractivePath));
 
         for purpose in [RenderPurpose::Export, RenderPurpose::Analysis] {
-            let full = plan(
-                &recipe,
-                purpose,
-                InputKind::Working,
-                Capabilities::default(),
-            );
+            let full = plan(&recipe, purpose, InputKind::Working, caps);
             assert!(
-                full.stages.contains(&Stage::Dehaze),
+                full.stages.contains(&Stage::Dehaze) && full.stages.contains(&Stage::Restoration),
                 "{purpose:?} must not skip"
             );
         }
@@ -1034,7 +1031,9 @@ mod tests {
         // Full-size reconstruction changes pixels too, even though the model proxy is fixed.
         assert!(engine.contains(&format!("+raw.{}", aura_raw::full::DEMOSAIC_VER)));
         assert!(engine.contains(&format!("+skin.{}", crate::retouch_skin::REFERENCE_VERSION)));
-        assert!(engine.ends_with("+labs.selected-v5"));
+        assert!(engine.contains("+labs.selected-v5+"));
+        assert!(engine.contains("+background-repair.2+"));
+        assert!(engine.ends_with("+hsl-neutral.1+people-gate.1"));
         assert!(engine.contains(&format!("+clear.{}+", crate::retouch_clear::VERSION)));
         assert!(engine.contains(&format!("+undereye.{}+", crate::retouch_undereye::VERSION)));
     }
