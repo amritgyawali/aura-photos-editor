@@ -777,7 +777,7 @@ pub fn render_hash(
 #[must_use]
 pub fn engine_string() -> String {
     format!(
-        "{}+profiles.{}+portrait.{}+display.{}+local.{}+raw.{}+clear.{}+matte.{}+undereye.{}+boundary.{}+skin.{}+labs.selected-v5+calibrated.2+background-repair.1",
+        "{}+profiles.{}+portrait.{}+display.{}+local.{}+raw.{}+clear.{}+matte.{}+undereye.{}+boundary.{}+skin.{}+labs.selected-v5+calibrated.2+hsl.2+faceless.1+background-repair.1",
         ENGINE,
         crate::profiles::PROFILES_VER,
         aura_portrait::PARSE_VER,
@@ -1034,7 +1034,10 @@ mod tests {
         // Full-size reconstruction changes pixels too, even though the model proxy is fixed.
         assert!(engine.contains(&format!("+raw.{}", aura_raw::full::DEMOSAIC_VER)));
         assert!(engine.contains(&format!("+skin.{}", crate::retouch_skin::REFERENCE_VERSION)));
-        assert!(engine.ends_with("+labs.selected-v5"));
+        assert!(engine.contains("+labs.selected-v5+"));
+        // The calibrated look and the background repair are stages whose pixels it decides too.
+        assert!(engine.contains("+calibrated.2+"));
+        assert!(engine.ends_with("+background-repair.1"));
         assert!(engine.contains(&format!("+clear.{}+", crate::retouch_clear::VERSION)));
         assert!(engine.contains(&format!("+undereye.{}+", crate::retouch_undereye::VERSION)));
     }

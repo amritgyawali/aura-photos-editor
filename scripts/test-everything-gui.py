@@ -93,6 +93,7 @@ def prepare_inputs():
     # One PNG, made from the first bride photograph.
     with Image.open(inputs / chosen[0]) as im:
         ImageOps.exif_transpose(im).convert('RGB').save(inputs / 'bride-as-png.png')
+    make_colour_chart(inputs / 'colour-chart.png')
     report['inputs'] = sorted(p.name for p in inputs.iterdir())
     report['inputHashes'] = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in inputs.iterdir()}
     # A finished version of the PNG for the paired match: brighter and warmer, same pixels.
@@ -120,6 +121,52 @@ def prepare_inputs():
     return inputs, chosen
 
 
+# The eight HSL bands at the hue each is centred on, as the chart paints them.
+CHART_HUES = [('red', 0), ('orange', 30), ('yellow', 60), ('green', 120), ('aqua', 180), ('blue', 240),
+              ('purple', 270), ('magenta', 300)]
+CHART_GREYS = [0.1, 0.25, 0.4, 0.55, 0.7, 0.85]
+
+
+def make_colour_chart(path):
+    """Eight saturated patches at the HSL band centres, a grey ramp, and two skin tones."""
+    import colorsys
+    w, h = 1600, 800
+    chart = np.zeros((h, w, 3), np.uint8)
+    for k, (_, hue) in enumerate(CHART_HUES):
+        rgb = colorsys.hsv_to_rgb(hue / 360, 0.7, 0.8)
+        chart[0:int(0.4 * h), int(k * w / 8):int((k + 1) * w / 8)] = [round(v * 255) for v in rgb]
+    for k, v in enumerate(CHART_GREYS):
+        chart[int(0.4 * h):int(0.7 * h), int(k * w / 6):int((k + 1) * w / 6)] = round(v * 255)
+    chart[int(0.7 * h):, :w // 2] = (224, 172, 140)
+    chart[int(0.7 * h):, w // 2:] = (120, 80, 60)
+    Image.fromarray(chart).save(path)
+
+
+def chart_patch(img, row, k):
+    """The mean colour of the middle of one chart patch: row 'hue' (0-7), 'grey' (0-5) or 'skin' (0-1)."""
+    h, w, _ = img.shape
+    rows = {'hue': (0.0, 0.4, 8), 'grey': (0.4, 0.7, 6), 'skin': (0.7, 1.0, 2)}
+    y0, y1, n = rows[row]
+    span = y1 - y0
+    ys = slice(int((y0 + 0.25 * span) * h), int((y1 - 0.25 * span) * h))
+    xs = slice(int((k + 0.25) / n * w), int((k + 0.75) / n * w))
+    return img[ys, xs].reshape(-1, 3).astype(float).mean(0)
+
+
+def hsv_of(rgb):
+    import colorsys
+    return colorsys.rgb_to_hsv(*(np.clip(rgb, 0, 255) / 255.0))
+
+
+def luma_of(rgb):
+    return float(0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2])
+
+
+def hue_turn(a, b):
+    d = (hsv_of(b)[0] - hsv_of(a)[0]) * 360
+    return (d + 180) % 360 - 180
+
+
 def launch(exe, port):
     env = dict(os.environ,
                WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=f'--remote-debugging-port={port}',
@@ -127,12 +174,19 @@ def launch(exe, port):
                AURA_TEST_CATALOG=str(OUT / 'catalog' / 'catalog.sqlite'))
     (OUT / 'catalog').mkdir(parents=True, exist_ok=True)
     proc = subprocess.Popen([str(exe)], cwd=str(ROOT), env=env)
+    # Wait for this app's own page, not merely for a debugging port: another AURA on the machine
+    # (another harness, or the photographer's own window) must never be driven by mistake.
     for _ in range(180):
+        if proc.poll() is not None:
+            raise RuntimeError(f'AURA exited during start-up (code {proc.returncode})')
         try:
-            urllib.request.urlopen(f'http://127.0.0.1:{port}/json/version', timeout=1)
-            return proc
+            with urllib.request.urlopen(f'http://127.0.0.1:{port}/json/list', timeout=1) as reply:
+                pages = json.loads(reply.read())
+            if any(p.get('type') == 'page' and 'tauri' in p.get('url', '') for p in pages):
+                return proc
         except Exception:  # noqa: BLE001
-            time.sleep(1)
+            pass
+        time.sleep(1)
     proc.terminate()
     raise RuntimeError('AURA did not start')
 
@@ -170,14 +224,22 @@ def main():
 
 
 def run(pw, port, inputs, chosen, only):
-    browser = pw.chromium.connect_over_cdp(f'http://127.0.0.1:{port}')
+    # WebView2 swaps processes when it navigates to the app's page; a connection made just before
+    # the swap stays attached to a blank target, so reconnect until the app's page is seen.
     page = None
-    for _ in range(120):
-        found = [p for c in browser.contexts for p in c.pages]
-        page = next((p for p in found if 'localhost' in p.url or 'tauri' in p.url), None)
+    for _ in range(8):
+        browser = pw.chromium.connect_over_cdp(f'http://127.0.0.1:{port}')
+        for _ in range(15):
+            found = [p for c in browser.contexts for p in c.pages]
+            page = next((p for p in found if 'localhost' in p.url or 'tauri' in p.url), None)
+            if page:
+                break
+            time.sleep(1)
         if page:
             break
-        time.sleep(1)
+        browser.close()
+    if page is None:
+        raise RuntimeError(f'no AURA page on port {port}: {[p.url for c in browser.contexts for p in c.pages]}')
     page.set_default_timeout(600000)
     expect.set_options(timeout=600000)
     page.wait_for_function('() => !!window.__TAURI_INTERNALS__')
@@ -193,8 +255,8 @@ def run(pw, port, inputs, chosen, only):
     def want(group):
         return only is None or group in only
 
-    def proxy(photo):
-        r = call('render_image', photoId=photo, level='proxy2048', purpose='interactive')
+    def proxy(photo, purpose='interactive'):
+        r = call('render_image', photoId=photo, level='proxy2048', purpose=purpose)
         return np.frombuffer(base64.b64decode(r['rgbBase64']), dtype=np.uint8).reshape(r['height'], r['width'], 3)
 
     def recipe_hash(photo):
@@ -383,6 +445,284 @@ def run(pw, port, inputs, chosen, only):
         case('develop', 'sync settings to another photo', sync)
         history(dev, 'reset_original')
 
+    # ---------------------------------------------------------- colour values
+    if want('colour-values'):
+        chart = by_name.get('colour-chart.png')
+        history(chart, 'reset_original')
+        base = proxy(chart)
+
+        def apply_and_check(changes, check, label, purpose='interactive'):
+            """Set each (path, value), run `check(after)`, then undo every step and require the
+            photograph back exactly. Dehaze is measured on the export render: the interactive
+            preview skips it by design and says so."""
+            for path, value in changes:
+                call('set_param', projectId=project, photoId=chart, path=path, value=value, label='Test ' + label)
+            after = proxy(chart, purpose)
+            base_here = base if purpose == 'interactive' else None
+            try:
+                if base_here is None:
+                    for _ in changes:
+                        history(chart, 'undo')
+                    before = proxy(chart, purpose)
+                    for path, value in changes:
+                        call('set_param', projectId=project, photoId=chart, path=path, value=value,
+                             label='Test ' + label)
+                else:
+                    before = base_here
+                if np.array_equal(after, before):
+                    raise AssertionError('no visible change at this value')
+                return check(after)
+            finally:
+                for _ in changes:
+                    history(chart, 'undo')
+                if not np.array_equal(proxy(chart), base):
+                    raise AssertionError('Undo did not restore the photograph exactly')
+
+        def greys_kept(after, tolerance=2.0):
+            worst = max(float(np.abs(chart_patch(after, 'grey', k) - chart_patch(base, 'grey', k)).max())
+                        for k in range(len(CHART_GREYS)))
+            if worst > tolerance:
+                raise AssertionError(f'neutral greys moved by {worst:.1f} levels')
+            return worst
+
+        for k, (band, _) in enumerate(CHART_HUES):
+            opposite = (k + 4) % 8
+            for channel in 'hsl':
+                for value in (-100, 100):
+                    def hsl(k=k, band=band, channel=channel, value=value, opposite=opposite):
+                        def check(after):
+                            was, now = chart_patch(base, 'hue', k), chart_patch(after, 'hue', k)
+                            moved = float(np.abs(now - was).mean())
+                            if moved < 2.0:
+                                raise AssertionError(f'{band} patch barely moved ({moved:.1f} levels)')
+                            if channel == 's':
+                                ds = hsv_of(now)[1] - hsv_of(was)[1]
+                                if (value > 0) != (ds > 0):
+                                    raise AssertionError(f'saturation went the wrong way ({ds:+.3f})')
+                                what = f'saturation {ds:+.3f}'
+                            elif channel == 'l':
+                                dl = luma_of(now) - luma_of(was)
+                                if (value > 0) != (dl > 0):
+                                    raise AssertionError(f'luminance went the wrong way ({dl:+.1f})')
+                                what = f'luma {dl:+.1f}'
+                            else:
+                                turn = hue_turn(was, now)
+                                if abs(turn) < 3:
+                                    raise AssertionError(f'hue turned only {turn:+.1f} degrees')
+                                what = f'hue {turn:+.1f} deg'
+                            far = float(np.abs(chart_patch(after, 'hue', opposite) - chart_patch(base, 'hue', opposite)).mean())
+                            if far > 3.0:
+                                raise AssertionError(f'{CHART_HUES[opposite][0]} patch moved {far:.1f} levels')
+                            grey = greys_kept(after)
+                            return f'{what}; opposite band {far:.1f}, greys {grey:.1f} levels; Undo exact'
+                        return apply_and_check([(f'global.hsl.{band}.{channel}', value)], check, f'hsl {band} {channel}')
+                    case('colour-values', f'HSL {band} {channel} {value:+d}', hsl)
+
+        mid = 3  # the 0.55 grey
+
+        def warmth(after):  # red minus blue on the middle grey
+            p = chart_patch(after, 'grey', mid)
+            return float(p[0] - p[2])
+
+        def magenta(after):  # how far green sits below red and blue
+            p = chart_patch(after, 'grey', mid)
+            return float((p[0] + p[2]) / 2 - p[1])
+
+        def mean_sat(after):
+            return float(np.mean([hsv_of(chart_patch(after, 'hue', k))[1] for k in range(8)]))
+
+        def grey_luma(after, k):
+            return luma_of(chart_patch(after, 'grey', k))
+
+        directional = [
+            ('temperature 2000 K', [('global.temperature', 2000)], lambda a: warmth(a) < warmth(base) - 3, 'cooler'),
+            ('temperature 50000 K', [('global.temperature', 50000)], lambda a: warmth(a) > warmth(base) + 3, 'warmer'),
+            ('tint -150', [('global.tint', -150)], lambda a: magenta(a) < magenta(base) - 3, 'greener'),
+            ('tint +150', [('global.tint', 150)], lambda a: magenta(a) > magenta(base) + 3, 'more magenta'),
+            ('saturation -100', [('global.saturation', -100)], lambda a: mean_sat(a) < 0.08, 'grey'),
+            ('saturation +100', [('global.saturation', 100)], lambda a: mean_sat(a) > mean_sat(base) + 0.03, 'more saturated'),
+            ('vibrance -100', [('global.vibrance', -100)], lambda a: mean_sat(a) < mean_sat(base) - 0.03, 'less saturated'),
+            ('vibrance +100', [('global.vibrance', 100)], lambda a: mean_sat(a) > mean_sat(base) + 0.01, 'more saturated'),
+            ('exposure -5', [('global.exposure', -5.0)], lambda a: grey_luma(a, mid) < grey_luma(base, mid) - 20, 'darker'),
+            ('exposure +5', [('global.exposure', 5.0)], lambda a: grey_luma(a, mid) > grey_luma(base, mid) + 20, 'brighter'),
+            ('contrast -100', [('global.contrast', -100)],
+             lambda a: grey_luma(a, 5) - grey_luma(a, 0) < grey_luma(base, 5) - grey_luma(base, 0) - 5, 'flatter'),
+            ('contrast +100', [('global.contrast', 100)],
+             lambda a: grey_luma(a, 5) - grey_luma(a, 0) > grey_luma(base, 5) - grey_luma(base, 0) + 5, 'punchier'),
+            ('highlights -100', [('global.highlights', -100)], lambda a: grey_luma(a, 5) < grey_luma(base, 5) - 2, 'brights darker'),
+            ('highlights +100', [('global.highlights', 100)], lambda a: grey_luma(a, 5) > grey_luma(base, 5) + 2, 'brights brighter'),
+            ('shadows -100', [('global.shadows', -100)], lambda a: grey_luma(a, 0) < grey_luma(base, 0) - 2, 'darks darker'),
+            ('shadows +100', [('global.shadows', 100)], lambda a: grey_luma(a, 0) > grey_luma(base, 0) + 2, 'darks brighter'),
+            ('whites -100', [('global.whites', -100)], lambda a: grey_luma(a, 5) < grey_luma(base, 5) - 2, 'whites darker'),
+            ('whites +100', [('global.whites', 100)], lambda a: grey_luma(a, 5) > grey_luma(base, 5) + 2, 'whites brighter'),
+            ('blacks -100', [('global.blacks', -100)], lambda a: grey_luma(a, 0) < grey_luma(base, 0) - 2, 'blacks darker'),
+            ('blacks +100', [('global.blacks', 100)], lambda a: grey_luma(a, 0) > grey_luma(base, 0) + 2, 'blacks brighter'),
+            ('red curve lifted', [('global.channel_curves.red.points', [[0, 0], [128, 190], [255, 255]])],
+             lambda a: chart_patch(a, 'grey', mid)[0] > chart_patch(base, 'grey', mid)[0] + 8, 'redder greys'),
+            ('green curve lifted', [('global.channel_curves.green.points', [[0, 0], [128, 190], [255, 255]])],
+             lambda a: chart_patch(a, 'grey', mid)[1] > chart_patch(base, 'grey', mid)[1] + 8, 'greener greys'),
+            ('blue curve lifted', [('global.channel_curves.blue.points', [[0, 0], [128, 190], [255, 255]])],
+             lambda a: chart_patch(a, 'grey', mid)[2] > chart_patch(base, 'grey', mid)[2] + 8, 'bluer greys'),
+            ('tone curve lifted', [('global.curve.points', [[0, 0], [128, 190], [255, 255]])],
+             lambda a: grey_luma(a, mid) > grey_luma(base, mid) + 8, 'brighter mid greys'),
+            ('grade shadows blue', [('global.colour_grade.shadows.hue', 240), ('global.colour_grade.shadows.saturation', 100)],
+             lambda a: (chart_patch(a, 'grey', 1)[2] - chart_patch(a, 'grey', 1)[0]) - (chart_patch(base, 'grey', 1)[2] - chart_patch(base, 'grey', 1)[0])
+             > (chart_patch(a, 'grey', 5)[2] - chart_patch(a, 'grey', 5)[0]) - (chart_patch(base, 'grey', 5)[2] - chart_patch(base, 'grey', 5)[0]) + 1,
+             'darks bluer than brights'),
+            ('grade highlights orange', [('global.colour_grade.highlights.hue', 30), ('global.colour_grade.highlights.saturation', 100)],
+             lambda a: (chart_patch(a, 'grey', 5)[0] - chart_patch(a, 'grey', 5)[2]) - (chart_patch(base, 'grey', 5)[0] - chart_patch(base, 'grey', 5)[2])
+             > (chart_patch(a, 'grey', 0)[0] - chart_patch(a, 'grey', 0)[2]) - (chart_patch(base, 'grey', 0)[0] - chart_patch(base, 'grey', 0)[2]) + 1,
+             'brights warmer than darks'),
+            ('grade midtones green', [('global.colour_grade.midtones.hue', 120), ('global.colour_grade.midtones.saturation', 100)],
+             lambda a: chart_patch(a, 'grey', 2)[1] - chart_patch(a, 'grey', 2)[0] > chart_patch(base, 'grey', 2)[1] - chart_patch(base, 'grey', 2)[0] + 2,
+             'mid greys greener'),
+            ('grade global magenta', [('global.colour_grade.global.hue', 300), ('global.colour_grade.global.saturation', 100)],
+             lambda a: magenta(a) > magenta(base) + 2, 'greys more magenta'),
+        ]
+        for wheel, row in [('shadows', 1), ('midtones', 3), ('highlights', 4), ('global', 3)]:
+            directional.append((f'grade {wheel} luminance -100', [(f'global.colour_grade.{wheel}.luminance', -100)],
+                                lambda a, row=row: grey_luma(a, row) < grey_luma(base, row) - 1, 'darker'))
+            directional.append((f'grade {wheel} luminance +100', [(f'global.colour_grade.{wheel}.luminance', 100)],
+                                lambda a, row=row: grey_luma(a, row) > grey_luma(base, row) + 1, 'brighter'))
+        for case_name, changes, holds, meaning in directional:
+            def directed(changes=changes, holds=holds, meaning=meaning):
+                def check(after):
+                    if not holds(after):
+                        raise AssertionError(f'expected {meaning}; warmth {warmth(base):.1f}->{warmth(after):.1f}, '
+                                             f'magenta {magenta(base):.1f}->{magenta(after):.1f}, '
+                                             f'saturation {mean_sat(base):.3f}->{mean_sat(after):.3f}, '
+                                             f'mid grey {grey_luma(base, mid):.1f}->{grey_luma(after, mid):.1f}')
+                    return f'{meaning}; Undo exact'
+                return apply_and_check(changes, check, case_name)
+            case('colour-values', case_name, directed)
+
+        # Every other colour control at both ends: it must act and undo exactly.
+        others = [(f'global.calibration.{f}', v) for f in ('shadows_tint', 'red_hue', 'red_saturation', 'green_hue',
+                                                          'green_saturation', 'blue_hue', 'blue_saturation') for v in (-100, 100)]
+        others += [(f'global.parametric.{f}', v) for f in ('highlights', 'lights', 'darks', 'shadows') for v in (-100, 100)]
+        others += [(f'global.{f}', v) for f in ('clarity', 'texture', 'dehaze') for v in (-100, 100)]
+        others += [('global.sharpen.amount', 150), ('global.noise.luminance', 100), ('global.noise.colour', 100),
+                   ('global.effects.vignette.amount', -100), ('global.effects.vignette.amount', 100),
+                   ('global.effects.grain.amount', 100)]
+        for path, value in others:
+            def plain(path=path, value=value):
+                purpose = 'export' if path == 'global.dehaze' else 'interactive'
+                return apply_and_check([(path, value)], lambda after: 'acts; Undo exact', path, purpose)
+            case('colour-values', f'{path} {value:+}', plain)
+        for case_name, extra in [('grade blending 0', ('global.colour_grade.blending', 0)),
+                            ('grade blending 100', ('global.colour_grade.blending', 100)),
+                            ('grade balance -100', ('global.colour_grade.balance', -100)),
+                            ('grade balance +100', ('global.colour_grade.balance', 100))]:
+            def blend(extra=extra):
+                graded = [('global.colour_grade.shadows.hue', 240), ('global.colour_grade.shadows.saturation', 80),
+                          ('global.colour_grade.highlights.hue', 40), ('global.colour_grade.highlights.saturation', 80)]
+                for path, value in graded:
+                    call('set_param', projectId=project, photoId=chart, path=path, value=value, label='Test grade')
+                alone = proxy(chart)
+                try:
+                    def check(after):
+                        if np.array_equal(after, alone):
+                            raise AssertionError('no effect on an active split grade')
+                        return 'changes an active grade; Undo exact'
+                    call('set_param', projectId=project, photoId=chart, path=extra[0], value=extra[1], label='Test grade')
+                    after = proxy(chart)
+                    history(chart, 'undo')
+                    return check(after)
+                finally:
+                    for _ in graded:
+                        history(chart, 'undo')
+                    if not np.array_equal(proxy(chart), base):
+                        raise AssertionError('Undo did not restore the photograph exactly')
+            case('colour-values', case_name, blend)
+
+    # ----------------------------------------------------- face and body values
+    if want('finish-values'):
+        # The photograph whose largest detected face is biggest: face sliders need a face, and the
+        # first "bride" in the source manifest is not always a person.
+        sizes = {}
+        for fname, pid in by_name.items():
+            if fname.lower().endswith(('.jpg', '.png')) and fname != 'colour-chart.png':
+                try:
+                    found = call('analyse_portrait', photoId=pid).get('faces', [])
+                except Exception:  # noqa: BLE001 - a photo that cannot be parsed has no usable face
+                    found = []
+                sizes[fname] = max((f['bbox'][2] * f['bbox'][3] for f in found), default=0.0)
+        report['faceSizes'] = sizes
+        faceless = [f for f, a in sizes.items() if a == 0]
+        portrait = max(sizes, key=sizes.get) if sizes and max(sizes.values()) > 0 else None
+        if portrait is None:
+            case('finish-values', 'a photograph with a face', lambda: (_ for _ in ()).throw(AssertionError(f'no face found: {sizes}')))
+        person = by_name[portrait] if portrait else bride_jpeg
+        report['finishPhoto'] = portrait
+        history(person, 'reset_original')
+        base = proxy(person)
+        start = call('studio_finish', projectId=project, photoId=person)['finish']
+
+        def finish_case(group_key, field, value):
+            def run_one():
+                before_hash = recipe_hash(person)
+                finish = json.loads(json.dumps(start))
+                finish[group_key][field] = value
+                try:
+                    call('save_studio_finish', projectId=project, photoId=person, finish=finish,
+                         label=f'Test {group_key}.{field}')
+                except Exception as e:  # noqa: BLE001 - an out-of-range refusal is reported as such
+                    if value < 0 and ('0..=100' in str(e) or 'must be' in str(e) or 'AURA-RENDER-8002' in str(e)):
+                        if recipe_hash(person) != before_hash:
+                            raise AssertionError('refused, but the recipe changed')
+                        raise Skip('one-sided control (0..100): a negative value is refused and nothing changes')
+                    raise
+                after = proxy(person)
+                history(person, 'undo')
+                if not np.array_equal(proxy(person), base):
+                    raise AssertionError('Undo did not restore the photograph exactly')
+                if after.shape != base.shape:
+                    return f'size {base.shape[1]}x{base.shape[0]} -> {after.shape[1]}x{after.shape[0]}; Undo exact'
+                diff = np.abs(after.astype(np.int16) - base.astype(np.int16))
+                moved = float((diff.max(axis=2) > 2).mean())
+                if after.std() < 1:
+                    raise AssertionError('the render became a flat colour')
+                if moved == 0:
+                    raise Warn('no visible change on this photograph')
+                return f'{moved:.2%} of pixels changed; Undo exact'
+            return run_one
+
+        ranges = {'light': {'direction': (-180, 180), 'height': (-30, 80)}}
+        for group_key in ['face', 'body', 'skin', 'makeup', 'hair', 'attire', 'scene', 'subject', 'light']:
+            fields = start.get(group_key)
+            if not isinstance(fields, dict):
+                case('finish-values', f'{group_key} controls', lambda g=group_key: (_ for _ in ()).throw(AssertionError(f'no {g} group in the finish')))
+                continue
+            for field, current in fields.items():
+                if not isinstance(current, (int, float)) or isinstance(current, bool):
+                    continue
+                low, high = ranges.get(group_key, {}).get(field, (-100, 100))
+                for value in (low, high):
+                    if value == current:
+                        continue
+                    case('finish-values', f'{group_key}.{field} {value:+}', finish_case(group_key, field, value))
+
+        # People-only controls must leave a photograph with nobody in it exactly as it was.
+        for fname in faceless[:1]:
+            empty = by_name[fname]
+            history(empty, 'reset_original')
+            plain = proxy(empty)
+            blank = call('studio_finish', projectId=project, photoId=empty)['finish']
+            for group_key, field in [('body', 'slim'), ('body', 'height'), ('body', 'legs'), ('body', 'torso'),
+                                     ('subject', 'exposure'), ('subject', 'warmth'), ('subject', 'clarity'),
+                                     ('face', 'slim'), ('face', 'eyeSize')]:
+                def nobody(group_key=group_key, field=field, empty=empty, plain=plain, blank=blank):
+                    finish = json.loads(json.dumps(blank))
+                    finish[group_key][field] = 100
+                    call('save_studio_finish', projectId=project, photoId=empty, finish=finish, label='Test nobody')
+                    after = proxy(empty)
+                    history(empty, 'undo')
+                    if not np.array_equal(after, plain):
+                        moved = float((np.abs(after.astype(int) - plain.astype(int)).max(axis=2) > 2).mean())
+                        raise AssertionError(f'changed {moved:.1%} of a photograph with no person in it')
+                    return 'no person, no change'
+                case('finish-values', f'no person: {group_key}.{field} leaves {fname} alone', nobody)
+
     # --------------------------------------------------------- retouch tools
     if want('retouch-tools'):
         rt = bride
@@ -391,7 +731,7 @@ def run(pw, port, inputs, chosen, only):
         base = proxy(rt)
         quiet = {'red_eye', 'eye_glow_fix', 'eye_clean', 'teeth', 'auto_blemish', 'acne_clear', 'frequency_heal',
                  'defringe', 'vein_reduce', 'glare', 'stretch_marks', 'texture_graft', 'mattify', 'lip_gloss', 'halation',
-                 'under_eye', 'chroma_key', 'local_white_balance'}
+                 'under_eye', 'chroma_key', 'local_white_balance', 'body_hair_soften', 'shadow_remove'}
         for tool in tool_ids():
             def tool_case(tool=tool):
                 warps = tool.startswith('liquify_') or tool == 'reshape'
@@ -400,6 +740,13 @@ def run(pw, port, inputs, chosen, only):
                             tone=.6, warmth=.4 if warps else .25, tint=.1, targetColor=[.6, .3, .2])
                 if tool == 'acne_clear':
                     edit['mask'] = {'strokes': [{'erase': False, 'radius': .03, 'opacity': 1, 'points': [[.5, .35, 1]]}]}
+                # Tools that act only on a chosen colour or above a threshold, set as a photographer
+                # would for this spot: the spill colour sampled from the spot itself, and a
+                # compression threshold the spot's highlights reach.
+                if tool == 'color_despill':
+                    edit.update(targetColor=[.13, .59, .76], tone=.5)
+                if tool == 'highlight_compress':
+                    edit.update(tone=.25, texture=1.6)
                 saved = call('native_retouch_edit', projectId=project, photoId=rt, action='append', edits=[edit], id=None)
                 after = proxy(rt)
                 changed = int((np.abs(after.astype(int) - base.astype(int)).max(axis=2) > 1).sum())
@@ -466,7 +813,8 @@ def run(pw, port, inputs, chosen, only):
         if ok:
             for label in presets:
                 def preset_case(label=label):
-                    radio = page.get_by_role('radio', name=label, exact=True)
+                    # Auto advanced retouch offers a preset of the same name in its own group.
+                    radio = page.get_by_role('radiogroup', name='Retouch preset').get_by_role('radio', name=label, exact=True)
                     radio.click()
                     button = page.get_by_role('button', name=re.compile(r'^Auto retouch'))
                     before = recipe_hash(bride_jpeg)
@@ -505,6 +853,9 @@ def run(pw, port, inputs, chosen, only):
             case('auto-retouch', 'retouch strength sliders', strength)
 
             def portrait_button():
+                # From the original: once a retouch has been chosen the button deliberately adds
+                # only the global enhance, which the presets above have already saved.
+                history(bride_jpeg, 'reset_original')
                 before = recipe_hash(bride_jpeg)
                 page.get_by_role('button', name='Auto portrait', exact=True).click()
                 deadline = time.monotonic() + 600
@@ -520,7 +871,10 @@ def run(pw, port, inputs, chosen, only):
             if len(stages) != 18:
                 raise AssertionError(f'{len(stages)} stages')
             applied = sum(s['outcome'] == 'applied' for s in stages)
-            return f"18 stages, {applied} applied; quality passed={r['report']['quality'].get('passed')}"
+            q = r['report']['quality']
+            reasons = q.get('incompleteReasons') or q.get('incomplete_reasons') or []
+            return (f"18 stages, {applied} applied; quality passed={q.get('passed')}"
+                    + (f"; not complete because: {reasons}" if reasons else ''))
         case('auto-retouch', 'Auto advanced retouch (18 stages)', advanced)
         case('auto-retouch', 'analyse portrait', lambda: str(call('analyse_portrait', photoId=bride_jpeg))[:160])
         for style in ['natural', 'soft', 'polished']:

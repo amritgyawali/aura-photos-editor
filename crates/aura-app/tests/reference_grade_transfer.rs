@@ -186,6 +186,20 @@ fn base64_decode(text: &str) -> Vec<u8> {
 }
 
 /// Mean OKLab difference times a hundred - close to CIELAB ΔE in size.
+/// Mean |dL| and mean |d(a,b)| in `OKLab` times a hundred: the tone and the colour halves of an
+/// error.
+fn split_error(rgb: &[u8], truth: &image::RgbImage) -> (f32, f32) {
+    let lab = |p: &[u8]| oklab_from_linear_srgb([p[0], p[1], p[2]].map(srgb_byte_to_linear));
+    let (mut tone, mut colour, mut n) = (0.0_f32, 0.0_f32, 0.0_f32);
+    for (a, b) in rgb.chunks_exact(3).zip(truth.as_raw().chunks_exact(3)) {
+        let (a, b) = (lab(a), lab(b));
+        tone += (a[0] - b[0]).abs();
+        colour += (a[1] - b[1]).hypot(a[2] - b[2]);
+        n += 1.0;
+    }
+    (100.0 * tone / n.max(1.0), 100.0 * colour / n.max(1.0))
+}
+
 fn error(rgb: &[u8], truth: &image::RgbImage) -> f32 {
     let lab = |p: &[u8]| oklab_from_linear_srgb([p[0], p[1], p[2]].map(srgb_byte_to_linear));
     assert_eq!(rgb.len(), truth.as_raw().len());
@@ -246,7 +260,7 @@ fn a_new_photograph_takes_an_edited_references_look_through_the_renderer() {
     )
     .expect("transfer fit");
     let fitting = prepared.fitting.clone().expect("diagnostics");
-    assert_eq!(fitting.engine, "reference-grade-transfer-v3");
+    assert_eq!(fitting.engine, "reference-grade-transfer-v4-scene-tone");
     let transfer = fitting.transfer.expect("transfer diagnostics");
     assert!(
         transfer.rendered_after.total < transfer.rendered_before.total,
@@ -398,11 +412,29 @@ fn a_new_photograph_takes_an_edited_references_look_through_the_renderer() {
         std::fs::read(&target_path).expect("read original"),
         original
     );
-    // Retain both photographic accuracy gates, after the independent history, replacement,
-    // restart and source-preservation checks so a fidelity failure cannot hide those results.
+    // Both photographic accuracy gates run after the independent history, replacement, restart
+    // and source-preservation checks, so a fidelity failure cannot hide those results.
+    //
+    // One reference of another scene identifies its colour - the neutral axis it puts shadows
+    // and highlights on, its warmth - and not its tone, which it shares with its scene: these
+    // painted scenes have no true black or white, so a matte lift on one reads as its scene
+    // (ADR-0180, ADR-0181). So the colour half must lose at least 40 % of its error, the tone
+    // half must not get worse, and the whole must improve.
+    let (split_tone_before, split_colour_before) = split_error(&baseline_pixels, &truth);
+    let (split_tone_after, split_colour_after) = split_error(&matched_pixels, &truth);
+    let (warm_tone_before, warm_colour_before) = split_error(&baseline_pixels, &warm_truth);
+    let (warm_tone_after, warm_colour_after) = split_error(&replaced, &warm_truth);
+    println!(
+        "colour: split {split_colour_before:.2} -> {split_colour_after:.2}, warm matte {warm_colour_before:.2} -> {warm_colour_after:.2}; tone: split {split_tone_before:.2} -> {split_tone_after:.2}, warm matte {warm_tone_before:.2} -> {warm_tone_after:.2}"
+    );
     assert!(
-        after < 0.6 * before && warm_after < 0.6 * warm_before,
-        "known grade: split {before:.2} -> {after:.2}; warm matte {warm_before:.2} -> {warm_after:.2}"
+        after < before
+            && warm_after < warm_before
+            && split_colour_after < 0.6 * split_colour_before
+            && warm_colour_after < 0.6 * warm_colour_before
+            && split_tone_after <= split_tone_before + 0.02
+            && warm_tone_after <= warm_tone_before + 0.02,
+        "known grade: split {before:.2} -> {after:.2} (colour {split_colour_before:.2} -> {split_colour_after:.2}, tone {split_tone_before:.2} -> {split_tone_after:.2}); warm matte {warm_before:.2} -> {warm_after:.2} (colour {warm_colour_before:.2} -> {warm_colour_after:.2}, tone {warm_tone_before:.2} -> {warm_tone_after:.2})"
     );
 }
 
@@ -527,7 +559,7 @@ fn a_native_regression_is_refused_and_stale_measurements_can_be_refreshed() {
             .fitting
             .expect("diagnostics")
             .engine,
-        "reference-grade-transfer-v3"
+        "reference-grade-transfer-v4-scene-tone"
     );
     assert_eq!(history(), history_before);
 }
@@ -581,7 +613,7 @@ fn clipping_is_refused_even_when_it_would_match_reference_statistics() {
             .map_err(|e| aura_core::errors::db::statement_failed("inject clipped fit", &e))?;
         Ok(())
     }).expect("clipped fit");
-    let refused = color_match::apply(
+    let applied = color_match::apply(
         &state,
         &color_match::ApplyInput {
             photo_id: photo.to_db(),
@@ -589,15 +621,6 @@ fn clipping_is_refused_even_when_it_would_match_reference_statistics() {
             controls: color_match::Controls::default(),
             cancel_id: job(),
         },
-    )
-    .expect_err("a perfect white histogram cannot justify destroying target detail");
-    assert!(
-        refused.message.contains("full-resolution highlight"),
-        "{refused:?}"
-    );
-    assert_eq!(
-        state.recipe_store().load(&photo).expect("unchanged"),
-        baseline
     );
     let after_history = state
         .catalog()
@@ -608,5 +631,32 @@ fn clipping_is_refused_even_when_it_would_match_reference_statistics() {
             .map_err(|e| aura_core::errors::db::statement_failed("history", &e))
         })
         .expect("history");
-    assert_eq!(before_history, after_history);
+    // A perfect white histogram cannot justify destroying target detail: the amount asked for is
+    // never saved. Apply may save a smaller share of it that passes every native check (it says
+    // so), or refuse when none does - and then nothing changes.
+    match applied {
+        Err(refused) => {
+            assert_eq!(refused.code, "AURA-ML-5146");
+            assert!(
+                refused.message.contains("full-resolution")
+                    && refused.message.contains("highlight"),
+                "{refused:?}"
+            );
+            assert_eq!(
+                state.recipe_store().load(&photo).expect("unchanged"),
+                baseline
+            );
+            assert_eq!(before_history, after_history);
+        }
+        Ok(saved) => {
+            assert_eq!(
+                saved.reduced_from,
+                Some(1.0),
+                "the full amount was not saved"
+            );
+            assert!(saved.controls.amount <= 0.75 + 1e-6, "{:?}", saved.controls);
+            assert!(saved.full_resolution_checked && saved.current);
+            assert_eq!(after_history, before_history + 1);
+        }
+    }
 }

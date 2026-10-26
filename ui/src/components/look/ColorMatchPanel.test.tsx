@@ -7,11 +7,14 @@ vi.mock('./RegionalColorMatchPanel', () => ({ RegionalColorMatchPanel: () => nul
 vi.mock('./ReferenceLibraryManager', () => ({ ReferenceLibraryManager: () => null }));
 
 vi.mock('../../ipc/client', () => ({ inTauri: () => true, api: { cancelJob: vi.fn(), listImages: vi.fn() },
-  asIpcError: (error: Error) => ({ message: error.message }) }));
+  // The real fallback: only a backend error or a Refusal reaches the photographer as written.
+  asIpcError: (error: unknown) => (typeof error === 'object' && error !== null && 'runbookUrl' in error ? error : { message: 'AURA hit an unexpected problem and stopped safely.' }) }));
 vi.mock('../../ipc/colorMatch', () => ({
   DEFAULT_MATCH_CONTROLS: { amount: 1, tone: 1, color: 1, whiteBalance: 1 }, pickColorReference: vi.fn(), pickColorReferences: vi.fn(),
   colorMatch: { list: vi.fn(), status: vi.fn(), import: vi.fn(), prepare: vi.fn(), apply: vi.fn(), manage:vi.fn(), capture:vi.fn(), generatePreset:vi.fn() },
 }));
+// A refusal as the backend sends it: a typed error, not a JavaScript exception.
+const backendError = (message: string) => ({ code: 'AURA-ML-5070', message, runbookUrl: 'https://aura.app/e/AURA-ML-5070', retryable: false });
 const reference = { id: 'ref', name: 'My wedding.tiff', width: 4480, height: 6720, convertedIcc: true, regions: ['whole image', 'face skin'] };
 const analysis: ColorMatchReport = { sessionId: 'session', photoId: 'photo', reference,
   controls: { amount: 1, tone: 1, color: 1, whiteBalance: 1 }, matchedRegions: reference.regions,
@@ -72,13 +75,39 @@ it('sends independent slider strengths and uses an explicit native application',
 it('shows separately verified tone and palette differences for the saved strengths', async () => {
   const distance = (tone: number, palette: number) => ({ tone, palette, cast: 1, chroma: 1, hue: 1, total: 3 });
   vi.mocked(colorMatch.status).mockResolvedValue({ ...analysis, fullResolutionChecked: true, fitting: {
-    engine: 'reference-palette-transport-v7', intent: 'palette', refinementCandidates: 4, uniqueRenders: 3, cachedProposals: 0,
+    engine: 'reference-palette-transport-v8', intent: 'palette', refinementCandidates: 4, uniqueRenders: 3, cachedProposals: 0,
     transfer: { renderedBefore: distance(8, 6), renderedAfter: distance(4, 2) },
   } });
   render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
   const components = await screen.findByTestId('colour-match-components');
   expect(components.textContent).toContain('Tone difference: 8.00 → 4.00');
   expect(components.textContent).toContain('Colour palette difference: 6.00 → 2.00');
+});
+it('says when the look was held back in the highlights to keep their detail', async () => {
+  const distance = { tone: 5, palette: 0, cast: 1, chroma: 1, hue: 1, total: 2 };
+  vi.mocked(colorMatch.status).mockResolvedValue({ ...analysis, fullResolutionChecked: true, fitting: {
+    engine: 'reference-grade-transfer-v4-scene-tone', intent: 'natural', refinementCandidates: 4, uniqueRenders: 6,
+    cachedProposals: 0, nativeCandidateChecked: true, nativeBacktrackFactor: 1,
+    transfer: { renderedBefore: distance, renderedAfter: distance, highlightsLimitedFrom: 0.23 },
+  } });
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
+  const note = await screen.findByTestId('colour-match-highlights');
+  expect(note.textContent).toContain('held back in the brightest areas');
+  expect(note.textContent).toContain('23% of the photo');
+});
+it('says what tone the reference look implies and when the photo was finished first', async () => {
+  const distance = { tone: 5, palette: 0, cast: 1, chroma: 1, hue: 1, total: 2 };
+  vi.mocked(colorMatch.status).mockResolvedValue({ ...analysis, fullResolutionChecked: true, fitting: {
+    engine: 'reference-grade-transfer-v4-scene-tone', intent: 'natural', refinementCandidates: 4, uniqueRenders: 3,
+    cachedProposals: 0, nativeCandidateChecked: true, nativeBacktrackFactor: 0.75,
+    transfer: { renderedBefore: distance, renderedAfter: distance,
+      toneEstimate: { lookBlack: 0.12, lookWhite: 0.94, ownBlack: 0.14, ownWhite: 0.9 } },
+  } });
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
+  const tone = await screen.findByTestId('colour-match-tone');
+  expect(tone.textContent).toContain('lifts blacks by about 12%');
+  expect(tone.textContent).toContain('given a finished range first');
+  expect(screen.getByText(/limited the fitted look to 75%/)).toBeTruthy();
 });
 it('matches the newly selected reference with a fresh analysis and native apply in one click', async () => {
   const warm = { ...reference, id: 'warm', name: 'Warm portrait.jpg' };
@@ -108,7 +137,7 @@ it('never applies a one-click analysis returned for another reference', async ()
   expect(colorMatch.apply).not.toHaveBeenCalled();
 });
 it('ends the matching status when the selected reference is refused', async () => {
-  vi.mocked(colorMatch.prepare).mockRejectedValue(new Error('No safe colour fit. Your edit was kept.'));
+  vi.mocked(colorMatch.prepare).mockRejectedValue(backendError('No safe colour fit. Your edit was kept.'));
   render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
   await screen.findByRole('option', { name: reference.name });
   fireEvent.click(screen.getByRole('button', { name: 'Match reference to this photo' }));
@@ -116,6 +145,77 @@ it('ends the matching status when the selected reference is refused', async () =
   expect(screen.queryByText(/Matching the selected reference/)).toBeNull();
   expect((screen.getByRole('button', { name: 'Match reference to this photo' }) as HTMLButtonElement).disabled).toBe(false);
   expect(colorMatch.apply).not.toHaveBeenCalled();
+});
+it('ends the matching status when the editor refuses the save (deep assessment, target 11)', async () => {
+  // The editor's write wrapper catches a native refusal, shows its own alert and resolves to
+  // the reason. The panel must end in a refusal of its own, not keep "Matching..." on screen.
+  const refusing = async (action: () => Promise<unknown>) => {
+    try { await action(); return null; } catch (cause) { return (cause as Error).message; }
+  };
+  vi.mocked(colorMatch.apply).mockRejectedValue(backendError('This strength failed the full-resolution check. No edit was saved.'));
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={refusing}/>);
+  await screen.findByRole('option', { name: reference.name });
+  fireEvent.click(screen.getByRole('button', { name: 'Match reference to this photo' }));
+  expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'This strength failed the full-resolution check. No edit was saved.');
+  expect(screen.queryByText(/Matching the selected reference/)).toBeNull();
+  expect(screen.queryByText(/Matched .* to this photo/)).toBeNull();
+  expect((screen.getByRole('button', { name: 'Match reference to this photo' }) as HTMLButtonElement).disabled).toBe(false);
+});
+it('says the look was learned from the original and leaves only Amount, up to 100%', async () => {
+  const distance = { tone: 2, palette: 0, cast: 1, chroma: 1, hue: 1, total: 2 };
+  vi.mocked(colorMatch.status).mockResolvedValue({ ...analysis, fullResolutionChecked: true, fitting: {
+    engine: 'reference-original-calibrated-v1', intent: 'natural', refinementCandidates: 0, uniqueRenders: 2,
+    cachedProposals: 0, nativeCandidateChecked: true, nativeBacktrackFactor: 1,
+    transfer: { renderedBefore: distance, renderedAfter: distance, learnedFrom: '989A2698.CR3' },
+  } });
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
+  expect((await screen.findByTestId('colour-match-learned')).textContent).toContain('your own edit of 989A2698.CR3');
+  const amount = screen.getByRole('slider', { name: 'Match amount' }) as HTMLInputElement;
+  expect(amount.disabled).toBe(false);
+  expect(amount.max).toBe('100');
+  for (const name of ['Tone match', 'Colour match', 'Warmth match']) {
+    expect((screen.getByRole('slider', { name }) as HTMLInputElement).disabled).toBe(true);
+  }
+});
+it('explains when a photo looked like the original but could not be used', async () => {
+  const distance = { tone: 2, palette: 0, cast: 1, chroma: 1, hue: 1, total: 2 };
+  vi.mocked(colorMatch.status).mockResolvedValue({ ...analysis, fullResolutionChecked: true, fitting: {
+    engine: 'reference-grade-transfer-v4-scene-tone', intent: 'natural', refinementCandidates: 1, uniqueRenders: 2, cachedProposals: 0,
+    transfer: { renderedBefore: distance, renderedAfter: distance,
+      originalRefused: 'DSC0001.png looks like the original, but the edited photo is cropped or rotated, so its pixels do not line up.' },
+  } });
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
+  expect((await screen.findByTestId('colour-match-original-refused')).textContent).toContain('estimated from the edited photo alone');
+  expect((screen.getByRole('slider', { name: 'Tone match' }) as HTMLInputElement).disabled).toBe(false);
+});
+it('never calls a result a match when the photo looks the same as before', async () => {
+  vi.mocked(colorMatch.apply).mockImplementation(async (_photo, _session, controls) => ({
+    ...analysis, controls, changed: 1, fullResolutionChecked: true, afterDistance: 2, visibleChange: 0.4,
+  }));
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
+  await screen.findByRole('option', { name: reference.name });
+  fireEvent.click(screen.getByRole('button', { name: 'Match reference to this photo' }));
+  expect(await screen.findByText(/looks almost the same as before \(difference 0\.4/)).toBeTruthy();
+  expect(screen.queryByText(/Matched .* to this photo/)).toBeNull();
+  expect(screen.getByTestId('colour-match-visible').textContent).toContain('0.4');
+});
+it('reports a visible match as a match, with how much it changed', async () => {
+  vi.mocked(colorMatch.apply).mockImplementation(async (_photo, _session, controls) => ({
+    ...analysis, controls, changed: 1, fullResolutionChecked: true, afterDistance: 2, visibleChange: 6.2,
+  }));
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
+  await screen.findByRole('option', { name: reference.name });
+  fireEvent.click(screen.getByRole('button', { name: 'Match reference to this photo' }));
+  await screen.findByText(`Matched ${reference.name} to this photo. Use Undo to compare.`);
+  expect(screen.getByTestId('colour-match-visible').textContent).toContain('6.2');
+});
+it('treats an edit that is still saving as nothing saved', async () => {
+  const busy = async () => 'Another edit is still being saved. No edit was saved; try again when it finishes.';
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={busy}/>);
+  await screen.findByRole('option', { name: reference.name });
+  fireEvent.click(screen.getByRole('button', { name: 'Match reference to this photo' }));
+  expect((await screen.findByRole('alert')).textContent).toContain('Another edit is still being saved');
+  expect(screen.queryByText(/Matching the selected reference/)).toBeNull();
 });
 it('does not report a closer match when native safety retained an unchanged endpoint', async () => {
   vi.mocked(colorMatch.apply).mockResolvedValue({ ...analysis, afterDistance: analysis.beforeDistance, changed: 0, fullResolutionChecked: true });
@@ -157,7 +257,7 @@ it('does not import or fit when the reference picker is cancelled', async () => 
 it('requires a new analysis when changing from natural look to reference palette and tone', async () => {
   vi.mocked(colorMatch.status).mockResolvedValue(analysis);
   vi.mocked(colorMatch.prepare).mockResolvedValue({ ...analysis, fitting: {
-    engine: 'reference-palette-transport-v7', quality: 'precise', intent: 'palette',
+    engine: 'reference-palette-transport-v8', quality: 'precise', intent: 'palette',
     refinementCandidates: 4, uniqueRenders: 3, cachedProposals: 0,
   } });
   render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
@@ -170,14 +270,34 @@ it('requires a new analysis when changing from natural look to reference palette
   await waitFor(() => expect((screen.getByRole('button', { name: 'Apply colour strengths' }) as HTMLButtonElement).disabled).toBe(false));
 });
 
-it.each(['reference-palette-transport-v4', 'reference-palette-transport-v5', 'reference-palette-transport-v6'])('refits saved %s sessions with continuous palette transport', async engine => {
+it('analyses the exact colours of the reference when that goal is chosen, and says what it does', async () => {
+  vi.mocked(colorMatch.status).mockResolvedValue(analysis);
+  const exact = { ...analysis, sessionId: 'exact', fitting: {
+    engine: 'reference-exact-colours-v1', quality: 'precise' as const, intent: 'exact' as const,
+    refinementCandidates: 1, uniqueRenders: 2, cachedProposals: 0,
+  } };
+  vi.mocked(colorMatch.prepare).mockResolvedValue(exact);
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
+  await screen.findByTestId('colour-match-measurement');
+  fireEvent.change(screen.getByRole('combobox', { name: 'Matching goal' }), { target: { value: 'exact' } });
+  expect(screen.getByTestId('colour-match-exact-hint').textContent).toContain('repainted');
+  // A natural analysis does not serve the exact goal.
+  expect((screen.getByRole('button', { name: 'Apply colour strengths' }) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(screen.getByRole('button', { name: 'Analyse reference match' }));
+  await waitFor(() => expect(colorMatch.prepare).toHaveBeenCalledWith('photo', 'ref', expect.any(String), 'precise', 'exact'));
+  expect((await screen.findByTestId('colour-match-exact')).textContent).toContain('moved onto the reference');
+  // The exact colours are a stored grade: every strength slider applies to them.
+  expect((screen.getByRole('slider', { name: 'Match amount' }) as HTMLInputElement).max).toBe('200');
+});
+
+it.each(['reference-palette-transport-v4', 'reference-palette-transport-v5', 'reference-palette-transport-v6', 'reference-palette-transport-v7'])('refits saved %s sessions with continuous palette transport', async engine => {
   const legacy = { ...analysis, fitting: {
     engine, quality: 'precise' as const, intent: 'palette' as const,
     refinementCandidates: 4, uniqueRenders: 3, cachedProposals: 0,
   } };
   vi.mocked(colorMatch.status).mockResolvedValue(legacy);
   vi.mocked(colorMatch.prepare).mockResolvedValue({ ...legacy, sessionId: 'guarded',
-    fitting: { ...legacy.fitting, engine: 'reference-palette-transport-v7' } });
+    fitting: { ...legacy.fitting, engine: 'reference-palette-transport-v8' } });
   render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
   await screen.findByTestId('colour-match-measurement');
   fireEvent.click(screen.getByRole('checkbox', { name: 'Real-Time Color Adjustments' }));
@@ -229,7 +349,7 @@ it('renames and groups a reference and removes only its library entry', async ()
 it('keeps valid references when one file in a multiple upload is refused', async () => {
   vi.mocked(pickColorReferences).mockResolvedValue(['a.tiff','broken.jpg','b.png']);
   vi.mocked(colorMatch.import).mockResolvedValueOnce({ ...reference,id:'a',name:'A.tiff' })
-    .mockRejectedValueOnce(new Error('Cannot decode this reference.')).mockResolvedValueOnce({ ...reference,id:'b',name:'B.png' });
+    .mockRejectedValueOnce(backendError('Cannot decode this reference.')).mockResolvedValueOnce({ ...reference,id:'b',name:'B.png' });
   render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
   await screen.findByRole('option', { name:reference.name });
   fireEvent.click(screen.getByRole('button', { name:'Upload several colour references' }));
@@ -336,7 +456,7 @@ it('cancels hidden live analysis and ignores its late completion', async () => {
 });
 
 it('surfaces failed live analysis without writing and allows a later strength change to retry', async () => {
-  vi.mocked(colorMatch.prepare).mockRejectedValueOnce(new Error('Native analysis failed'));
+  vi.mocked(colorMatch.prepare).mockRejectedValueOnce(backendError('Native analysis failed'));
   render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
   await screen.findByRole('option', { name: reference.name });
   fireEvent.click(screen.getByRole('checkbox', { name: 'Real-Time Color Adjustments' }));

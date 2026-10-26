@@ -14,11 +14,15 @@ pub(super) struct Region {
 }
 
 fn describe(image: &Rgb8) -> LookAggregate {
-    aggregate::fold(&[&measure::read_at(
-        "colour-match",
-        image,
-        image.width.max(image.height),
-    )])
+    // Native safety review can receive a camera master with tens of millions of pixels.
+    // Bound whole-image statistics; compact skin/region sample strips retain every point.
+    let longest = image.width.max(image.height);
+    let edge = if u64::from(image.width) * u64::from(image.height) <= 512 * 512 {
+        longest
+    } else {
+        longest.min(512)
+    };
+    aggregate::fold(&[&measure::read_at("colour-match", image, edge)])
 }
 
 fn selected_region(image: &Rgb8, name: &str, mattes: &[&skin::Matte]) -> Option<Region> {
@@ -161,6 +165,32 @@ pub(super) fn distance(reference: &[Region], actual: &[Region]) -> f32 {
     } else {
         f32::INFINITY
     }
+}
+
+/// How far each person's skin moved, as the largest of [`skin_preserved`]'s five readings
+/// divided by its limit: at most one is within the pilot limits. A person who is no longer
+/// found is an unbounded change.
+pub(super) fn skin_change(before: &[Region], after: &[Region]) -> f32 {
+    before
+        .iter()
+        .filter(|r| r.name.ends_with("skin"))
+        .map(|a| {
+            after
+                .iter()
+                .find(|b| b.name == a.name)
+                .map_or(f32::INFINITY, |b| {
+                    [
+                        a.appearance.shadow.distance(b.appearance.shadow) / 5.0,
+                        a.appearance.mid.distance(b.appearance.mid) / 5.0,
+                        a.appearance.high.distance(b.appearance.high) / 5.0,
+                        (a.appearance.chroma_p50 - b.appearance.chroma_p50).abs() * 128.0 / 5.0,
+                        (a.appearance.tone.p50 - b.appearance.tone.p50).abs() / 0.12,
+                    ]
+                    .into_iter()
+                    .fold(0.0, f32::max)
+                })
+        })
+        .fold(0.0, f32::max)
 }
 
 pub(super) fn skin_preserved(before: &[Region], after: &[Region]) -> bool {

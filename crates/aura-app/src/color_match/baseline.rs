@@ -130,6 +130,7 @@ mod tests {
             checked_hash: None,
             measured_before: None,
             measured_after: None,
+            measured_visible: None,
             fitting: None,
             reference_monochrome: false,
             grade_offsets: [0.0; 6],

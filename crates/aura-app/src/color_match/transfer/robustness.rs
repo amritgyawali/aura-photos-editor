@@ -97,7 +97,7 @@ fn a_near_grey_wall_does_not_override_supported_white_and_shadow_anchors() {
 }
 
 #[test]
-fn unrelated_colour_scenes_keep_their_tone_and_object_brightness() {
+fn unrelated_colour_scenes_keep_their_colour_and_object_brightness() {
     let pixels = samples(&super::tests::outdoor(), TARGET_SAMPLES);
     let mut reference = measure(&pixels.iter().map(|p| p.lab).collect::<Vec<_>>());
     // Change scene statistics without providing corresponding pixels or a neutral cast.
@@ -105,22 +105,35 @@ fn unrelated_colour_scenes_keep_their_tone_and_object_brightness() {
     reference.sector_light.iter_mut().for_each(|v| *v *= 0.6);
     reference.zone_chroma.iter_mut().for_each(|v| *v *= 0.5);
     let fitted = fit(&reference, &pixels, None);
-    let worst = transformed(&fitted.grade, &pixels)
+    let output = transformed(&fitted.grade, &pixels);
+    // Object brightness and colourfulness are scene content and are not copied: no pixel's
+    // colour moves, and lightness moves only through one curve shared by every pixel - so two
+    // pixels never swap order, and a tone change stays bounded (ADR-0180). A reference this much
+    // darker than ordinary photographs may legitimately darken the photograph somewhat.
+    let worst_colour = output
         .iter()
         .zip(&pixels)
-        .map(|(output, input)| {
-            output
-                .iter()
-                .zip(input.lab)
-                .map(|(a, b)| (a - b).powi(2))
-                .sum::<f32>()
-                .sqrt()
-        })
+        .map(|(o, i)| (o[1] - i.lab[1]).hypot(o[2] - i.lab[2]))
         .fold(0.0_f32, f32::max);
     assert!(
-        worst < 1e-5,
-        "unrelated object proportions changed target pixels: {worst}"
+        worst_colour < 0.01,
+        "unrelated object colours changed: {worst_colour}"
     );
+    let mut order: Vec<(f32, f32)> = pixels
+        .iter()
+        .zip(&output)
+        .map(|(i, o)| (i.lab[0], o[0]))
+        .collect();
+    order.sort_by(|a, b| a.0.total_cmp(&b.0));
+    assert!(
+        order.windows(2).all(|w| w[1].1 >= w[0].1 - 1e-4),
+        "tone is not one rising curve"
+    );
+    let worst_tone = order
+        .iter()
+        .map(|(i, o)| (i - o).abs())
+        .fold(0.0_f32, f32::max);
+    assert!(worst_tone <= 0.2, "tone moved by {worst_tone}");
 }
 
 #[test]

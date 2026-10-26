@@ -24,9 +24,11 @@ pub(super) fn colour_recipe(recipe: &Recipe) -> Recipe {
     colour.global.sharpen = neutral.global.sharpen;
     colour.global.noise = neutral.global.noise;
     colour.global.effects = neutral.global.effects;
-    colour
-        .extra
-        .retain(|key, _| key == aura_recipe::reference_grade::KEY);
+    // A learned original/edited operation is a per-colour mapping too, so it bakes into the
+    // preset's colour table exactly as a reference grade does.
+    colour.extra.retain(|key, _| {
+        key == aura_recipe::reference_grade::KEY || key == aura_recipe::calibrated_look::KEY
+    });
     colour
 }
 

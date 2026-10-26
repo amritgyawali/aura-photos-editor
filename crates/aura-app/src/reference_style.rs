@@ -44,6 +44,26 @@ struct StoredReference {
     monochrome: bool,
     #[serde(default)]
     calibration: Option<aura_recipe::calibrated_look::CalibratedLook>,
+    /// The single edited reference on disk, as caches written before `sources` recorded it.
+    #[serde(default)]
+    source: Option<PathBuf>,
+    /// Every edited reference on disk, so their originals can be looked for in a collection.
+    #[serde(default)]
+    sources: Vec<PathBuf>,
+    /// The collection photographs the calibration was learned from, when they were found there.
+    #[serde(default)]
+    learned_from: Option<String>,
+    /// Collections already searched for the references' originals, so each is searched once.
+    #[serde(default)]
+    searched: Vec<String>,
+    /// Why an original found in a collection was not learned from.
+    #[serde(default)]
+    original_refused: Option<String>,
+    /// How far a look learned from its originals may move skin and clipping.
+    #[serde(default)]
+    learned_allowance: Option<gallery_fit::Allowance>,
+    #[serde(default)]
+    evidence: Option<gallery_fit::ReferenceEvidence>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -87,6 +107,12 @@ pub struct ApplyReferenceReport {
     pub before_distance: f32,
     pub after_distance: f32,
     pub protected_fields: usize,
+    /// The reference's own original, found in the collection, that the look was learned from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub learned_from: Option<String>,
+    /// Why an original that was found in the collection could not be learned from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub original_refused: Option<String>,
 }
 
 fn refused(message: impl Into<String>) -> aura_core::AuraError {
@@ -188,6 +214,7 @@ fn analyse(
     let mut monochrome = true;
     let mut readings = Vec::new();
     let mut palette = [0_usize; 64];
+    let mut evidence = gallery_fit::EvidenceBuilder::default();
     for file in &files {
         if cancel.is_cancelled() {
             return Err(refused(
@@ -214,8 +241,10 @@ fn analyse(
                 thumbnail = gallery_fit::thumbnail(&image);
                 dimensions = [image.width, image.height];
             }
+            let reading = measure::read_at(&file.key, &image, 256);
+            evidence.add(&file.key, reading.lighting, &image);
+            readings.push(reading);
             let image = aura_raw::thumb::scale_to(&image, 256);
-            readings.push(measure::read_at(&file.key, &image, 256));
             for pixel in image.data.chunks_exact(3) {
                 if let [r, g, b] = pixel {
                     let bin =
@@ -270,22 +299,99 @@ fn analyse(
         .filter_map(|(bucket, rows)| (rows.len() >= 4).then(|| (bucket, aggregate::fold(&rows))))
         .collect();
     let stored = StoredReference {
-        version: 3,
+        version: 4,
         analysis: analysis.clone(),
         global,
         lighting,
         thumbnail,
         dimensions,
         monochrome,
+        source: None,
+        // A chosen original already gives the calibration; otherwise every reference may have its
+        // original in the collection the look is applied to.
+        sources: if calibrated.is_none() {
+            files.iter().map(|file| file.path.clone()).collect()
+        } else {
+            Vec::new()
+        },
         calibration: calibrated,
+        learned_from: None,
+        searched: Vec::new(),
+        original_refused: None,
+        learned_allowance: None,
+        evidence: evidence.finish(),
     };
-    let path = profile_path(state, &analysis.id)?;
+    save_reference(state, &analysis.id, &stored)?;
+    Ok(analysis)
+}
+
+fn save_reference(
+    state: &AppState,
+    id: &str,
+    stored: &StoredReference,
+) -> aura_core::AuraResult<()> {
+    let path = profile_path(state, id)?;
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| refused(e.to_string()))?;
     }
-    let bytes = serde_json::to_vec(&stored).map_err(|e| refused(e.to_string()))?;
-    std::fs::write(path, bytes).map_err(|e| refused(e.to_string()))?;
-    Ok(analysis)
+    let bytes = serde_json::to_vec(stored).map_err(|e| refused(e.to_string()))?;
+    // Written beside and renamed, so a reader never sees half a reference.
+    let partial = path.with_extension("json.partial");
+    std::fs::write(&partial, bytes).map_err(|e| refused(e.to_string()))?;
+    std::fs::rename(&partial, &path).map_err(|e| refused(e.to_string()))
+}
+
+/// Look once per collection for the single reference's own original. When it is there, the
+/// edit is learned from the pair and becomes the reference's calibration, for this photograph
+/// and every later one: the look is then the photographer's operation, not an estimate made
+/// from another scene's colours.
+fn learn_original(
+    state: &AppState,
+    id: &str,
+    reference: &mut StoredReference,
+    project: &ProjectId,
+    cancel: &CancelToken,
+) -> aura_core::AuraResult<()> {
+    let key = project.to_db();
+    let sources: Vec<PathBuf> = if reference.sources.is_empty() {
+        reference.source.iter().cloned().collect()
+    } else {
+        reference.sources.clone()
+    };
+    if sources.is_empty() || reference.calibration.is_some() || reference.searched.contains(&key) {
+        return Ok(());
+    }
+    let learned = crate::color_match::original::learn(
+        state,
+        project,
+        &sources,
+        crate::color_match::original::Baseline::AutoCorrected,
+        cancel,
+    );
+    if cancel.is_cancelled() {
+        return Err(refused("Reference matching stopped. No edit was saved."));
+    }
+    match learned {
+        Ok(search) => {
+            if let Some(found) = search.learned {
+                tracing::info!(
+                    pairs = found.photos.len(),
+                    "Reference look learned from its originals"
+                );
+                reference.learned_from = Some(found.label());
+                reference.calibration = Some(found.model);
+                reference.analysis.calibration = Some(found.report);
+                reference.learned_allowance = Some(found.allowance);
+                reference.original_refused = None;
+            } else if search.refused.is_some() {
+                reference.original_refused = search.refused;
+            }
+        }
+        // A moved or unreadable reference file leaves matching to the reference alone.
+        Err(error) => tracing::debug!(code = %error.code, "Reference original not searched"),
+    }
+    reference.searched.push(key);
+    save_reference(state, id, reference)
 }
 
 /// Fit the reference to one photo through actual rendered candidates, preserving manual edits.
@@ -314,15 +420,28 @@ fn load_reference(
     let bytes = std::fs::read(profile_path(state, &input.reference_id)?).map_err(|_| {
         refused("This reference style is no longer cached. Analyse the references again.")
     })?;
-    let reference: StoredReference =
+    let mut reference: StoredReference =
         serde_json::from_slice(&bytes).map_err(|e| refused(e.to_string()))?;
-    if !matches!(reference.version, 1..=3) {
+    if !matches!(reference.version, 1..=4) {
         return Err(refused(
             "Analyse this reference again with the current version.",
         ));
     }
     if let Some(model) = &reference.calibration {
         model.validate()?;
+    }
+    let native_pixels = u64::from(reference.dimensions[0]) * u64::from(reference.dimensions[1]);
+    if reference.version < 4
+        && reference.evidence.is_none()
+        && reference.analysis.measured == 1
+        && native_pixels >= 256
+    {
+        // Older single-reference caches retained a colour preview. It supplies bounded
+        // migration evidence without requiring access to the original reference file.
+        reference.evidence = gallery_fit::ReferenceEvidence::from_preview(&reference.thumbnail);
+    }
+    if let Some(evidence) = &reference.evidence {
+        evidence.validate()?;
     }
     Ok(reference)
 }
@@ -339,7 +458,7 @@ pub(crate) fn apply_with_cancel(
     if cancel.is_cancelled() {
         return Err(refused("Reference matching stopped. No edit was saved.").into());
     }
-    let reference = load_reference(state, input)?;
+    let mut reference = load_reference(state, input)?;
     let photo =
         PhotoId::from_db(&input.photo_id).map_err(|_| refused("Invalid photo identifier"))?;
     let current = state.recipe_store().load(&photo)?.ok_or_else(|| {
@@ -355,6 +474,7 @@ pub(crate) fn apply_with_cancel(
         .map_err(|e| aura_core::errors::db::statement_failed("reference photo", &e))
     })?;
     let project = ProjectId::from_db(&project_key).map_err(|_| refused("Invalid collection"))?;
+    learn_original(state, &input.reference_id, &mut reference, &project, cancel)?;
     let full =
         crate::photo_frames::CatalogFrames::new(state.clone()).frame(&photo, RenderLevel::Full)?;
     let small = gallery_fit::reduced(&full)?;
@@ -380,6 +500,7 @@ pub(crate) fn apply_with_cancel(
     // Rebuild every match from its baseline. A calibration belongs to the selected reference,
     // so changing references or strength must replace it rather than compound it.
     baseline.extra.remove(aura_recipe::calibrated_look::KEY);
+    baseline.extra.remove(aura_recipe::reference_grade::KEY);
     let rendered = gallery_fit::render(state, &small, &baseline)?;
     let reading = measure::read("reference-baseline", &rendered);
     let target = reference
@@ -399,6 +520,9 @@ pub(crate) fn apply_with_cancel(
         baseline: &baseline,
         current: &current,
         target,
+        evidence: reference.evidence.as_ref(),
+        lighting: reading.lighting,
+        lighting_confidence: reading.lighting_confidence,
         thumbnail: if same_aspect {
             &reference.thumbnail
         } else {
@@ -407,6 +531,11 @@ pub(crate) fn apply_with_cancel(
         monochrome: reference.monochrome,
         strength: input.strength,
         cancel,
+        allowance: reference
+            .learned_from
+            .as_ref()
+            .and(reference.learned_allowance)
+            .unwrap_or_default(),
     };
     let fitted = if let Some(model) = &reference.calibration {
         gallery_fit::apply_calibrated(state, &request, model)?
@@ -425,10 +554,16 @@ pub(crate) fn apply_with_cancel(
             &photo,
             &recipe,
             &fitted.changed,
-            &format!(
-                "Reference style: {} ({} photos); native measured distance {:.2} -> {:.2}.",
-                reference.analysis.origin, reference.analysis.measured, fitted.before, fitted.after
-            ),
+            &match &reference.learned_from {
+                Some(original) => format!(
+                    "Reference style: {}, learned from your own edit of {original}; native measured distance {:.2} -> {:.2}.",
+                    reference.analysis.origin, fitted.before, fitted.after
+                ),
+                None => format!(
+                    "Reference style: {} ({} photos); native measured distance {:.2} -> {:.2}.",
+                    reference.analysis.origin, reference.analysis.measured, fitted.before, fitted.after
+                ),
+            },
             &hash,
         )?;
     }
@@ -437,5 +572,11 @@ pub(crate) fn apply_with_cancel(
         before_distance: fitted.before,
         after_distance: fitted.after,
         protected_fields: current.provenance.user_edited_fields.len(),
+        learned_from: reference.learned_from.clone(),
+        original_refused: reference
+            .learned_from
+            .is_none()
+            .then(|| reference.original_refused.clone())
+            .flatten(),
     })
 }

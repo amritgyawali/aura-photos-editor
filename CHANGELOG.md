@@ -2,6 +2,56 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Match a look: fixes for the deep assessment, learned originals, tone from the reference - 2026-10-25
+
+- **Your own edit, learned.** When the edited reference you upload was made from a photo in the
+  collection, the Match a look panel (as well as the start screen and collection preparation) finds
+  that photo by name or capture time, confirms it by pixels, and learns your edit pixel for pixel.
+  On the 20-photo desktop test the result came within a median 0.71 of the true look (from 7.6)
+  and the original was found in 19 of 20 cases (ADR-0161, ADR-0181).
+- **No more repainted scenes.** A reference of a different scene is matched as a look, not as a
+  colour distribution: a blue sky no longer turns the colour of the reference's fruit, nor a white
+  floor the green of its forest. Collection matching moved closer to the true look in 18 of 20
+  photos (was 12).
+- **No new bands or blotches.** Every fitted look is limited in how steeply it may stretch nearby
+  colours (twofold), and every result is checked for new bands and patches at every brightness, not
+  only in shadows. Palette results with new bands: 6 of 20 to 0; their median error to the true look
+  9.8 to 6.0.
+- **Tone from the reference.** Matte, airy, moody and contrasty looks now carry their tone across
+  scenes, estimated against ordinary finished photographs (ADR-0180).
+- **Honest results.** A refused save no longer leaves Matching... on screen, and a saved result
+  that looks the same as the original is reported as such, with its measured difference, never as a
+  match.
+- **Strength is a share of a safe match.** Collection matching checks the full-strength look first,
+  so 50 % is half of a look that was safe at 100 %; an edited photo used as a reference is measured
+  at full size.
+- **Exact colours of the reference.** A third matching goal gives your photo the reference's own
+  colours and tones - its tone curve, its palette in its proportions, its split tone, skin to skin -
+  and repaints a different scene to do it. On the 20-photo desktop test it moved photos closest to
+  the reference's colours (median distance 21.3 to 14.5; Palette 15.8, Natural 18.4). Where a full
+  copy would band, block up a dark backdrop or blow out highlights it stops short and says so
+  (ADR-0182).
+- **Apply saves the strongest strength that passes** instead of refusing when the amount asked for
+  fails one check, and says what was saved.
+- **No more hangs on small machines.** A colour match that captured its own edited preview waited
+  for itself forever with one image-work slot; the slot is now reentrant on its thread.
+- **Build green again.** The two Match a look accuracy gates now test what one reference of another
+  scene can identify - its colour, which loses 51-54 % of its error - instead of failing on tone it
+  cannot identify; TLS dependencies upgraded for three advisories, and the AI connection uses X25519
+  key exchange only, so the fourth cannot reach a secret (ADR-0066 addendum, ADR-0181).
+- **Colour bands leave greys alone.** The eight HSL bands now fade in with a pixel's saturation
+  (none below 3 %, all of it from 15 %), so moving the orange luminance slider to -100 no longer
+  darkens a grey card with a trace of warm cast by 34-55 levels. The shader does the same.
+- **No body without a person.** On a photo with no face, the learned subject selection (which
+  finds the most prominent *thing* - a pot, a cake) no longer becomes a body for the slim, height,
+  legs, torso and subject light controls to warp or relight. It still separates the background.
+- **Every retouched face is checked.** Auto advanced retouch's quality control now renders larger
+  - up to the full resolution - when a retouched face is too small to check at screen size, so the
+  guests seated across a stage are checked like the speaker, not left out of the report.
+- **The in-app test of every tool** (`scripts/test-everything-gui.py`) reconnects when the window
+  swaps its web process, measures dehaze on the export render, and no longer clobbers the project
+  name it uses to reopen the library.
+
 ## A hundred measured portrait, attire, background and delivery tools - 2026-10-22
 
 - **Sliders that find what they act on** (ADR-0150), in the style of Evoto: twenty more face sliders

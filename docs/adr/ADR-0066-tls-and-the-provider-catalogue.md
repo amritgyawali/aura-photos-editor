@@ -142,3 +142,21 @@ Declining answers the question, so nobody is asked twice, and a photographer who
   persistence, the refusals and the screen; what is not proved is a single successful
   round trip to any of the nineteen. The first real one reopens this ADR's criteria the
   way the first real camera file reopens phase 02's.
+
+## Addendum, 2026-10-25: X25519 only, and four new advisories
+
+`cargo deny` began failing on four advisories against the TLS stack. Two had fixes and are
+upgraded: `rustls-webpki` 0.103.15 to 0.103.16 and `webpki-roots` 1.0.9 to 1.0.11 (RUSTSEC-2026-0382
+and -0381, distrusted emSign intermediates). Two cannot be upgraded while `rustls-rustcrypto`
+0.0.2-alpha is the provider, and each is ignored by id in `deny.toml` with its reason:
+
+* RUSTSEC-2026-0382 against the provider's `rustls-webpki` 0.102, which it uses for algorithm
+  identifiers only; path validation is rustls's patched 0.103 - the same reason as the four 0.102
+  entries already there.
+* RUSTSEC-2026-0387, `crypto-bigint` 0.5 not constant-time. It arrives through the provider's P-256
+  and P-384, whose key exchange computes on the handshake's ephemeral secret. So the client now
+  offers **X25519 as its only key exchange** (`tls::provider`, pinned by
+  `the_only_key_exchange_is_x25519`): X25519 does not use `crypto-bigint`, and no secret reaches it.
+  P-256 still verifies server signatures, which handles public values only. Every vendor in the
+  catalogue offers X25519; a server that offered only NIST curves would now fail its handshake,
+  which reads as an unreachable provider and falls back locally like any other.

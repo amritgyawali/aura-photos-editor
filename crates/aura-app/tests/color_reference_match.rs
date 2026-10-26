@@ -719,7 +719,7 @@ fn pristine_imports_match_without_analysis_edits_and_first_apply_supports_undo()
             if legacy {
                 "bounded-pattern-search-v1"
             } else {
-                "reference-grade-transfer-v3"
+                "reference-grade-transfer-v4-scene-tone"
             }
         );
         let input = |amount| color_match::ApplyInput {
@@ -1444,15 +1444,21 @@ fn different_dimensions_match_strengths_restore_and_new_manual_edits_are_kept() 
         .fitting
         .as_ref()
         .expect("measured fitting diagnostics");
-    assert_eq!(fitting.engine, "reference-grade-transfer-v3");
+    assert_eq!(fitting.engine, "reference-grade-transfer-v4-scene-tone");
     assert_eq!(fitting.quality, color_match::MatchQuality::Precise);
     assert_eq!(fitting.max_iterations, 4);
     assert!((1..=fitting.max_iterations).contains(&fitting.refinement_candidates));
     assert!((1..=40_000).contains(&fitting.target_samples));
-    assert_eq!(fitting.unique_renders, 2);
+    // Natural analysis finds a native-safe endpoint before offering it (ADR-0180): the baseline
+    // plus one to six bracketing renders.
+    assert!(
+        (2..=8).contains(&fitting.unique_renders),
+        "{}",
+        fitting.unique_renders
+    );
     assert_eq!(fitting.cached_proposals, 0);
     assert_eq!(fitting.grade_candidates, 0);
-    assert!(!fitting.native_candidate_checked);
+    assert!(fitting.native_candidate_checked);
     assert!((0.0..=1.0).contains(&fitting.native_backtrack_factor));
     let transfer = fitting
         .transfer

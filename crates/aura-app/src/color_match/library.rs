@@ -126,14 +126,12 @@ pub fn capture(state: &AppState, input: &CaptureInput) -> IpcResult<ReferenceSum
         };
         let rgb = image::RgbImage::from_raw(image.width, image.height, pixels)
             .ok_or_else(|| invalid("The edited preview could not be read."))?;
-        let small = image::DynamicImage::ImageRgb8(rgb)
-            .thumbnail(512, 512)
-            .to_rgb8();
+        // Measure the actual edited pixels; persist_reference bounds display previews.
         let mut digest = blake3::Hasher::new();
-        digest.update(b"edited-preview-reference-v1");
-        digest.update(&small.width().to_le_bytes());
-        digest.update(&small.height().to_le_bytes());
-        digest.update(small.as_raw());
+        digest.update(b"edited-native-reference-v2");
+        digest.update(&rgb.width().to_le_bytes());
+        digest.update(&rgb.height().to_le_bytes());
+        digest.update(rgb.as_raw());
         let summary = new_summary(
             digest.finalize().to_hex().to_string(),
             name,
@@ -142,9 +140,9 @@ pub fn capture(state: &AppState, input: &CaptureInput) -> IpcResult<ReferenceSum
             false,
         );
         let pixels = Rgb8 {
-            width: small.width(),
-            height: small.height(),
-            data: small.into_raw(),
+            width: rgb.width(),
+            height: rgb.height(),
+            data: rgb.into_raw(),
         };
         persist_reference(state, summary, &pixels, cancel)
     })
