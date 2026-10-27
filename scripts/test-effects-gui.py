@@ -20,6 +20,7 @@ build so `AURA_TEST_CATALOG` is honoured). Writes `.work-checks/effects-gui/`.
 import argparse
 import base64
 import json
+import re
 import os
 import shutil
 import subprocess
@@ -100,6 +101,14 @@ COLOURS = {'chroma_key': [.2, .45, .85], 'light_leak': [1, .55, .25], 'haze': [.
 QUIET = {'clipped_highlight_repair', 'sky_blue', 'anamorphic_streak', 'eye_glow_fix', 'vein_reduce', 'local_white_balance', 'chroma_key', 'lip_gloss', 'halation',
          # Darken only what is darker than its surroundings, or star only real glints (ADR-0135).
          'lash_darken', 'sparkle'}
+
+
+def tool_ids():
+    """Every retouch tool the window offers, read from the window's own source."""
+    text = (ROOT / 'ui/src/ipc/nativeRetouch.ts').read_text(encoding='utf-8')
+    base = re.findall(r"^\s*\['([a-z_]+)', '", text.split('export const RETOUCH_TOOLS = [')[1].split('] as const')[0], re.M)
+    effects = re.findall(r"^\s*\['([a-z_]+)', '", (ROOT / 'ui/src/ipc/retouchEffects.ts').read_text(encoding='utf-8'), re.M)
+    return base + [e for e in effects if e not in base]
 
 
 def launch(exe, port):
@@ -302,8 +311,9 @@ def main():
             expect(library).to_be_visible()
             uses = library.get_by_role('button', name='Use on this photo', exact=True)
             total = uses.count()
-            check('the Effects screen lists every tool', total == 119 and uses.first.is_enabled(),
-                  f'{total} tools')
+            expected = len(tool_ids())
+            check('the Effects screen lists every tool', total == expected and uses.first.is_enabled(),
+                  f'{total} tools, {expected} in the tool lists')
             page.screenshot(path=str(OUT / '02-effects-screen.png'), full_page=False)
             page.get_by_label('Search tools', exact=True).fill('jewellery')
             card = library.get_by_role('listitem').filter(has=page.get_by_role('heading', name='Sparkle', exact=True))
