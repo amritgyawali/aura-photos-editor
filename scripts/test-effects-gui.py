@@ -109,12 +109,19 @@ def launch(exe, port):
                AURA_TEST_CATALOG=str(OUT / 'catalog' / 'catalog.sqlite'))
     (OUT / 'catalog').mkdir(parents=True, exist_ok=True)
     proc = subprocess.Popen([str(exe)], cwd=str(ROOT), env=env)
+    # Wait for this app's own page, not merely for a debugging port: another AURA on the machine
+    # must never be driven by mistake.
     for _ in range(180):
+        if proc.poll() is not None:
+            raise RuntimeError(f'AURA exited during start-up (code {proc.returncode})')
         try:
-            urllib.request.urlopen(f'http://127.0.0.1:{port}/json/version', timeout=1)
-            return proc
+            with urllib.request.urlopen(f'http://127.0.0.1:{port}/json/list', timeout=1) as reply:
+                pages = json.loads(reply.read())
+            if any(p.get('type') == 'page' and 'tauri' in p.get('url', '') for p in pages):
+                return proc
         except Exception:  # noqa: BLE001 - the port is not open until the window is
-            time.sleep(1)
+            pass
+        time.sleep(1)
     proc.terminate()
     raise RuntimeError('AURA did not start')
 
@@ -156,14 +163,22 @@ def main():
 
     try:
         with sync_playwright() as pw:
-            browser = pw.chromium.connect_over_cdp(f'http://127.0.0.1:{args.port}')
+            # WebView2 swaps processes when it navigates to the app's page; a connection made just
+            # before the swap stays attached to a blank target, so reconnect until the page is seen.
             page = None
-            for _ in range(120):
-                found = [p for c in browser.contexts for p in c.pages]
-                page = next((p for p in found if 'localhost' in p.url or 'tauri' in p.url), None)
+            for _ in range(8):
+                browser = pw.chromium.connect_over_cdp(f'http://127.0.0.1:{args.port}')
+                for _ in range(15):
+                    found = [p for c in browser.contexts for p in c.pages]
+                    page = next((p for p in found if 'localhost' in p.url or 'tauri' in p.url), None)
+                    if page:
+                        break
+                    time.sleep(1)
                 if page:
                     break
-                time.sleep(1)
+                browser.close()
+            if page is None:
+                raise RuntimeError(f'no AURA page on port {args.port}')
             page.set_default_timeout(300000)
             expect.set_options(timeout=300000)
             page.wait_for_function('() => !!window.__TAURI_INTERNALS__')

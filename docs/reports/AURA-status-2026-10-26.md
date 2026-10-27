@@ -4,6 +4,46 @@ What has been achieved, what was done and fixed, what is left, and what to aim f
 for the product owner and for whoever picks the work up next. Branch
 `feat/match-a-look-assessment-fixes`, pull request #73.
 
+## Update - 2026-10-27
+
+PR #73 was merged into `main` (`b0c20d4`, all CI checks green). This round is on branch
+`fix/faces-and-in-app-coverage`.
+
+**Fixed: the window filled its memory while you edited.** Running the 100 Evoto-style tools in the
+window, the page process reached 4.4 GB after about 18 slider changes on CR3 files and stopped
+answering clicks (two checks failed on timeouts, not on the tools). The cause: every full-quality
+preview of a 30-megapixel photograph was turned into a 120 MB `data:` text URL, and the window
+kept each one it had shown - measured, every new preview added 120 MB that a forced clean-up did not
+return. Previews and the coverage, changes and clipping overlays are now blob images, made once per
+preview, released when the preview is dropped or replaced, and built in under a second instead of
+7-24 s. The window's security policy allows `blob:` images.
+
+Rerun of the 100 Evoto-style tools on the 27 CR3 files with the fix: **108 checks, 93 pass, 15
+warnings, 0 failures**. The page's memory now rises and falls (mean 3.7 GB, back down to 1.7 GB
+repeatedly, peak 5.9 GB) instead of only rising. The warnings are face sliders that move a few
+hundred pixels on that portrait (inner corners, nostrils, lashes, eyeliner wing), a beard control
+on a photo without a beard, and three spot tools that found nothing where they were tried.
+
+**Test fix: placing a light needs a light.** The in-app test moved the key light's direction and
+height and the relight's direction while the light itself was off, and reported "no change". It
+now switches them on first; all six checks pass, and the face and body section reads **228 checks,
+163 pass, 51 skips (one-sided controls refusing negatives), 14 warnings, 0 failures**.
+
+**Found, not yet fixed: two face finders disagree on small faces.** Auto advanced retouch, auto
+edit, masks and culling use the learned detector, which also scans tiles of the 2048 px preview;
+the portrait parse that the renderer uses (face and body sliders, group balance, group skin, the
+portrait operators, `analyse_portrait`) uses the Haar detector on a 1024 px canvas and needs eye
+evidence. On a stage photograph the first finds four people and the second one, so the group
+controls treat four people as one. The fix that keeps every render re-creatable from its recipe:
+when a face-dependent edit is saved, add the faces the learned detector found and the parse did not
+as face boxes in the recipe (the same `hint:` form the "draw a missed face" tool already writes),
+so the parse measures them like a drawn face. It changes what the people tools act on in every
+group photograph, so it needs its own measured change, an ADR and a run over group photographs.
+
+**Still high: peak memory.** A full-resolution preview still crosses from the engine to the window
+as about 120 MB of base64 text. Sending pixels as binary would roughly halve the peak; it changes
+the IPC contract (`ui/src/ipc/types.ts` is frozen), so it needs an ADR.
+
 ## 1. What has been achieved
 
 - **Match a look copies the reference's colours.** A new goal, *Exact colours of the reference*,
@@ -95,14 +135,17 @@ byte-identical after the run.
 
 ## 6. What needs to be done next
 
-1. Merge PR #73 once CI is green on this commit.
+1. ~~Merge PR #73 once CI is green on this commit.~~ Done 2026-10-26 (`b0c20d4`).
 2. Reconcile Codex's main-tree colour-match changes with this branch (rebase whichever lands second
    and rerun `scripts/test-everything-gui.py` plus the 20-photo match test).
-3. Run `scripts/test-evoto100-gui.py` and `scripts/test-effects-gui.py` on the photos in
-   `H:\AURA EDIT` with the rebuilt app; they were not part of this round.
+3. ~~Run `scripts/test-evoto100-gui.py`~~ done 2026-10-27 (108 checks, 0 failures after the memory
+   fix). `scripts/test-effects-gui.py` is still to run.
 4. Add a group photograph, a full-length portrait and a photo with a beard and an open smile to the
    in-app test inputs, so the warnings in section 4 become real checks.
 5. Test a person seen from behind with a drawn face box, to confirm the body tools follow it.
+6. Make the two face finders agree (see the 2026-10-27 update): an ADR, the face boxes saved into
+   the recipe, and a run over group photographs.
+7. Send previews to the window as binary rather than base64 text (an IPC contract change, ADR first).
 
 ## 7. What to achieve next
 

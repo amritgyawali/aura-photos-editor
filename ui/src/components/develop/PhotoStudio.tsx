@@ -11,7 +11,7 @@ import { SyncSettingsPanel } from './SyncSettingsPanel';
 import { NativeRetouchWorkspace } from './NativeRetouchWorkspace';
 import { PortraitAutoReport } from './PortraitAutoReport';
 import { MasksPanel, type BrushSettings, type MaskTool } from './MasksPanel';
-import { coverageDataUrl } from './rgbImage';
+import { coverageImageUrl } from './rgbImage';
 import { PairedReference } from '../look/PairedReference';
 import { ColorMatchPanel } from '../look/ColorMatchPanel';
 import { ReferenceComparison } from '../look/ReferenceComparison';
@@ -174,7 +174,7 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
       .catch(() => { if (active) setCoverage(null); });
     return () => { active = false; };
   }, [projectId, photoId, selectedMask, maskOverlay, masks]);
-  const overlaid = useMemo(() => render && coverage ? coverageDataUrl(render, coverage, 0.5, [235, 40, 40], crop) : null, [render, coverage, crop]);
+  const overlaid = useMemo(() => render && coverage ? coverageImageUrl(render, coverage, 0.5, [235, 40, 40], crop) : null, [render, coverage, crop]);
   useEffect(() => {
     let active = true;
     if (inRetouch) { setLoading(false); return; }

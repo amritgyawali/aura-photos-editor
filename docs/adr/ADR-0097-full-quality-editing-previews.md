@@ -94,3 +94,27 @@ and nothing when the preview is already held in the window.
 - Memory: a 28 MP preview is about 86 MB of pixels in the app and about 230 MB in the window;
   both caches are bounded and evict the least recently used.
 - Live drafts stay at the quick size; once applied, the saved result is shown at full quality.
+
+## Addendum - 2026-10-27: blob images, owned by their preview
+
+The window cache was bounded; the pictures made from it were not. Each preview became a `data:`
+URL (a 120 MB string for a 30 MP frame, built through two more copies of that size), and the
+window keeps every inline image it has decoded until it prunes on its own schedule. Measured in the
+desktop window: each new full-quality preview added about 120 MB that a forced garbage collection
+did not return, and a session of slider changes on CR3 files reached 4.4 GB and stopped answering
+clicks.
+
+Decision: a preview, and the coverage, changes and clipping overlays drawn from it, is a BMP blob
+URL (`components/develop/imageUrls.ts`). Each URL is owned by the object it was made from - the
+render - and revoked when that object is collected (`FinalizationRegistry`), so a picture on
+screen, whose component still holds its render, is never revoked under it. One URL per owner and
+slot: an overlay redrawn at a new opacity releases the one before. Where blob URLs are not
+available (the unit tests' DOM) the same bytes become a `data:` URL. The window's content security
+policy gains `blob:` for images only.
+
+Measured after the change, on the 100 Evoto-style tools over 27 CR3 files: 108 checks, no failures
+(two had timed out before), the page's memory rising and falling between 1.7 and 5.9 GB (mean 3.7)
+instead of only rising, and a preview built in under a second instead of 7-24 s. The peak is still
+set by the transfer: a full-resolution preview crosses the IPC boundary as base64 text in
+`RenderDto.rgbBase64`. Sending it as binary would roughly halve the peak and is a frozen-contract
+change, so it is left for its own ADR.

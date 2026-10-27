@@ -658,10 +658,22 @@ def run(pw, port, inputs, chosen, only):
         base = proxy(person)
         start = call('studio_finish', projectId=project, photoId=person)['finish']
 
+        # Controls that place something only act when that something is switched on: where the
+        # key light comes from needs a key light, the relight's direction needs a relight.
+        needs = {('light', 'direction'): ('light', 'key', 60), ('light', 'height'): ('light', 'key', 60),
+                 ('subject', 'relightDirection'): ('subject', 'relight', 60)}
+
         def finish_case(group_key, field, value):
             def run_one():
                 before_hash = recipe_hash(person)
                 finish = json.loads(json.dumps(start))
+                lit = needs.get((group_key, field))
+                reference = base
+                if lit:
+                    finish[lit[0]][lit[1]] = lit[2]
+                    call('save_studio_finish', projectId=project, photoId=person, finish=finish,
+                         label=f'Test {lit[0]}.{lit[1]} on')
+                    reference = proxy(person)
                 finish[group_key][field] = value
                 try:
                     call('save_studio_finish', projectId=project, photoId=person, finish=finish,
@@ -674,11 +686,13 @@ def run(pw, port, inputs, chosen, only):
                     raise
                 after = proxy(person)
                 history(person, 'undo')
+                if lit:
+                    history(person, 'undo')
                 if not np.array_equal(proxy(person), base):
                     raise AssertionError('Undo did not restore the photograph exactly')
-                if after.shape != base.shape:
+                if after.shape != reference.shape:
                     return f'size {base.shape[1]}x{base.shape[0]} -> {after.shape[1]}x{after.shape[0]}; Undo exact'
-                diff = np.abs(after.astype(np.int16) - base.astype(np.int16))
+                diff = np.abs(after.astype(np.int16) - reference.astype(np.int16))
                 moved = float((diff.max(axis=2) > 2).mean())
                 if after.std() < 1:
                     raise AssertionError('the render became a flat colour')
