@@ -432,3 +432,58 @@ fn the_store_refuses_a_file_that_claims_to_be_verified_with_no_digest() {
         "a verified file with no digest must be refused"
     );
 }
+
+#[test]
+fn several_workers_write_the_same_files_in_the_same_order_as_one() {
+    // Frames are rendered and encoded in parallel, then written in the plan's order: what
+    // reaches the disk, and what the catalog records about it, must not depend on the count.
+    let run = |workers: usize| {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let (catalog, project) = catalog(dir.path());
+        let images = wedding(9);
+        seed_photos(&catalog, project, &images);
+        let store = ExportStore::new(Arc::clone(&catalog));
+        let field = ScriptedField::new(Some("Alex & Sam"), 9, 9);
+        let source = ScriptedSource::new(Plate::Gradient, 64, 48);
+        let out = dir.path().join("delivery");
+        let job = one_set(images.clone(), out.clone(), "{couple}_{seq}");
+        let result = ExportPass::new(&store, &field, &source, "0.1.0")
+            .with_workers(workers)
+            .run(project, &job)
+            .expect("run");
+        assert!(result.manifest.is_some());
+        let order: Vec<_> = images.iter().map(|i| i.to_db()).collect();
+        result
+            .files
+            .iter()
+            .map(|f| {
+                let position = order.iter().position(|id| *id == f.image.to_db());
+                (position, f.path.clone(), f.hash.clone(), f.bytes)
+            })
+            .collect::<Vec<_>>()
+    };
+    let one = run(1);
+    assert_eq!(one.len(), 9);
+    assert_eq!(run(3), one);
+    assert_eq!(run(8), one);
+}
+
+#[test]
+fn a_frame_that_will_not_render_is_still_skipped_with_several_workers() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (catalog, project) = catalog(dir.path());
+    let images = wedding(7);
+    seed_photos(&catalog, project, &images);
+    let store = ExportStore::new(Arc::clone(&catalog));
+    let field = ScriptedField::new(Some("Alex"), 7, 7);
+    let source = ScriptedSource::new(Plate::Flat, 32, 32).failing(images[4]);
+    let job = one_set(images.clone(), dir.path().join("delivery"), "{seq}");
+    let result = ExportPass::new(&store, &field, &source, "0.1.0")
+        .with_workers(3)
+        .run(project, &job)
+        .expect("run");
+    assert_eq!(result.files.len(), 6);
+    assert_eq!(result.skipped.len(), 1);
+    assert_eq!(result.skipped[0].0, images[4]);
+    assert!(result.manifest.is_none());
+}

@@ -2,7 +2,6 @@
 //! Reference pixels guide bounded tone/color settings; they never enter the export or recipe.
 use std::io::Read;
 use std::path::Path;
-use std::sync::PoisonError;
 
 use aura_core::progress::CancelToken;
 use aura_core::{AuraResult, PhotoId, ProjectId};
@@ -400,10 +399,7 @@ fn run(
     let expected_hash = aura_recipe::hash::recipe_hash(&current)?;
     let bounds = subject_bounds(&current)?;
     // Includes source/target decode and all renders. Live previews defer while this lane is busy.
-    let _work = state
-        .image_work_gate()
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner);
+    let _work = state.image_work_gate().acquire();
     check_cancel(cancel)?;
     let (reference, reference_hash) = decode_reference(Path::new(&input.reference_path))?;
     if !known_dimensions {

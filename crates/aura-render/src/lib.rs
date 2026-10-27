@@ -136,6 +136,7 @@ pub mod shaders;
 pub mod spatial;
 pub mod tiles;
 pub mod tonemap;
+pub mod work_gate;
 
 pub use contract::render::{
     Backend, OutputColour, OutputSpec, RenderCaps, RenderLevel, RenderNote, RenderPurpose,
@@ -144,3 +145,4 @@ pub use contract::render::{
 pub use cpu::{CpuEngine, Frame, FrameSource};
 pub use graph::{engine_string, render_hash, Capabilities, InputKind, Plan, Stage};
 pub use parity::TOLERANCE as PARITY_TOLERANCE;
+pub use work_gate::{WorkGate, WorkPermit};

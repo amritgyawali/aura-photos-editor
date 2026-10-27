@@ -154,8 +154,9 @@ pub struct AppState {
     /// Buffers before and after each photograph's retouch stack, shared by every render this
     /// process makes. ADR-0098.
     retouch_checkpoints: aura_render::retouch_cache::Checkpoints,
-    /// One expensive image pass at a time, shared by planners and every renderer.
-    image_work_gate: Arc<std::sync::Mutex<()>>,
+    /// How many expensive image passes run at once, shared by planners and every renderer:
+    /// one on a small machine, a few on a large one. `aura_render::work_gate`.
+    image_work_gate: Arc<aura_render::WorkGate>,
     cache_root: PathBuf,
     /// Where `models.lock`, its signature and the model files live.
     ///
@@ -290,7 +291,7 @@ impl AppState {
             previews: Arc::new(Mutex::new(BTreeMap::new())),
             edited_previews: Arc::default(),
             retouch_checkpoints: aura_render::retouch_cache::Checkpoints::new(),
-            image_work_gate: Arc::default(),
+            image_work_gate: Arc::new(aura_render::WorkGate::for_this_machine()),
             cache_root,
             models_root: default_models_root(),
             infer: Arc::new(Mutex::new(InferSlot::default())),
@@ -317,7 +318,7 @@ impl AppState {
             previews: Arc::new(Mutex::new(BTreeMap::new())),
             edited_previews: Arc::default(),
             retouch_checkpoints: aura_render::retouch_cache::Checkpoints::new(),
-            image_work_gate: Arc::default(),
+            image_work_gate: Arc::new(aura_render::WorkGate::for_this_machine()),
             cache_root,
             models_root: default_models_root(),
             infer: Arc::new(Mutex::new(InferSlot::default())),
@@ -1475,7 +1476,7 @@ impl AppState {
         &self.edited_previews
     }
 
-    pub(crate) fn image_work_gate(&self) -> &Arc<std::sync::Mutex<()>> {
+    pub(crate) fn image_work_gate(&self) -> &Arc<aura_render::WorkGate> {
         &self.image_work_gate
     }
 

@@ -45,6 +45,18 @@ pub struct ExportPass<'a> {
     field: &'a dyn Field,
     source: &'a dyn Source,
     app_version: String,
+    workers: usize,
+}
+
+/// A frame after stage one of the pass: encoded and ready to write, or left out with a reason.
+#[derive(Debug)]
+enum Prepared {
+    Ready {
+        sharpened: Rendered,
+        bytes: Vec<u8>,
+        reasons: Vec<DeliveryReason>,
+    },
+    Skipped(String),
 }
 
 /// What a pass produced.
@@ -74,7 +86,154 @@ impl<'a> ExportPass<'a> {
             field,
             source,
             app_version: app_version.into(),
+            workers: 1,
         }
+    }
+
+    /// Stage one of every frame in `chunk`, `workers` at a time, in the chunk's order.
+    fn prepare_all(
+        &self,
+        project: ProjectId,
+        chunk: &[&naming::PlannedName],
+        job: &ExportJob,
+        watermark: Option<&crate::watermark::Watermark>,
+    ) -> Vec<AuraResult<Prepared>> {
+        if self.workers <= 1 || chunk.len() <= 1 {
+            return chunk
+                .iter()
+                .map(|planned| self.prepare(project, job, planned, watermark))
+                .collect();
+        }
+        let next = std::sync::atomic::AtomicUsize::new(0);
+        let mut done: Vec<(usize, AuraResult<Prepared>)> = std::thread::scope(|scope| {
+            let handles: Vec<_> = (0..self.workers.min(chunk.len()))
+                .map(|_| {
+                    scope.spawn(|| {
+                        let mut mine = Vec::new();
+                        loop {
+                            let index = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            let Some(planned) = chunk.get(index) else {
+                                break;
+                            };
+                            mine.push((index, self.prepare(project, job, planned, watermark)));
+                        }
+                        mine
+                    })
+                })
+                .collect();
+            handles
+                .into_iter()
+                .flat_map(|handle| {
+                    handle
+                        .join()
+                        .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
+                })
+                .collect()
+        });
+        done.sort_by_key(|(index, _)| *index);
+        done.into_iter().map(|(_, prepared)| prepared).collect()
+    }
+
+    /// Stage one of one frame: its pixels, resized, sharpened, marked and encoded. Nothing is
+    /// written, so any number of these may run at once.
+    fn prepare(
+        &self,
+        project: ProjectId,
+        job: &ExportJob,
+        planned: &naming::PlannedName,
+        watermark: Option<&crate::watermark::Watermark>,
+    ) -> AuraResult<Prepared> {
+        let Some(set) = job.sets.iter().find(|s| s.name == planned.set) else {
+            return Ok(Prepared::Skipped(String::new()));
+        };
+        // 4a. Pixels, from the one place they come from.
+        let rendered = match self
+            .source
+            .render(project, planned.image, set.colour, set.bit_depth)
+        {
+            Ok(r) if r.is_well_formed() => r,
+            Ok(_) => {
+                return Ok(Prepared::Skipped(
+                    "the render returned a malformed buffer".to_owned(),
+                ));
+            }
+            Err(e) => {
+                // Item-level. The wedding delivers without this frame and the summary names it.
+                return Ok(Prepared::Skipped(e.to_string()));
+            }
+        };
+
+        let mut reasons = planned.reasons.clone();
+
+        // 4b. Resize, in linear light, never upward.
+        let (tw, th) = set.resize.target(rendered.width, rendered.height);
+        if set.resize.would_upscale(rendered.width, rendered.height) {
+            reasons.push(DeliveryReason::with(
+                DeliveryCode::ResizeIgnoredUpscale,
+                format!("{}x{}", rendered.width, rendered.height),
+            ));
+        }
+        let resized: Rendered = if tw == rendered.width && th == rendered.height {
+            rendered
+        } else {
+            resample::downscale(&rendered, tw, th)
+        };
+
+        // 4c. Sharpen, in the encoded domain, by how far the frame was scaled.
+        let scale = if resized.width.max(resized.height) == 0 {
+            1.0
+        } else {
+            f64::from(resized.width.max(resized.height)) as f32
+                / f64::from(tw.max(th).max(1)) as f32
+        };
+        let long_before = f64::from(set.resize.target(resized.width, resized.height).0);
+        let _ = long_before;
+        let scale_factor = if matches!(set.resize, Resize::Full) {
+            1.0
+        } else {
+            scale
+        };
+        let sharpened = resample::sharpen(&resized, set.sharpen, scale_factor);
+        if set.sharpen != aura_core::contract::delivery::OutputSharpen::None {
+            reasons.push(DeliveryReason::with(
+                DeliveryCode::SharpenedForOutput,
+                format!("{}x{}", sharpened.width, sharpened.height),
+            ));
+        }
+
+        let sharpened = if let Some(mark) = watermark {
+            mark.apply(&sharpened)?
+        } else {
+            sharpened
+        };
+
+        // 4d. Encode.
+        let (bytes, mut encode_reasons) = match set.format {
+            aura_core::contract::delivery::FileFormat::Jpeg => {
+                jpeg::encode(&sharpened, set.quality, &job.metadata)?
+            }
+            aura_core::contract::delivery::FileFormat::Tiff => {
+                tiff::encode(&sharpened, &job.metadata)?
+            }
+            aura_core::contract::delivery::FileFormat::Png => {
+                png::encode(&sharpened, &job.metadata)?
+            }
+        };
+        reasons.append(&mut encode_reasons);
+        Ok(Prepared::Ready {
+            sharpened,
+            bytes,
+            reasons,
+        })
+    }
+
+    /// Render and encode up to `workers` frames at once. Files are still written, read back
+    /// and recorded one at a time in the plan's order, so names, the manifest and the point a
+    /// failing destination stops the job are the same as with one worker.
+    #[must_use]
+    pub fn with_workers(mut self, workers: usize) -> Self {
+        self.workers = workers.max(1);
+        self
     }
 
     /// Run a job.
@@ -136,141 +295,81 @@ impl<'a> ExportPass<'a> {
             std::collections::BTreeMap::new();
         let mut sidecars = 0_u32;
 
-        for planned in &plan {
-            let Some(set) = job.sets.iter().find(|s| s.name == planned.set) else {
-                continue;
-            };
-
-            // 4a. Pixels, from the one place they come from.
-            let rendered =
-                match self
-                    .source
-                    .render(project, planned.image, set.colour, set.bit_depth)
-                {
-                    Ok(r) if r.is_well_formed() => r,
-                    Ok(_) => {
-                        skipped.push((
-                            planned.image,
-                            "the render returned a malformed buffer".to_owned(),
-                        ));
-                        continue;
-                    }
-                    Err(e) => {
-                        // Item-level. The wedding delivers without this frame and the summary names it.
-                        skipped.push((planned.image, e.to_string()));
+        let mut planned_frames = plan.iter().peekable();
+        while planned_frames.peek().is_some() {
+            let chunk: Vec<_> = planned_frames
+                .by_ref()
+                .take(self.workers.saturating_mul(2))
+                .collect();
+            let prepared = self.prepare_all(project, &chunk, job, watermark);
+            for (planned, prepared) in chunk.into_iter().zip(prepared) {
+                let Some(set) = job.sets.iter().find(|s| s.name == planned.set) else {
+                    continue;
+                };
+                let (sharpened, bytes, mut reasons) = match prepared? {
+                    Prepared::Ready {
+                        sharpened,
+                        bytes,
+                        reasons,
+                    } => (sharpened, bytes, reasons),
+                    Prepared::Skipped(why) => {
+                        skipped.push((planned.image, why));
                         continue;
                     }
                 };
 
-            let mut reasons = planned.reasons.clone();
-
-            // 4b. Resize, in linear light, never upward.
-            let (tw, th) = set.resize.target(rendered.width, rendered.height);
-            if set.resize.would_upscale(rendered.width, rendered.height) {
-                reasons.push(DeliveryReason::with(
-                    DeliveryCode::ResizeIgnoredUpscale,
-                    format!("{}x{}", rendered.width, rendered.height),
-                ));
-            }
-            let resized: Rendered = if tw == rendered.width && th == rendered.height {
-                rendered
-            } else {
-                resample::downscale(&rendered, tw, th)
-            };
-
-            // 4c. Sharpen, in the encoded domain, by how far the frame was scaled.
-            let scale = if resized.width.max(resized.height) == 0 {
-                1.0
-            } else {
-                f64::from(resized.width.max(resized.height)) as f32
-                    / f64::from(tw.max(th).max(1)) as f32
-            };
-            let long_before = f64::from(set.resize.target(resized.width, resized.height).0);
-            let _ = long_before;
-            let scale_factor = if matches!(set.resize, Resize::Full) {
-                1.0
-            } else {
-                scale
-            };
-            let sharpened = resample::sharpen(&resized, set.sharpen, scale_factor);
-            if set.sharpen != aura_core::contract::delivery::OutputSharpen::None {
-                reasons.push(DeliveryReason::with(
-                    DeliveryCode::SharpenedForOutput,
-                    format!("{}x{}", sharpened.width, sharpened.height),
-                ));
-            }
-
-            let sharpened = if let Some(mark) = watermark {
-                mark.apply(&sharpened)?
-            } else {
-                sharpened
-            };
-
-            // 4d. Encode.
-            let (bytes, mut encode_reasons) = match set.format {
-                aura_core::contract::delivery::FileFormat::Jpeg => {
-                    jpeg::encode(&sharpened, set.quality, &job.metadata)?
+                // 4e. Write, read back, hash. A failure here stops the job.
+                let path = root.join(&planned.rel_path);
+                let written = write_and_verify(&path, &bytes, job.verify)?;
+                reasons.push(DeliveryReason::plain(if written.verified {
+                    DeliveryCode::WrittenAndVerified
+                } else {
+                    DeliveryCode::WrittenUnverified
+                }));
+                if written.verified {
+                    verified_count += 1;
                 }
-                aura_core::contract::delivery::FileFormat::Tiff => {
-                    tiff::encode(&sharpened, &job.metadata)?
+                bytes_total = bytes_total.saturating_add(written.bytes);
+
+                // 4f. The sidecar, when the set asked for one.
+                let frame = self.field.frame(planned.image);
+                if set.sidecar {
+                    if let Some(recipe) = &frame.recipe_json {
+                        let sidecar_path =
+                            path.with_extension(aura_core::contract::delivery::SIDECAR_EXT);
+                        write_and_verify(&sidecar_path, recipe.as_bytes(), job.verify)?;
+                        reasons.push(DeliveryReason::plain(DeliveryCode::SidecarWritten));
+                        sidecars += 1;
+                    }
                 }
-                aura_core::contract::delivery::FileFormat::Png => {
-                    png::encode(&sharpened, &job.metadata)?
+
+                // 4g. Phase 24's disclosures travel to the manifest.
+                for what in &frame.cleanup_disclosures {
+                    reasons.push(DeliveryReason::with(
+                        DeliveryCode::CleanupDisclosed,
+                        what.clone(),
+                    ));
                 }
-            };
-            reasons.append(&mut encode_reasons);
 
-            // 4e. Write, read back, hash. A failure here stops the job.
-            let path = root.join(&planned.rel_path);
-            let written = write_and_verify(&path, &bytes, job.verify)?;
-            reasons.push(DeliveryReason::plain(if written.verified {
-                DeliveryCode::WrittenAndVerified
-            } else {
-                DeliveryCode::WrittenUnverified
-            }));
-            if written.verified {
-                verified_count += 1;
+                reasons.truncate(aura_core::contract::delivery::MAX_REASONS);
+
+                let file = ExportedFile {
+                    image: planned.image,
+                    set: planned.set.clone(),
+                    path: planned.rel_path.clone(),
+                    bytes: written.bytes,
+                    hash: written.hash,
+                    width: sharpened.width,
+                    height: sharpened.height,
+                    render_hash: sharpened.render_hash,
+                    verified: written.verified,
+                    renamed: planned.renamed,
+                    reasons,
+                };
+                self.store.write_file(&job_id, &file)?;
+                *per_set.entry(planned.set.clone()).or_insert(0) += 1;
+                files.push(file);
             }
-            bytes_total = bytes_total.saturating_add(written.bytes);
-
-            // 4f. The sidecar, when the set asked for one.
-            let frame = self.field.frame(planned.image);
-            if set.sidecar {
-                if let Some(recipe) = &frame.recipe_json {
-                    let sidecar_path =
-                        path.with_extension(aura_core::contract::delivery::SIDECAR_EXT);
-                    write_and_verify(&sidecar_path, recipe.as_bytes(), job.verify)?;
-                    reasons.push(DeliveryReason::plain(DeliveryCode::SidecarWritten));
-                    sidecars += 1;
-                }
-            }
-
-            // 4g. Phase 24's disclosures travel to the manifest.
-            for what in &frame.cleanup_disclosures {
-                reasons.push(DeliveryReason::with(
-                    DeliveryCode::CleanupDisclosed,
-                    what.clone(),
-                ));
-            }
-
-            reasons.truncate(aura_core::contract::delivery::MAX_REASONS);
-
-            let file = ExportedFile {
-                image: planned.image,
-                set: planned.set.clone(),
-                path: planned.rel_path.clone(),
-                bytes: written.bytes,
-                hash: written.hash,
-                width: sharpened.width,
-                height: sharpened.height,
-                render_hash: sharpened.render_hash,
-                verified: written.verified,
-                renamed: planned.renamed,
-                reasons,
-            };
-            self.store.write_file(&job_id, &file)?;
-            *per_set.entry(planned.set.clone()).or_insert(0) += 1;
-            files.push(file);
         }
 
         for (name, count) in &per_set {

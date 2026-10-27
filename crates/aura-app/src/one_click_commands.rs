@@ -273,6 +273,54 @@ fn error(message: &str) -> IpcError {
     message.clone_into(&mut error.message);
     error
 }
+/// Run `work` on every item, `workers` at a time, and give the answers back in the items' own
+/// order. Each answer is what that item would produce alone - only the scheduling changes - so
+/// reports, file numbering and every recipe are the same with one worker or with three.
+fn in_order<T: Sync, R: Send>(
+    items: &[T],
+    workers: usize,
+    work: impl Fn(&T) -> R + Sync,
+) -> Vec<R> {
+    if workers <= 1 || items.len() <= 1 {
+        return items.iter().map(&work).collect();
+    }
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let work = &work;
+    let mut answers: Vec<(usize, R)> = std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..workers.min(items.len()))
+            .map(|_| {
+                scope.spawn(|| {
+                    let mut mine = Vec::new();
+                    loop {
+                        let index = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        let Some(item) = items.get(index) else {
+                            break;
+                        };
+                        mine.push((index, work(item)));
+                    }
+                    mine
+                })
+            })
+            .collect();
+        handles
+            .into_iter()
+            .flat_map(|handle| {
+                handle
+                    .join()
+                    .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
+            })
+            .collect()
+    });
+    answers.sort_by_key(|(index, _)| *index);
+    answers.into_iter().map(|(_, answer)| answer).collect()
+}
+
+/// How many photographs a folder run works on at once: as many as the image gate lets run
+/// together, so the run never holds more full-size frames than the rest of the app may.
+fn workers(state: &AppState) -> usize {
+    state.image_work_gate().permits()
+}
+
 fn update(job: &str, change: impl FnOnce(&mut OneClickStatusDto)) {
     if let Some(slot) = JOBS.lock().get_mut(job) {
         change(&mut slot.status);
@@ -656,32 +704,43 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
     );
     let mut readable = Vec::new();
     let mut analysis = Vec::new();
-    for (index, photo) in photos.iter().enumerate() {
+    let lanes = workers(state);
+    for chunk in photos.chunks(lanes.saturating_mul(4).max(1)) {
         if stopped(job) {
             return Ok(());
         }
-        match crate::photo_analysis(
-            state,
-            &PhotoAutoEditInput {
-                project_id: project.clone(),
-                photo_id: photo.id.clone(),
-                job_id: job.into(),
-            },
-        ) {
-            Ok(row) => {
-                readable.push(photo.id.clone());
-                analysis.push(serde_json::to_value(row).map_err(|e| error(&e.to_string()))?);
-                update(job, |s| s.analyzed += 1);
+        let rows = in_order(chunk, lanes, |photo| {
+            if stopped(job) {
+                return None;
             }
-            Err(err) => {
-                update(job, |s| s.failed_edits += 1);
-                note(
-                    job,
-                    format!("{} could not be analyzed: {}", photo.id, err.message),
-                );
+            let row = crate::photo_analysis(
+                state,
+                &PhotoAutoEditInput {
+                    project_id: project.clone(),
+                    photo_id: photo.id.clone(),
+                    job_id: job.into(),
+                },
+            );
+            update(job, |s| s.items_done = s.items_done.saturating_add(1));
+            Some(row)
+        });
+        for (photo, row) in chunk.iter().zip(rows) {
+            match row {
+                None => return Ok(()),
+                Some(Ok(row)) => {
+                    readable.push(photo.id.clone());
+                    analysis.push(serde_json::to_value(row).map_err(|e| error(&e.to_string()))?);
+                    update(job, |s| s.analyzed += 1);
+                }
+                Some(Err(err)) => {
+                    update(job, |s| s.failed_edits += 1);
+                    note(
+                        job,
+                        format!("{} could not be analyzed: {}", photo.id, err.message),
+                    );
+                }
             }
         }
-        update(job, |s| s.items_done = (index + 1) as u64);
     }
     let report = Path::new(&input.destination).join("photo-analysis.json");
     std::fs::write(
@@ -901,54 +960,63 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
         .collect();
     let mut edits = EditLog::create(Path::new(&input.destination).join("photo-edits.json"))?;
     let started = state.clock().monotonic_ms();
-    for (index, photo) in targets.iter().enumerate() {
+    let cloud = use_cloud && look.is_none();
+    // A provider call is one child job at a time and its allowance is per minute; a measured
+    // edit is local work the image gate already bounds.
+    let lanes = if cloud { 1 } else { workers(state) };
+    let done = std::sync::atomic::AtomicUsize::new(0);
+    for chunk in targets.chunks(lanes.saturating_mul(4).max(1)) {
         if stopped(job) {
             return Ok(());
         }
-        let left = remaining(started, state.clock().monotonic_ms(), index, targets.len());
-        update(job, |s| {
-            s.phase_label = format!(
-                "Editing and retouching photo {} of {}: {}.{left}",
-                index + 1,
-                targets.len(),
-                names.get(photo.as_str()).copied().unwrap_or("photograph")
-            );
-        });
-        let result = edit_one(
-            state,
-            job,
-            project,
-            photo,
-            look,
-            use_cloud && look.is_none(),
-        );
-        if stopped(job) {
-            return Ok(());
-        }
-        match result {
-            Ok(entry) => {
-                update(job, |s| {
-                    if entry.source == "cloud" || entry.source == "cache" {
-                        s.ai_edited += 1;
-                    } else {
-                        s.local_edited += 1;
-                    }
-                });
-                edits.push(&entry)?;
+        let results = in_order(chunk, lanes, |photo| {
+            if stopped(job) {
+                return None;
             }
-            Err(err) => {
-                update(job, |s| s.failed_edits += 1);
-                note(
-                    job,
-                    format!(
-                        "{} edit or retouch failed; exporting its last saved reversible recipe: {}",
-                        names.get(photo.as_str()).copied().unwrap_or(photo),
-                        err.message
-                    ),
+            let begun = done.load(std::sync::atomic::Ordering::Relaxed);
+            let left = remaining(started, state.clock().monotonic_ms(), begun, targets.len());
+            update(job, |s| {
+                s.phase_label = format!(
+                    "Editing and retouching photo {} of {}: {}.{left}",
+                    begun + 1,
+                    targets.len(),
+                    names.get(photo.as_str()).copied().unwrap_or("photograph")
                 );
+            });
+            let result = edit_one(state, job, project, photo, look, cloud);
+            let finished = done.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+            update(job, |s| s.items_done = finished as u64);
+            Some(result)
+        });
+        if stopped(job) {
+            return Ok(());
+        }
+        for (photo, result) in chunk.iter().zip(results) {
+            match result {
+                None => return Ok(()),
+                Some(Ok(entry)) => {
+                    update(job, |s| {
+                        if entry.source == "cloud" || entry.source == "cache" {
+                            s.ai_edited += 1;
+                        } else {
+                            s.local_edited += 1;
+                        }
+                    });
+                    edits.push(&entry)?;
+                }
+                Some(Err(err)) => {
+                    update(job, |s| s.failed_edits += 1);
+                    note(
+                        job,
+                        format!(
+                            "{} edit or retouch failed; exporting its last saved reversible recipe: {}",
+                            names.get(photo.as_str()).copied().unwrap_or(photo),
+                            err.message
+                        ),
+                    );
+                }
             }
         }
-        update(job, |s| s.items_done = (index + 1) as u64);
     }
     edits.close()?;
     if stopped(job) {

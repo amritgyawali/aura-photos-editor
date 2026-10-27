@@ -474,7 +474,8 @@ pub fn export_run_with_watermark(
     let field = ExportField::new(state, project)?;
     let source = ExportSource::new(state);
     let store = ExportStore::new(Arc::clone(state.catalog()));
-    let pass = ExportPass::new(&store, &field, &source, crate::state::APP_VERSION);
+    let pass = ExportPass::new(&store, &field, &source, crate::state::APP_VERSION)
+        .with_workers(state.image_work_gate().permits());
     pass.run_with_watermark(project, &job, watermark.as_ref())?;
 
     let service = Export::new(store, field.photos(), field.selected());

@@ -18,7 +18,7 @@
 //! it stays that way from the first stage to the output transform. A `f16` working buffer
 //! would round twice per stage and eat the parity tolerance the gate is written against.
 
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError, TryLockError};
+use std::sync::Arc;
 
 use aura_core::clock::Clock;
 use aura_core::errors::render::tiled_fallback;
@@ -35,6 +35,7 @@ use crate::geometry;
 use crate::graph::{self, Capabilities, InputKind, Plan, Stage};
 use crate::spatial;
 use crate::tonemap::{self, Tone};
+use crate::work_gate::{WorkGate, WorkPermit};
 
 /// The working buffer's bytes per pixel: three `f32`.
 pub const BYTES_PER_PIXEL: u64 = 12;
@@ -127,7 +128,7 @@ pub struct CpuEngine {
     /// Buffers before and after the retouch stack, shared across renders. ADR-0098.
     checkpoints: Option<crate::retouch_cache::Checkpoints>,
     /// Shared with retouch planning by the application, before decoding large frames.
-    image_work_gate: Option<Arc<Mutex<()>>>,
+    image_work_gate: Option<Arc<WorkGate>>,
 }
 
 impl CpuEngine {
@@ -300,18 +301,16 @@ impl CpuEngine {
         self
     }
 
-    /// Serialize decoding and rendering with other expensive image work in the same app.
+    /// Bound decoding and rendering together with other expensive image work in the same app.
     /// The gate changes scheduling only; render keys and pixel calculations stay unchanged.
     #[must_use]
-    pub fn with_image_work_gate(mut self, gate: Arc<Mutex<()>>) -> Self {
+    pub fn with_image_work_gate(mut self, gate: Arc<WorkGate>) -> Self {
         self.image_work_gate = Some(gate);
         self
     }
 
-    fn image_work(&self) -> Option<MutexGuard<'_, ()>> {
-        self.image_work_gate
-            .as_ref()
-            .map(|gate| gate.lock().unwrap_or_else(PoisonError::into_inner))
+    fn image_work(&self) -> Option<WorkPermit<'_>> {
+        self.image_work_gate.as_ref().map(|gate| gate.acquire())
     }
 
     /// Override the working-buffer ceiling. Used by the tiling tests and by the phase 03
@@ -966,10 +965,9 @@ impl CpuEngine {
         // A carried preview is optional. Keep the displayed frame while a full
         // render or retouch plan owns the buffers, rather than queue more work.
         let _image_work = if let Some(gate) = &self.image_work_gate {
-            match gate.try_lock() {
-                Ok(guard) => Some(guard),
-                Err(TryLockError::Poisoned(error)) => Some(error.into_inner()),
-                Err(TryLockError::WouldBlock) => return Ok(None),
+            match gate.try_acquire() {
+                Some(permit) => Some(permit),
+                None => return Ok(None),
             }
         } else {
             None
@@ -1310,7 +1308,7 @@ mod tests {
         let expected = engine(fixtures::StaticSource::shared(frame))
             .render(request.clone())
             .unwrap();
-        let gate = Arc::new(Mutex::new(()));
+        let gate = Arc::new(WorkGate::new(1));
         let start = Arc::new(std::sync::Barrier::new(3));
         let workers: Vec<_> = (0..2)
             .map(|_| {
@@ -1342,7 +1340,7 @@ mod tests {
             peak: AtomicUsize::new(0),
             calls: AtomicUsize::new(0),
         });
-        let gate = Arc::new(Mutex::new(()));
+        let gate = Arc::new(WorkGate::new(1));
         let engine = engine(source.clone())
             .with_image_work_gate(Arc::clone(&gate))
             .with_checkpoints(crate::retouch_cache::Checkpoints::new());
@@ -1354,7 +1352,7 @@ mod tests {
             purpose: RenderPurpose::Export,
         };
         engine.render(request.clone()).unwrap();
-        let held = gate.lock().unwrap();
+        let held = gate.acquire();
         assert!(engine.render_live(&request).unwrap().is_none());
         assert_eq!(source.calls.load(Ordering::SeqCst), 1);
         drop(held);

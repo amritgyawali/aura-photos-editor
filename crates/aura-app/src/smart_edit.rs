@@ -1153,10 +1153,7 @@ fn run_with(
 ) -> IpcResult<RecipeDto> {
     // Residual planning renders working skin buffers directly. Share the same
     // gate as previews and exports so they cannot inflate its transient peak.
-    let _image_work = state
-        .image_work_gate()
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _image_work = state.image_work_gate().acquire();
     let input = DevelopImageInput {
         photo_id: photo_id.to_owned(),
     };
