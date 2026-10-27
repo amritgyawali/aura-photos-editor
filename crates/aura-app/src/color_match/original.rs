@@ -95,6 +95,7 @@ fn allowance(original: &Rgb8, edited: &Rgb8) -> Allowance {
             pilot.skin
         },
         clipping: pilot.clipping.max(clipping + pilot.clipping),
+        toward_reference: false,
     }
 }
 
@@ -366,6 +367,7 @@ fn learned(pairs: &[&Pair], model: CalibratedLook, report: CalibrationReport) ->
         .fold(Allowance::default(), |a, b| Allowance {
             skin: a.skin.max(b.skin),
             clipping: a.clipping.max(b.clipping),
+            toward_reference: false,
         });
     Learned {
         photos: pairs.iter().map(|p| p.photo).collect(),

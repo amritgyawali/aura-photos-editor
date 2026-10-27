@@ -26,7 +26,7 @@ def main():
     parser.add_argument('targets', type=Path, nargs=2)
     parser.add_argument('--exe', type=Path, default=ROOT / 'target/desktop-launch/debug/aura-desktop.exe')
     parser.add_argument('--port', type=int, default=9377)
-    parser.add_argument('--intent', choices=['natural', 'palette'], default='natural')
+    parser.add_argument('--intent', choices=['natural', 'palette', 'exact'], default='exact')
     parser.add_argument('--second-reference', type=Path, help='Also verify switching to a different reference and matching it in one click.')
     parser.add_argument('--allow-switch-refusal', action='store_true', help='Also accept an explicit native refusal only when the prior recipe/session remain unchanged. Record refusal separately from matching.')
     args = parser.parse_args()
@@ -189,7 +189,7 @@ def main():
                 try:
                     saved = wait_status(lambda value: value['reference']['id'] == replacement['id'] and value['fullResolutionChecked'])
                     if args.intent == 'palette':
-                        assert saved['fitting']['engine'] == 'reference-palette-transport-v7'
+                        assert saved['fitting']['engine'] == 'reference-palette-transport-v8'
                     report['checks']['changedReferenceIsActuallyApplied'] = saved['current']
                     report['referenceSwitchOutcome'] = 'matched'
                 except RuntimeError as error:
