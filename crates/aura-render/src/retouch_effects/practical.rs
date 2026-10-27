@@ -306,7 +306,7 @@ fn bokeh(rgb: &mut [f32], frame: Frame, edit: &Edit, coverage: &Coverage) {
         return;
     };
     let snapshot = Snapshot::take(rgb, frame, rect);
-    let threshold = 0.4 + (1.0 - edit.tone.clamp(0.0, 1.0)) * 1.2;
+    let threshold = super::light_threshold(edit.tone);
     // Gather each block of half the disc radius into one source - at its brightest pixel, with
     // the light of the whole block - so a single bright point is never missed between samples.
     let step = (disc / 2).max(1) as usize;
@@ -496,6 +496,30 @@ mod tests {
             assert!(px(&out, w, x, y)[0] > 0.03, "({x},{y})");
         }
         assert!(px(&out, w, 50, 50)[0] < 0.021);
+    }
+
+    #[test]
+    fn bokeh_finds_the_lights_of_an_ordinary_photograph_at_its_defaults() {
+        // Fairy lights in a display-referred frame are 1, not 8.
+        let (w, h) = (60, 60);
+        let base = fill(w, h, |x, y| {
+            if (29..32).contains(&x) && (29..32).contains(&y) {
+                [1.0; 3]
+            } else {
+                [0.02; 3]
+            }
+        });
+        let mut e = edit(Tool::BokehHighlights, [0.5, 0.5, 0.45, 0.45]);
+        // The window's defaults for this tool.
+        e.radius = 0.12;
+        e.tone = 0.5;
+        e.amount = 0.8;
+        let mut out = base.clone();
+        run(&mut out, w, h, &e);
+        assert!(
+            px(&out, w, 36, 30)[0] > 0.03,
+            "a disc grows around the light"
+        );
     }
 
     #[test]

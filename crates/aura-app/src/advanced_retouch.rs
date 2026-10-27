@@ -1774,8 +1774,24 @@ pub(crate) fn qc_render(
     qc_render_at(state, photo, recipe, QC_SIZE)
 }
 
+/// `qc_render` large enough for every face in `faces` to have its contours checked, and the
+/// level it chose, so a second render of another recipe lines up with it pixel for pixel.
+pub(crate) fn qc_render_for_faces(
+    state: &AppState,
+    photo: PhotoId,
+    recipe: &Recipe,
+    faces: &[PortraitFace],
+) -> AuraResult<((Vec<u8>, usize, usize), RenderLevel)> {
+    let first = qc_render(state, photo, recipe)?;
+    let size = qc_level(faces, first.1, first.2);
+    if size == QC_SIZE {
+        return Ok((first, size));
+    }
+    Ok((qc_render_at(state, photo, recipe, size)?, size))
+}
+
 /// `qc_render` at a level of the caller's choosing.
-fn qc_render_at(
+pub(crate) fn qc_render_at(
     state: &AppState,
     photo: PhotoId,
     recipe: &Recipe,

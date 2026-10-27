@@ -33,6 +33,23 @@ const TABS: ReadonlyArray<readonly [Tab, string]> = [
   ['makeup', 'Makeup & colour'], ['hair', 'Hair & attire'], ['people', 'People & scene'], ['faces', 'Faces'],
 ];
 
+/** A slider that only shapes another one: the eyeliner wing draws nothing without a liner, a
+ * light's direction moves nothing until there is a light. While its parent is at zero it is
+ * shown disabled with the reason, so it never looks like a slider that does nothing. */
+const NEEDS: Readonly<Record<string, readonly [string, string]>> = {
+  eyelinerWing: ['eyeliner', 'Set Eyeliner first: the wing extends the liner.'],
+  relightDirection: ['relight', 'Set Relight first: this is where that light comes from.'],
+  direction: ['key', 'Set Key light first: this is where that light comes from.'],
+  height: ['key', 'Set Key light first: this is how high that light is.'],
+};
+
+/** The sentence for a slider that is waiting on its parent, or undefined when it can act. Only
+ * within the group that holds the parent: the body's Height has no light to wait for. */
+function waitingFor(key: string, values: object): string | undefined {
+  const need = NEEDS[key];
+  return need && need[0] in values && (values as Record<string, number>)[need[0]] === 0 ? need[1] : undefined;
+}
+
 /** One ADR-0150 group of sliders, each committing the whole group when released. */
 function SliderGroup<K extends string>({ title, list, values, neutral, disabled, onCommit }: {
   title?: string; list: ReadonlyArray<Slider<K>>; values: Record<K, number>; neutral?: Partial<Record<K, number>>; disabled: boolean;
@@ -42,7 +59,7 @@ function SliderGroup<K extends string>({ title, list, values, neutral, disabled,
     {title && <h4>{title}</h4>}
     {list.map(([key, label, min, max, hint]) => <div key={key} title={hint}>
       <ShapeSlider label={label} min={min} max={max} neutral={neutral?.[key] ?? 0} value={values[key] ?? 0} disabled={disabled}
-        onCommit={value => onCommit(key, value, label)} />
+        waiting={waitingFor(key, values)} onCommit={value => onCommit(key, value, label)} />
     </div>)}
   </div>;
 }
@@ -53,8 +70,11 @@ const LIGHT_POSITIONS: ReadonlyArray<readonly [string, number, number]> = [
 ];
 
 /** One shape slider: commits when released, so a drag does not queue a render per step. */
-function ShapeSlider({ label, value, min = -100, max = 100, neutral = 0, disabled, onCommit }: {
-  label: string; value: number; min?: number; max?: number; neutral?: number; disabled: boolean; onCommit: (value: number) => void;
+function ShapeSlider({ label, value, min = -100, max = 100, neutral = 0, disabled, waiting, onCommit }: {
+  label: string; value: number; min?: number; max?: number; neutral?: number; disabled: boolean;
+  /** Why this slider cannot act yet; it is disabled and says so. */
+  waiting?: string;
+  onCommit: (value: number) => void;
 }): JSX.Element {
   const [draft, setDraft] = useState(value);
   const committed = useRef(value);
@@ -63,13 +83,17 @@ function ShapeSlider({ label, value, min = -100, max = 100, neutral = 0, disable
     const clamped = Math.min(max, Math.max(min, Math.round(next)));
     if (clamped !== committed.current) { committed.current = clamped; onCommit(clamped); }
   };
-  return <label className="lr-slider" title="Double-click to reset">
-    <span className="lr-slider-label" onDoubleClick={() => { setDraft(neutral); commit(neutral); }}>{label}</span>
-    <input type="range" min={min} max={max} step={1} value={draft} disabled={disabled} aria-label={label}
-      onChange={event => setDraft(Number(event.target.value))}
-      onPointerUp={() => commit(draft)} onKeyUp={() => commit(draft)} onBlur={() => commit(draft)} />
-    <span className="lr-number" aria-hidden="true">{draft}</span>
-  </label>;
+  const off = disabled || waiting !== undefined;
+  return <>
+    <label className="lr-slider" title={waiting ?? 'Double-click to reset'}>
+      <span className="lr-slider-label" onDoubleClick={() => { if (!off) { setDraft(neutral); commit(neutral); } }}>{label}</span>
+      <input type="range" min={min} max={max} step={1} value={draft} disabled={off} aria-label={label}
+        onChange={event => setDraft(Number(event.target.value))}
+        onPointerUp={() => commit(draft)} onKeyUp={() => commit(draft)} onBlur={() => { if (!off) commit(draft); }} />
+      <span className="lr-number" aria-hidden="true">{draft}</span>
+    </label>
+    {waiting && <p className="lr-hint">{waiting}</p>}
+  </>;
 }
 
 const LIQUIFY_MODES: ReadonlyArray<readonly [LiquifyMode, string, string]> = [
@@ -176,7 +200,7 @@ export function PortraitFinishPanel({ finish, disabled, liquify, onSave, onLiqui
           onClick={() => onSave({ ...finish, light: { ...light, direction, height, key: light.key > 0 ? light.key : 35 } }, `Light: ${label.toLowerCase()}`)}>{label}</button>)}
       </div>
       {LIGHT_SLIDERS.map(([key, label, min, max]) => <ShapeSlider key={key} label={label} min={min} max={max} neutral={NEUTRAL_LIGHT[key]}
-        value={light[key]} disabled={disabled}
+        value={light[key]} disabled={disabled} waiting={waitingFor(key, light)}
         onCommit={value => onSave({ ...finish, light: { ...light, [key]: value } }, `Light: ${label}`)} />)}
       <button type="button" disabled={disabled} onClick={() => onSave({ ...finish, light: NEUTRAL_LIGHT }, 'Portrait light reset')}>Reset light</button>
     </div>}

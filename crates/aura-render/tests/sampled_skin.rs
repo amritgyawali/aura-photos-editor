@@ -492,3 +492,36 @@ fn coverage_cache_cannot_reuse_a_different_tools_boundary_or_radius() {
     apply(&mut together, W, H, &[prior, next]);
     assert_eq!(alone, together);
 }
+
+#[test]
+fn a_cheek_smaller_than_the_wide_band_is_still_smoothed() {
+    // A cheek in a group photograph: an ellipse about 60 px across, at a radius whose wide band
+    // (three radii) is wider than the ellipse. It used to change nothing at all.
+    let (w, h) = (400, 300);
+    let original: Vec<f32> = (0..w * h)
+        .flat_map(|i| {
+            let (x, y) = ((i % w) as f32, (i / w) as f32);
+            let blotch = 0.12 * (x * 0.25).sin() * (y * 0.21).cos();
+            [1.3_f32, 0.9, 0.7].map(|c| c * 0.3 * (1.0 + blotch))
+        })
+        .collect();
+    let mut op = operation(Tool::SkinSmooth);
+    op.region = [0.5, 0.5, 0.08, 0.1];
+    op.source = Some([0.5, 0.5]);
+    op.radius = 0.05;
+    op.feather = 0.5;
+    let mut out = original.clone();
+    apply(&mut out, w, h, &[op]);
+    let energy = |pixels: &[f32]| -> f32 {
+        // The middle of the ellipse, which is centred on (200, 150).
+        let lumas: Vec<f32> = (135..165)
+            .flat_map(|y| (185..215).map(move |x| (y * w + x) * 3))
+            .map(|i| luma(&pixels[i..i + 3]))
+            .collect();
+        let mean = lumas.iter().sum::<f32>() / lumas.len() as f32;
+        lumas.iter().map(|l| (l - mean).powi(2)).sum::<f32>()
+    };
+    let (before, after) = (energy(&original), energy(&out));
+    // Before the band was kept inside the selection: 0.03 % less; now about 14 % less.
+    assert!(after < before * 0.92, "blotch energy {before} -> {after}");
+}

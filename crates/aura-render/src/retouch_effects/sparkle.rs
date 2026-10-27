@@ -25,7 +25,8 @@ fn sparkle(rgb: &mut [f32], frame: Frame, edit: &Edit, coverage: &Coverage) {
     };
     let snapshot = Snapshot::take(rgb, frame, rect);
     let length = (edit.radius * 3.0 * frame.short()).clamp(4.0, 120.0);
-    let threshold = 0.5 + (1.0 - edit.tone.clamp(0.0, 1.0)) * 1.0;
+    // Below white at every setting: a display-referred photograph has nothing above 1.
+    let threshold = (0.5 + (1.0 - edit.tone.clamp(0.0, 1.0)) * 1.0).min(0.97);
     // The brightest pixel of every cell, when it is a highlight: one star per glint.
     let cell = (length * 0.5).ceil() as usize;
     let mut stars: Vec<(f32, f32, f32)> = Vec::new();

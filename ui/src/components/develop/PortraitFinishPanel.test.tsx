@@ -101,3 +101,26 @@ it('a stored finish without a light reads as no light', () => {
   expect(lit.light.key).toBe(40);
   expect(lit.light.direction).toBe(NEUTRAL_LIGHT.direction);
 });
+
+it('a slider that only shapes another waits for it, and says which', () => {
+  const { rerender } = render(<PortraitFinishPanel finish={NEUTRAL_FINISH} initialTab="makeup" disabled={false} liquify={null} onSave={vi.fn()} onLiquify={vi.fn()} />);
+  expect((screen.getByLabelText('Eyeliner wing') as HTMLInputElement).disabled).toBe(true);
+  expect(screen.getByText('Set Eyeliner first: the wing extends the liner.')).toBeTruthy();
+  const lined = { ...NEUTRAL_FINISH, makeup: { ...NEUTRAL_FINISH.makeup, eyeliner: 40 } };
+  rerender(<PortraitFinishPanel finish={lined} initialTab="makeup" disabled={false} liquify={null} onSave={vi.fn()} onLiquify={vi.fn()} />);
+  expect((screen.getByLabelText('Eyeliner wing') as HTMLInputElement).disabled).toBe(false);
+  expect(screen.queryByText(/Set Eyeliner first/)).toBeNull();
+});
+
+it('the light points nowhere until there is a light, and the body keeps its own height', () => {
+  render(<PortraitFinishPanel finish={NEUTRAL_FINISH} initialTab="light" disabled={false} liquify={null} onSave={vi.fn()} onLiquify={vi.fn()} />);
+  expect((screen.getByLabelText('Light direction') as HTMLInputElement).disabled).toBe(true);
+  expect((screen.getByLabelText('Light height') as HTMLInputElement).disabled).toBe(true);
+  expect((screen.getByLabelText('Key light') as HTMLInputElement).disabled).toBe(false);
+  cleanup();
+  render(<PortraitFinishPanel finish={{ ...NEUTRAL_FINISH, light: { ...NEUTRAL_LIGHT, key: 35 } }} initialTab="light" disabled={false} liquify={null} onSave={vi.fn()} onLiquify={vi.fn()} />);
+  expect((screen.getByLabelText('Light direction') as HTMLInputElement).disabled).toBe(false);
+  cleanup();
+  render(<PortraitFinishPanel finish={NEUTRAL_FINISH} initialTab="body" disabled={false} liquify={null} onSave={vi.fn()} onLiquify={vi.fn()} />);
+  for (const height of screen.getAllByLabelText('Height')) expect((height as HTMLInputElement).disabled).toBe(false);
+});
