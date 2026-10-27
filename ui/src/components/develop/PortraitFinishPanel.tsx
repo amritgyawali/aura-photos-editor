@@ -23,6 +23,8 @@ export type PortraitFinishPanelProps = {
   /** The face picker: the faces in this photograph. Absent where it cannot run. */
   onFindFaces?: () => Promise<EvotoFace[]>;
   initialTab?: Tab;
+  /** What the last save could not do on this photograph, shown above the tools. */
+  notes?: string[];
 };
 
 type Tab = 'face' | 'body' | 'skin' | 'light' | 'liquify' | 'background' | 'makeup' | 'hair' | 'people' | 'faces';
@@ -87,7 +89,7 @@ const BACKGROUND_MODES: ReadonlyArray<readonly [BackgroundMode, string]> = [
  * and makeup, each saved as one undoable step. Nothing here is applied automatically; Auto light
  * runs only when pressed. ADR-0108, ADR-0127.
  */
-export function PortraitFinishPanel({ finish, disabled, liquify, onSave, onLiquify, onSuggestLight, subject, onFindFaces, initialTab = 'face' }: PortraitFinishPanelProps): JSX.Element {
+export function PortraitFinishPanel({ finish, disabled, liquify, onSave, onLiquify, onSuggestLight, subject, onFindFaces, initialTab = 'face', notes = [] }: PortraitFinishPanelProps): JSX.Element {
   const [tab, setTab] = useState<Tab>(initialTab);
   useEffect(() => { setTab(initialTab); }, [initialTab]);
   const [faces, setFaces] = useState<EvotoFace[] | null>(null);
@@ -139,6 +141,7 @@ export function PortraitFinishPanel({ finish, disabled, liquify, onSave, onLiqui
 
   return <div className="portrait-finish" aria-label="Portrait finishing">
     <p className="lr-hint">Reshape, light, background and makeup tools in the style of Evoto. Every change is one step in your history, and none of them is ever applied automatically.</p>
+    {notes.length > 0 && <div className="portrait-finish-notes" aria-live="polite">{notes.map(note => <p key={note} className="lr-notice">{note}</p>)}</div>}
     <div className="lr-crops" aria-label="Finishing presets">{FINISH_PRESETS.map(preset =>
       <button type="button" key={preset.id} title={preset.hint} disabled={disabled} onClick={() => onSave(preset.apply(finish), preset.name)}>{preset.name}</button>)}
     </div>

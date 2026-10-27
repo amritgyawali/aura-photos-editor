@@ -115,3 +115,23 @@ byte-identical after the run.
 
 The in-app results are written to `.work-checks/everything/results.json` by
 `scripts/test-everything-gui.py --port 9391` (use a port no other AURA is using).
+
+## 8. Update, 2026-10-27 (branch `fix/tls-advisories-and-finish-notice`)
+
+Done:
+
+- **Cloud TLS moved to `ring`** (ADR-0066 addendum). The alpha `rustls-rustcrypto` provider and
+  everything it pinned (`rustls-webpki` 0.102, `crypto-bigint` 0.5, `rsa`) left the tree, along with
+  seven of eight advisory exceptions in `deny.toml` and about 470 lines of each lockfile. `cargo
+  deny check`: advisories, bans, licences and sources all ok. A certificate-verified handshake with
+  Anthropic and OpenAI was completed live through AURA's connector.
+- **The finishing panel says when people tools have no person.** Saving face, body, skin, makeup or
+  people values on a photograph with no face returns a note shown above the tools; background
+  tools report nothing. Tested end to end (`crates/aura-app/tests/studio_finish.rs`) and in the
+  panel's UI test.
+
+Still open from the lists above: the colour-match intent decision (match appearance or recover the
+edit) for the two accuracy gates; the glare finder's remaining false proposals; more real portraits
+(group, full-length, beard, open smile, a person seen from behind) in the harness inputs; and
+reconciling the main checkout's in-progress merge with PR #74.
+

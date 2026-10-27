@@ -370,3 +370,63 @@ fn background_repair_refuses_a_frame_without_a_detected_subject() {
     .finish
     .is_identity());
 }
+
+fn save(f: &Fixture, finish: StudioFinish) -> finish_commands::StudioFinishDto {
+    finish_commands::save_studio_finish(
+        &f.state,
+        &SaveStudioFinishInput {
+            project_id: f.project.clone(),
+            photo_id: f.photo.clone(),
+            finish,
+            label: None,
+        },
+    )
+    .expect("save")
+}
+
+#[test]
+fn people_tools_on_a_photograph_with_no_face_say_so_and_background_tools_do_not() {
+    let dir = tempfile::tempdir().expect("temp");
+    let path = dir.path().join("no-one.jpg");
+    let blank = Rgb8 {
+        width: 64,
+        height: 64,
+        data: vec![110; 64 * 64 * 3],
+    };
+    std::fs::write(&path, encode_jpeg(&blank, 95).unwrap()).unwrap();
+    let f = import(&path, dir);
+    let mut body = StudioFinish::default();
+    body.body.slim = 40.0;
+    assert_eq!(
+        save(&f, body).notes,
+        vec![finish_commands::NO_PERSON_NOTE.to_string()]
+    );
+    let mut subject = StudioFinish::default();
+    subject.subject.exposure = 30.0;
+    assert_eq!(
+        save(&f, subject).notes,
+        vec![finish_commands::NO_PERSON_NOTE.to_string()]
+    );
+    // The background needs no person, so nothing is reported.
+    let mut scene = StudioFinish::default();
+    scene.scene.brightness = 30.0;
+    assert!(save(&f, scene).notes.is_empty());
+}
+
+#[test]
+fn people_tools_on_a_portrait_report_nothing() {
+    let dir = tempfile::tempdir().expect("temp");
+    let path = dir.path().join("portrait.jpg");
+    let p = portrait(&PortraitSpec::default());
+    let rgb = Rgb8 {
+        width: p.width,
+        height: p.height,
+        data: p.rgb.clone(),
+    };
+    std::fs::write(&path, encode_jpeg(&rgb, 95).expect("jpeg")).expect("write");
+    let f = import(&path, dir);
+    let mut body = StudioFinish::default();
+    body.body.slim = 40.0;
+    body.face.eye_size = 20.0;
+    assert!(save(&f, body).notes.is_empty());
+}

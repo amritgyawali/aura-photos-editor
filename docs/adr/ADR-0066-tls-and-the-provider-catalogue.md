@@ -160,3 +160,27 @@ and -0381, distrusted emSign intermediates). Two cannot be upgraded while `rustl
   P-256 still verifies server signatures, which handles public values only. Every vendor in the
   catalogue offers X25519; a server that offered only NIST curves would now fail its handshake,
   which reads as an unreachable provider and falls back locally like any other.
+
+## Addendum, 2026-10-27: the provider is `ring`
+
+The condition this ADR set for leaving `rustls-rustcrypto` - "a C toolchain on the build
+machines" - is met: the reference machine builds with the GNU Rust toolchain and MinGW gcc, and
+the CI runners always had compilers. So the swap was made, and it was the one-file change the ADR
+predicted: `rustls` gains its `ring` feature, `tls::provider` returns
+`rustls::crypto::ring::default_provider()`, and `rustls-rustcrypto` leaves the tree.
+
+* **What leaves with it:** `rustls-webpki` 0.102, `crypto-bigint` 0.5 and `rsa`, about 470 lines of
+  each lockfile, and seven of the eight advisory exceptions in `deny.toml` (RUSTSEC-2026-0049,
+  -0098, -0099, -0104, -0382, -0387 and RUSTSEC-2023-0071). They were argued around; now there is
+  nothing to argue about. The remaining exception is `paste` (RUSTSEC-2024-0436), a build-time macro
+  crate the macOS GPU backend pulls in.
+* **The key exchange is no longer X25519 only.** That restriction existed because the pure-Rust
+  provider's P-256 arithmetic was not constant-time. `ring`'s X25519, P-256 and P-384 all are, so
+  the client offers `ring`'s defaults with X25519 first, and a server that prefers NIST curves is no
+  longer refused. Pinned by `x25519_is_preferred_and_every_key_exchange_is_constant_time`.
+* **Evidence:** `a_public_ai_provider_completes_a_verified_handshake` (ignored, live network)
+  completes a certificate-verified handshake with `api.anthropic.com` and `api.openai.com` through
+  `TlsConnector` and reads an HTTP status line back, sending no key and no photograph. It passed on
+  the reference machine on 2026-10-27.
+* **What does not change:** verification stays on with no switch to turn it off, the roots are
+  still the bundled Mozilla set, and plain HTTP still serves a local model.

@@ -17,3 +17,13 @@ Open **Hot Features** in the sidebar. Choose one of the five cards, then select 
 The save command refuses enabling/changing repair when it cannot find both a foreground subject and a background. A zero setting remains available to disable it. Segmentation quality still affects boundary quality. It cannot recover pixels missing from an imported flattened liquify edit without a clean original. Glare softening cannot reconstruct an eye hidden by opaque or clipped reflections. Skin-mark classification and single-reference colour transfer also require review; no universal perfect result is claimed.
 
 Cards use local vector artwork before a photo is selected and the selected photo's cached thumbnail afterward. These are tool illustrations, not fabricated before/after results; working comparisons are inside the native editor. No external stock-image requests or customer photographs are bundled.
+
+## When there is no person (2026-10-27)
+
+Face, body, skin, makeup and people adjustments act only where the portrait parse found a face
+(or the photographer drew one in Portrait retouch). On a photograph with nobody in it - a still
+life, an empty venue, wildlife - they leave the photograph unchanged, and saving one now returns a
+note that the finishing panel shows above its tools, so a slider never appears to be broken.
+Background adjustments need no person and are never reported. `save_studio_finish` carries the
+note in `notes`; the parse it checks is the renderer's own, so the note agrees with the render.
+

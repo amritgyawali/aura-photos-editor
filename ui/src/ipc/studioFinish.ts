@@ -71,7 +71,8 @@ export type StudioFinish = {
   /** The people as the learned selection found them, frozen by the backend; carried unchanged. */
   subjectMatte?: unknown;
 };
-export type StudioFinishDto = { finish: StudioFinish; recipe: RecipeDto };
+/** `notes`: what the saved finish could not do on this photograph, e.g. people tools with no face. */
+export type StudioFinishDto = { finish: StudioFinish; recipe: RecipeDto; notes?: string[] };
 /** What Auto light measured and proposes. Nothing is stored until the photographer saves it. */
 export type LightSuggestion = { light: PortraitLight; faces: number; contrast: number | null; reasons: string[] };
 

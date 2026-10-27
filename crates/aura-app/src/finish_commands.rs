@@ -10,7 +10,7 @@
 //! photographer saves it - or does not - like any other value in the panel.
 use aura_core::{AuraError, PhotoId, ProjectId};
 use aura_recipe::studio_finish::{self, Light, StudioFinish};
-use aura_recipe::{schema, EditSource};
+use aura_recipe::{schema, EditSource, Recipe};
 use aura_render::{FrameSource, RenderLevel};
 use serde::{Deserialize, Serialize};
 
@@ -48,6 +48,58 @@ pub struct SaveStudioFinishInput {
 pub struct StudioFinishDto {
     pub finish: StudioFinish,
     pub recipe: RecipeDto,
+    /// Sentences for the panel about what this finish could not do on this photograph: today,
+    /// that face, body, skin, make-up and people values have no person to act on.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub notes: Vec<String>,
+}
+
+/// What a photographer is told when people tools are set on a photograph with no face.
+pub const NO_PERSON_NOTE: &str = "No face was found in this photograph, so the face, body, skin, makeup and people adjustments have nothing to act on and leave it unchanged. If someone is there, draw their face in Portrait retouch.";
+
+/// True when the finish sets something that acts only on a person: the face and body shape, skin,
+/// makeup, and the people (not the background) adjustments.
+fn needs_a_person(f: &StudioFinish) -> bool {
+    let s = &f.subject;
+    !f.face.is_identity()
+        || !f.body.is_identity()
+        || !f.skin.is_identity()
+        || !f.makeup.is_identity()
+        || [
+            s.exposure,
+            s.warmth,
+            s.clarity,
+            s.group_balance,
+            s.group_skin,
+            s.relight,
+            s.harsh_shadows,
+            s.backlight,
+            s.face_brightness,
+        ]
+        .iter()
+        .any(|v| *v != 0.0)
+}
+
+/// The note for a finish whose people tools have no person on this photograph. The parse is the
+/// renderer's own, so the note agrees with what the photograph will look like.
+fn person_notes(
+    state: &AppState,
+    photo: PhotoId,
+    recipe: &Recipe,
+    finish: &StudioFinish,
+) -> Vec<String> {
+    if !needs_a_person(finish) {
+        return Vec::new();
+    }
+    let Ok(frame) = crate::photo_frames::CatalogFrames::new(state.clone())
+        .frame(&photo, RenderLevel::Proxy2048)
+    else {
+        return Vec::new();
+    };
+    match aura_render::portrait::parse(&frame, &aura_render::portrait::hints(recipe)) {
+        Some(map) if !map.faces.is_empty() => Vec::new(),
+        _ => vec![NO_PERSON_NOTE.to_string()],
+    }
 }
 
 fn ids(project: &str, photo: &str) -> Result<(ProjectId, PhotoId), AuraError> {
@@ -67,6 +119,7 @@ pub fn studio_finish(state: &AppState, input: &StudioFinishInput) -> IpcResult<S
     Ok(StudioFinishDto {
         finish: studio_finish::read(&recipe)?,
         recipe: crate::develop_commands::recipe_dto(&input.photo_id, &recipe),
+        notes: Vec::new(),
     })
 }
 
@@ -128,8 +181,10 @@ pub fn save_studio_finish(
     state
         .recipe_store()
         .save(&project, &photo, &merged, &changes.changed, &label)?;
+    let saved = studio_finish::read(&merged)?;
     Ok(StudioFinishDto {
-        finish: studio_finish::read(&merged)?,
+        notes: person_notes(state, photo, &merged, &saved),
+        finish: saved,
         recipe: crate::develop_commands::recipe_dto(&input.photo_id, &merged),
     })
 }

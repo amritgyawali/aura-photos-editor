@@ -164,7 +164,12 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
   }, [photoId, projectId]);
   const masks = useMemo(() => masksOf(recipe), [recipe]);
   const finish = useMemo(() => finishOf(recipe), [recipe]);
-  const saveFinish = (next: StudioFinish, label: string) => void write(() => studioFinish.save(projectId, photoId, next, label));
+  // What the last finishing save could not do here (people tools with no face), for the panel.
+  const [finishNotes, setFinishNotes] = useState<string[]>([]);
+  const saveFinish = (next: StudioFinish, label: string) => void write(async () => {
+    const saved = await studioFinish.save(projectId, photoId, next, label);
+    setFinishNotes(saved?.notes ?? []);
+  });
   const crop = useMemo(() => cropOf(recipe), [recipe]);
   // The selected mask's coverage, for the red overlay, refreshed with every saved change.
   useEffect(() => {
@@ -396,7 +401,7 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
         </div></details>
         <details className="lr-section" hidden={!shows('portrait')} open={featureMode === 'liquify' || panel === 'portrait' || liquifyTool !== null}><summary>Portrait studio: face, body, background, makeup</summary><div className="lr-section-body">
           <PortraitFinishPanel finish={finish} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)}
-            liquify={liquifyTool} onSave={saveFinish} subject={`${projectId}/${photoId}`} initialTab={featureMode === 'liquify' ? 'liquify' : 'face'}
+            liquify={liquifyTool} onSave={saveFinish} subject={`${projectId}/${photoId}`} initialTab={featureMode === 'liquify' ? 'liquify' : 'face'} notes={finishNotes}
             onSuggestLight={() => studioFinish.suggestLight(projectId, photoId)}
             onFindFaces={() => evotoWorkflow.faces(projectId, photoId).then(found => found.faces)}
             onLiquify={tool => { setLiquifyTool(tool); if (tool) { setMaskTool(null); setView('edited'); setPicking(false); } }} />
