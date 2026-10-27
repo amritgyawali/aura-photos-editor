@@ -8,7 +8,7 @@ const strengthsOf = (report: RegionalMatchReport): RegionalStrengths =>
 
 export function RegionalColorMatchPanel({ photoId, referenceId, referenceAvailable, revision, disabled, onApply, onBusyChange }: {
   photoId: string; referenceId: string; referenceAvailable: boolean; revision?: string; disabled: boolean;
-  onApply: (action: () => Promise<unknown>) => Promise<void>; onBusyChange: (busy: boolean) => void;
+  onApply: (action: () => Promise<unknown>) => Promise<unknown>; onBusyChange: (busy: boolean) => void;
 }): JSX.Element {
   const [report, setReport] = useState<RegionalMatchReport | null>(null);
   const [draft, setDraft] = useState<RegionalStrengths>({});

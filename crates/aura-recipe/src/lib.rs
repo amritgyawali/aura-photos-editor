@@ -90,6 +90,7 @@ pub mod local_masks;
 pub mod material_lab;
 pub mod migrate;
 pub mod reference_grade;
+pub mod retouch_intensity;
 pub mod retouch_tools;
 pub mod schema;
 pub mod sidecar;

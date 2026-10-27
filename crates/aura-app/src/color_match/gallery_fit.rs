@@ -13,6 +13,12 @@ use serde::{Deserialize, Serialize};
 use super::calibration;
 use super::{appearance, check_cancel, content, grade, refine, rendered, skin_guard, AppState};
 
+mod adaptive;
+mod correspondence;
+mod evidence;
+mod objective;
+pub(crate) use evidence::{EvidenceBuilder, ReferenceEvidence};
+
 pub(crate) fn calibrate(
     state: &AppState,
     original_path: &std::path::Path,
@@ -23,8 +29,8 @@ pub(crate) fn calibrate(
     super::CalibrationReport,
 )> {
     check_cancel(cancel)?;
-    let original = super::reference_image::decode(original_path)?;
-    let edited = super::reference_image::decode(edited_path)?;
+    let original = super::reference_image::decode_native(original_path)?;
+    let edited = super::reference_image::decode_native(edited_path)?;
     if (original.width, original.height) != (edited.width, edited.height) {
         return Err(super::invalid(
             "The original and edited reference must have identical dimensions and framing.",
@@ -64,6 +70,10 @@ pub(crate) struct Allowance {
     pub skin: f32,
     /// The largest increase in the fraction of clipped pixels.
     pub clipping: f32,
+    /// Skin may also move further than `skin` when the move brings it closer to the reference's
+    /// own skin: the reference's exact colours ask for its skin (ADR-0183).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub toward_reference: bool,
 }
 
 impl Default for Allowance {
@@ -71,6 +81,7 @@ impl Default for Allowance {
         Self {
             skin: 1.0,
             clipping: 0.01,
+            toward_reference: false,
         }
     }
 }
@@ -81,6 +92,9 @@ pub(crate) struct Request<'a> {
     pub baseline: &'a Recipe,
     pub current: &'a Recipe,
     pub target: &'a LookAggregate,
+    pub evidence: Option<&'a ReferenceEvidence>,
+    pub lighting: aura_core::contract::style::LightingBucket,
+    pub lighting_confidence: f32,
     pub thumbnail: &'a [u8],
     pub monochrome: bool,
     pub strength: f32,
@@ -100,26 +114,7 @@ pub(crate) struct Fit {
 /// The fitting domain is the native decode, including RAW camera colour, rather than an
 /// embedded camera JPEG. Only this reduced working-space frame is cloned for the search.
 pub(crate) fn reduced(full: &Frame) -> AuraResult<Frame> {
-    let longest = full.width.max(full.height).max(1);
-    let width = (u64::from(full.width) * 256 / u64::from(longest)).max(1) as u32;
-    let height = (u64::from(full.height) * 256 / u64::from(longest)).max(1) as u32;
-    if longest <= 256 {
-        return Ok(full.clone());
-    }
-    let mut rgb = Vec::with_capacity(width as usize * height as usize * 3);
-    for y in 0..height {
-        let row = u64::from(y) * u64::from(full.height) / u64::from(height);
-        for x in 0..width {
-            let column = u64::from(x) * u64::from(full.width) / u64::from(width);
-            let offset = ((row * u64::from(full.width) + column) * 3) as usize;
-            rgb.extend_from_slice(
-                full.rgb
-                    .get(offset..offset + 3)
-                    .ok_or_else(|| super::invalid("The native photo dimensions are invalid."))?,
-            );
-        }
-    }
-    Ok(Frame::working(rgb, width, height, &full.camera))
+    super::reduction::reduce(full, 256)
 }
 
 fn candidate(
@@ -156,25 +151,6 @@ fn candidate(
         .map_err(|_| super::invalid("The fitted reference recipe could not be encoded."))
 }
 
-/// A thumbnail correspondence is used only for a single reference with very strong structure
-/// evidence. Different scenes use aggregate appearance and conservative edit regularisation.
-fn distance(target: &LookAggregate, reference: &[u8], paired: bool, image: &Rgb8) -> f32 {
-    if paired {
-        let actual = content::thumbnail(image);
-        if actual.len() != reference.len() || actual.is_empty() {
-            return f32::INFINITY;
-        }
-        return reference
-            .iter()
-            .zip(&actual)
-            .map(|(a, b)| f32::from(a.abs_diff(*b)))
-            .sum::<f32>()
-            / reference.len().max(1) as f32;
-    }
-    let reading = aura_look::measure::read("reference-candidate", image);
-    aura_look::solve::distance(target, &aura_look::aggregate::fold(&[&reading]))
-}
-
 fn wheel_effort(wheels: &[f32; 6]) -> f32 {
     wheels
         .chunks_exact(2)
@@ -189,6 +165,14 @@ fn wheel_effort(wheels: &[f32; 6]) -> f32 {
 /// already-scaled proposal would let the optimiser undo the meaning of the strength slider.
 #[allow(clippy::too_many_lines)]
 pub(crate) fn fit(state: &AppState, request: &Request<'_>) -> AuraResult<Fit> {
+    if let Some(evidence) = request.evidence {
+        return adaptive::fit(state, request, evidence);
+    }
+    fit_legacy(state, request)
+}
+
+#[allow(clippy::too_many_lines)]
+fn fit_legacy(state: &AppState, request: &Request<'_>) -> AuraResult<Fit> {
     check_cancel(request.cancel)?;
     let small = reduced(request.full)?;
     let baseline = candidate(request, &StyleDelta::neutral(), &[0.0; 6], 0.0)?;
@@ -198,7 +182,8 @@ pub(crate) fn fit(state: &AppState, request: &Request<'_>) -> AuraResult<Fit> {
     let reading = aura_look::measure::read("reference-baseline", &before);
     let measured = aura_look::aggregate::fold(&[&reading]);
     let similarity = content::similarity(request.thumbnail, &before);
-    let paired = similarity.is_some_and(|s| s >= 0.985);
+    let objective = objective::Objective::new(request.target, request.thumbnail, &before);
+    let paired = objective.corresponding();
     let regularization = if paired {
         0.0
     } else {
@@ -215,7 +200,7 @@ pub(crate) fn fit(state: &AppState, request: &Request<'_>) -> AuraResult<Fit> {
                     && b.share >= aura_look::solve::BAND_MIN_SHARE
             })
     });
-    let before_score = distance(request.target, request.thumbnail, paired, &before);
+    let before_score = objective.distance(&before);
     let mut scores = BTreeMap::new();
     let mut evaluate = |delta: &StyleDelta, wheels: &[f32; 6]| -> AuraResult<f32> {
         check_cancel(request.cancel)?;
@@ -231,7 +216,7 @@ pub(crate) fn fit(state: &AppState, request: &Request<'_>) -> AuraResult<Fit> {
             {
                 f32::INFINITY
             } else {
-                distance(request.target, request.thumbnail, paired, &image)
+                objective.distance(&image)
             };
             scores.insert(hash, score);
             score
@@ -244,17 +229,19 @@ pub(crate) fn fit(state: &AppState, request: &Request<'_>) -> AuraResult<Fit> {
         // Monochrome intent changes the neutral proposal too. Score it before the search
         // so an already exact desaturation is not replaced by a needless tone correction.
         score = evaluate(&neutral, &[0.0; 6])?.min(score);
-        let seed = aura_look::solve::initial(request.target, &measured);
-        let seeded = evaluate(&seed, &[0.0; 6])?;
-        if seeded < score {
-            fitted = seed;
-            score = seeded;
+        if score > 1e-4 {
+            let seed = aura_look::solve::initial(request.target, &measured);
+            let seeded = evaluate(&seed, &[0.0; 6])?;
+            if seeded < score {
+                fitted = seed;
+                score = seeded;
+            }
+            let refined = refine::search(&fitted, score, supported, |delta| {
+                evaluate(delta, &[0.0; 6])
+            })?;
+            fitted = refined.delta;
+            score = refined.distance;
         }
-        let refined = refine::search(&fitted, score, supported, |delta| {
-            evaluate(delta, &[0.0; 6])
-        })?;
-        fitted = refined.delta;
-        score = refined.distance;
     }
     let mut wheels = if request.strength > 0.0 && !request.monochrome {
         let (wheels, next_score, _) = grade::search(score, |wheels| evaluate(&fitted, wheels))?;
@@ -281,9 +268,10 @@ pub(crate) fn fit(state: &AppState, request: &Request<'_>) -> AuraResult<Fit> {
     // Measure the *merged* recipe at native resolution. Full-resolution safeguards and the
     // same actual objective decide acceptance, including small faces/highlights missed above.
     let image = rendered(state, request.full, &baseline)?;
-    let native_regions = appearance::readings(&image, &regions);
+    let native_regions = appearance::analyse(&image)?;
+    let contours = super::contours::Contours::new(&image);
     let native_clip = appearance::clipped(&image);
-    let native_before = distance(request.target, request.thumbnail, paired, &image);
+    let native_before = objective.distance(&image);
     drop(image);
     let mut best = baseline;
     let mut native_after = native_before;
@@ -297,15 +285,19 @@ pub(crate) fn fit(state: &AppState, request: &Request<'_>) -> AuraResult<Fit> {
             continue;
         }
         let image = rendered(state, request.full, &proposal)?;
-        let after = appearance::readings(&image, &regions);
-        let measured = distance(request.target, request.thumbnail, paired, &image);
+        let after = appearance::readings(&image, &native_regions);
+        let measured = objective.distance(&image);
         if measured.is_finite()
             && measured + 1e-4 < native_after
             && appearance::clipped(&image) <= native_clip + 0.01
             && skin_guard(&native_regions, &after, request.monochrome)
+            && contours.accepts(&image)
         {
             native_after = measured;
             best = proposal;
+            if measured <= 1e-4 {
+                break;
+            }
         }
     }
     check_cancel(request.cancel)?;
@@ -322,7 +314,7 @@ pub(crate) fn fit(state: &AppState, request: &Request<'_>) -> AuraResult<Fit> {
 }
 
 pub(crate) fn decode(path: &std::path::Path) -> AuraResult<Rgb8> {
-    Ok(super::reference_image::decode(path)?.image)
+    Ok(super::reference_image::decode_native(path)?.image)
 }
 
 pub(crate) fn thumbnail(image: &Rgb8) -> Vec<u8> {
@@ -377,11 +369,10 @@ pub(crate) fn apply_calibrated(
 ) -> AuraResult<Fit> {
     check_cancel(request.cancel)?;
     let baseline = candidate(request, &StyleDelta::neutral(), &[0.0; 6], 0.0)?;
-    let small = rendered(state, &reduced(request.full)?, &baseline)?;
-    let regions = appearance::analyse(&small)?;
     let native = rendered(state, request.full, &baseline)?;
     check_cancel(request.cancel)?;
-    let before_regions = appearance::readings(&native, &regions);
+    let before_regions = appearance::analyse(&native)?;
+    let contours = super::contours::Contours::new(&native);
     let clipped = appearance::clipped(&native);
     let mut full_model = model.clone();
     full_model.amount = 1.0;
@@ -404,7 +395,9 @@ pub(crate) fn apply_calibrated(
         schema::Validation::check(&proposal)?;
         let image = rendered(state, request.full, &proposal)?;
         let distance = calibrated_distance(&native, &image, &evaluator);
-        let readings = appearance::readings(&image, &regions);
+        let readings = appearance::readings(&image, &before_regions);
+        // A look learned from the photographer's own edit may move skin and clipping as far as
+        // that edit did on its original (ADR-0161); everything else keeps the pilot limits.
         let skin_ok = if request.monochrome {
             skin_guard(&before_regions, &readings, true)
         } else {
@@ -414,6 +407,7 @@ pub(crate) fn apply_calibrated(
             && distance + 1e-4 < after
             && appearance::clipped(&image) <= clipped + request.allowance.clipping
             && skin_ok
+            && contours.accepts(&image)
         {
             best = proposal;
             after = distance;

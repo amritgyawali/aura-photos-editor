@@ -95,6 +95,7 @@ fn allowance(original: &Rgb8, edited: &Rgb8) -> Allowance {
             pilot.skin
         },
         clipping: pilot.clipping.max(clipping + pilot.clipping),
+        toward_reference: false,
     }
 }
 
@@ -233,30 +234,56 @@ fn averaged(full: &Frame, edge: u32) -> Frame {
     Frame::working(rgb, width, height, &full.camera)
 }
 
-/// The photograph as every target is matched from - its neutral rendering with the automatic
-/// correction, measured as targets measure it - rendered from an averaged frame.
-fn baseline(state: &AppState, photo: PhotoId) -> AuraResult<Rgb8> {
+/// How a candidate original is rendered before it is compared with its edited reference: the
+/// same way the route that will apply the look measures its targets, so the edit learned is the
+/// change from what a target looks like there to what the photographer delivered.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Baseline {
+    /// The neutral rendering with the automatic correction, as reference-first matching and
+    /// collection preparation start every target.
+    AutoCorrected,
+    /// The photograph as it currently looks, without any reference look on it, as the Match a
+    /// look panel measures every target (ADR-0180).
+    Current,
+}
+
+/// The photograph as targets are matched from, rendered from an averaged frame.
+fn baseline(state: &AppState, photo: PhotoId, mode: Baseline) -> AuraResult<Rgb8> {
     let full =
         crate::photo_frames::CatalogFrames::new(state.clone()).frame(&photo, RenderLevel::Full)?;
     let small = gallery_fit::reduced(&full)?;
     let large = averaged(&full, RENDER_EDGE);
     drop(full);
-    let neutral = crate::develop_commands::neutral_recipe(state, photo);
-    let source = gallery_fit::render(state, &small, &neutral)?;
-    let recipe = crate::edit_profiles::build(
-        &neutral,
-        None,
-        1.0,
-        crate::edit_profiles::AutoCorrection::measure(&source.data)?,
-        crate::edit_profiles::SceneStats::measure(&source.data)?,
-    )?
-    .0;
+    let recipe = match mode {
+        Baseline::AutoCorrected => {
+            let neutral = crate::develop_commands::neutral_recipe(state, photo);
+            let source = gallery_fit::render(state, &small, &neutral)?;
+            crate::edit_profiles::build(
+                &neutral,
+                None,
+                1.0,
+                crate::edit_profiles::AutoCorrection::measure(&source.data)?,
+                crate::edit_profiles::SceneStats::measure(&source.data)?,
+            )?
+            .0
+        }
+        Baseline::Current => {
+            without_reference_looks(crate::develop_commands::load_or_neutral(state, photo)?)
+        }
+    };
     gallery_fit::render(state, &large, &recipe)
+}
+
+/// A recipe with every reference look taken off: the photograph as the photographer edited it.
+pub(crate) fn without_reference_looks(mut recipe: aura_recipe::Recipe) -> aura_recipe::Recipe {
+    recipe.extra.remove(aura_recipe::reference_grade::KEY);
+    recipe.extra.remove(aura_recipe::calibrated_look::KEY);
+    recipe
 }
 
 /// An edited reference at the size pairs are compared at.
 fn edited_image(reference: &Path) -> AuraResult<Rgb8> {
-    let edited = super::reference_image::decode(reference)?.image;
+    let edited = super::reference_image::decode_native(reference)?.image;
     let longest = edited.width.max(edited.height).max(1);
     if longest <= EDGE {
         return Ok(edited);
@@ -280,6 +307,7 @@ fn pair_for(
     state: &AppState,
     shots: &[&Shot],
     edited: Rgb8,
+    mode: Baseline,
     cancel: &CancelToken,
 ) -> AuraResult<Result<Pair, String>> {
     let aspect = f64::from(edited.width) / f64::from(edited.height.max(1));
@@ -287,7 +315,7 @@ fn pair_for(
     let mut reason = None;
     for shot in shots {
         check_cancel(cancel)?;
-        let original = match baseline(state, shot.photo) {
+        let original = match baseline(state, shot.photo, mode) {
             Ok(image) => image,
             Err(error) => {
                 reason.get_or_insert_with(|| {
@@ -339,6 +367,7 @@ fn learned(pairs: &[&Pair], model: CalibratedLook, report: CalibrationReport) ->
         .fold(Allowance::default(), |a, b| Allowance {
             skin: a.skin.max(b.skin),
             clipping: a.clipping.max(b.clipping),
+            toward_reference: false,
         });
     Learned {
         photos: pairs.iter().map(|p| p.photo).collect(),
@@ -356,6 +385,7 @@ pub(crate) fn learn(
     state: &AppState,
     project: &ProjectId,
     references: &[PathBuf],
+    mode: Baseline,
     cancel: &CancelToken,
 ) -> AuraResult<Search> {
     let shots = collection(state, project)?;
@@ -374,7 +404,7 @@ pub(crate) fn learn(
         let Ok(edited) = edited_image(reference) else {
             continue;
         };
-        match pair_for(state, &found, edited, cancel)? {
+        match pair_for(state, &found, edited, mode, cancel)? {
             Ok(pair) => pairs.push(pair),
             Err(reason) if !reason.is_empty() => {
                 search.refused.get_or_insert(reason);

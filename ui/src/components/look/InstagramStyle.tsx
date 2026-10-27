@@ -43,7 +43,7 @@ export function InstagramStyle({ selection, disabled, onChange, onBusyChange, on
       const folder = single ? await pickColorReference()
         : await pickPhotoFolder(fromExport ? 'Choose your unzipped Instagram data export' : 'Choose a folder of at least 8 reference photos');
       if (!folder || stopped.current) { setStatus('Stopped. Your previous style is unchanged.'); return; }
-      setStatus('Measuring white balance, tonal range, contrast and color in the reference photos…');
+      setStatus('Measuring tonal curves, color palettes, hue relationships and lighting in the reference photos…');
       const analysis = original
         ? await referenceStyle.analyse(address.trim(), folder, cancelId.current, fromExport, original)
         : await referenceStyle.analyse(address.trim(), folder, cancelId.current, fromExport);
@@ -79,6 +79,7 @@ export function InstagramStyle({ selection, disabled, onChange, onBusyChange, on
       <div className="reference-palette" aria-label="Measured reference palette">{analysis.colors.map(color => <span key={color} style={{ backgroundColor: color }} title={color} />)}</div>
       <div><span className="eyebrow">REFERENCE READY</span><h2>{analysis.origin || 'Your reference style'}</h2><p>{analysis.measured} photos analyzed · {analysis.skipped} unreadable</p></div>
       {analysis.calibration && <p>Color transformation learned from your original and edited reference. Each photo uses this shared grade, with checks to protect skin and highlights.</p>}
+      {!analysis.calibration && <p>Adapts the reference’s tone, color and hue to each photo. Look strength controls how much of the result you apply.</p>}
       <div className="reference-traits"><span>{analysis.brightness < 0.4 ? 'Deep tones' : analysis.brightness > 0.65 ? 'Light tones' : 'Balanced tones'}</span><span>{analysis.contrast > 0.7 ? 'Strong contrast' : 'Soft contrast'}</span><span>{analysis.warmth > 3 ? 'Warm color lean' : analysis.warmth < -3 ? 'Cool color lean' : 'Neutral color lean'}</span></div>
       <label className="reference-strength">Look strength <output>{Math.round(selection.strength * 100)}%</output><input type="range" min={0} max={100} value={Math.round(selection.strength * 100)} disabled={disabled || busy} onChange={event => onChange({ ...selection, strength: Number(event.target.value) / 100 })} /></label>
       <div className="import-actions"><button type="button" className="is-primary" disabled={disabled || busy} onClick={onAddPhotos}>Choose your photos</button>

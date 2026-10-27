@@ -130,7 +130,8 @@ export async function pickImportPaths(directory: boolean): Promise<string[]> {
 export type ReferenceAnalysis = {
   id: string; origin: string; measured: number; skipped: number; colors: string[];
   brightness: number; contrast: number; warmth: number; saturation: number;
-  calibration?: { trainingSamples: number; validationSamples: number; meanError: number; p95Error: number; occupiedColorCells: number };
+  calibration?: { trainingSamples: number; validationSamples: number; meanError: number; p95Error: number; occupiedColorCells: number;
+    selectionSamples?: number; residualRefined?: boolean };
 };
 export type ReferenceSelection = { analysis: ReferenceAnalysis; strength: number };
 export type ApplyReport = { changed: number; beforeDistance: number; afterDistance: number; protectedFields: number;

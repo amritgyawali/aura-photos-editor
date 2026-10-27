@@ -259,7 +259,7 @@ impl PairSource for AuthoredArchive {
 
 /// A pair source with nothing in it.
 ///
-/// The desktop shell holds one of these until the archive-import flow exists: `train_profile`
+/// Tests without an archive can use this source: `train_profile`
 /// is a registered command with a frozen shape, and with no source to read it produces
 /// `AURA-ML-5073` - "not enough usable pairs" - which is the honest answer rather than a silent
 /// success. It lives in `fixtures` rather than in `api` because it is scaffolding and saying so

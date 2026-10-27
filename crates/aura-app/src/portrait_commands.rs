@@ -240,6 +240,92 @@ fn parse_photograph(
     Ok((map, frame))
 }
 
+/// One photograph in one collection.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FindGlareInput {
+    /// The collection the photograph is in.
+    pub project_id: String,
+    /// The photograph.
+    pub photo_id: String,
+}
+
+/// A lens reflection, shaped as a glare selection.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GlareRegionDto {
+    /// The ellipse `[cx, cy, rx, ry]` in frame fractions: a glare edit's `region`.
+    pub region: [f32; 4],
+    /// `0..1`: how sure the detector is.
+    pub confidence: f32,
+    /// Which face, largest first.
+    pub face: usize,
+}
+
+/// What the reflection search found.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FindGlareDto {
+    /// The faces searched.
+    pub faces: usize,
+    /// One selection per lens with a reflection.
+    pub regions: Vec<GlareRegionDto>,
+    /// One sentence for the panel.
+    pub message: String,
+}
+
+/// Find reflections on spectacle lenses, as glare selections a person previews and applies.
+/// Nothing is written: the panel turns the proposals into edits, which can be undone.
+///
+/// # Errors
+///
+/// A typed error when the photograph is not in the collection or cannot be decoded.
+pub fn find_glare(state: &AppState, input: &FindGlareInput) -> IpcResult<FindGlareDto> {
+    crate::studio_tools::require_member(state, &input.project_id, &input.photo_id)?;
+    let photo = parse_photo(&input.photo_id)?;
+    let recipe = load_or_neutral(state, photo)?;
+    let Ok((map, frame)) = parse_photograph(state, photo, &recipe) else {
+        return Ok(FindGlareDto {
+            faces: 0,
+            regions: Vec::new(),
+            message: "No face was found to search for lens reflections. Place an ellipse over the reflection by hand.".into(),
+        });
+    };
+    let found = aura_render::glare_find::find_reflections(
+        &frame.rgb,
+        frame.width as usize,
+        frame.height as usize,
+        &map,
+    );
+    let regions: Vec<GlareRegionDto> = found
+        .iter()
+        .map(|r| GlareRegionDto {
+            region: r.region,
+            confidence: r.confidence,
+            face: r.face,
+        })
+        .collect();
+    let faces =
+        aura_render::glare_find::searched_faces(frame.width as usize, frame.height as usize, &map);
+    let message = match (faces, regions.len()) {
+        (0, _) => "No face large enough to search for lens reflections was found. Place an ellipse over the reflection by hand.".to_string(),
+        (_, 0) => format!(
+            "No lens reflection stood out on {faces} face{}. If you see one, place an ellipse over it by hand.",
+            if faces == 1 { "" } else { "s" }
+        ),
+        (_, n) => format!(
+            "Found {n} lens reflection{} on {faces} face{}. Compare before and after, then adjust or undo.",
+            if n == 1 { "" } else { "s" },
+            if faces == 1 { "" } else { "s" }
+        ),
+    };
+    Ok(FindGlareDto {
+        faces,
+        regions,
+        message,
+    })
+}
+
 /// What AURA found in a photograph.
 ///
 /// # Errors

@@ -14,11 +14,15 @@ pub(super) struct Region {
 }
 
 fn describe(image: &Rgb8) -> LookAggregate {
-    aggregate::fold(&[&measure::read_at(
-        "colour-match",
-        image,
-        image.width.max(image.height),
-    )])
+    // Native safety review can receive a camera master with tens of millions of pixels.
+    // Bound whole-image statistics; compact skin/region sample strips retain every point.
+    let longest = image.width.max(image.height);
+    let edge = if u64::from(image.width) * u64::from(image.height) <= 512 * 512 {
+        longest
+    } else {
+        longest.min(512)
+    };
+    aggregate::fold(&[&measure::read_at("colour-match", image, edge)])
 }
 
 fn selected_region(image: &Rgb8, name: &str, mattes: &[&skin::Matte]) -> Option<Region> {
@@ -67,6 +71,35 @@ pub(super) fn at_points(image: &Rgb8, points: &[[f32; 2]]) -> Option<LookAggrega
         height: 1,
         data: samples,
     }))
+}
+
+/// Colours inside people's detected skin, at most `limit` of them. Each region point stands for a
+/// 1/128 cell well inside its matte (`selected_region` rejects borders), so the cell is read at
+/// sixteen places: a small face still gives enough colours to learn its skin from.
+pub(super) fn skin_colours(image: &Rgb8, regions: &[Region], limit: usize) -> Vec<[u8; 3]> {
+    const ACROSS: usize = 4;
+    let mut colours = Vec::new();
+    for region in regions
+        .iter()
+        .filter(|r| r.name == "face skin" || r.name == "body skin")
+    {
+        for &[x, y] in &region.points {
+            for step in 0..ACROSS * ACROSS {
+                let dx = ((step % ACROSS) as f32 + 0.5) / ACROSS as f32 - 0.5;
+                let dy = ((step / ACROSS) as f32 + 0.5) / ACROSS as f32 - 0.5;
+                let column = (((x + dx / 128.0) * image.width as f32) as usize)
+                    .min(image.width.saturating_sub(1) as usize);
+                let row = (((y + dy / 128.0) * image.height as f32) as usize)
+                    .min(image.height.saturating_sub(1) as usize);
+                let at = (row * image.width as usize + column) * 3;
+                if let Some([r, g, b]) = image.data.get(at..at + 3) {
+                    colours.push([*r, *g, *b]);
+                }
+            }
+        }
+    }
+    let stride = colours.len().div_ceil(limit.max(1)).max(1);
+    colours.into_iter().step_by(stride).collect()
 }
 
 pub(super) fn analyse(image: &Rgb8) -> AuraResult<Vec<Region>> {
@@ -174,19 +207,54 @@ pub(super) fn skin_change(before: &[Region], after: &[Region]) -> f32 {
             after
                 .iter()
                 .find(|b| b.name == a.name)
-                .map_or(f32::INFINITY, |b| {
-                    [
-                        a.appearance.shadow.distance(b.appearance.shadow) / 5.0,
-                        a.appearance.mid.distance(b.appearance.mid) / 5.0,
-                        a.appearance.high.distance(b.appearance.high) / 5.0,
-                        (a.appearance.chroma_p50 - b.appearance.chroma_p50).abs() * 128.0 / 5.0,
-                        (a.appearance.tone.p50 - b.appearance.tone.p50).abs() / 0.12,
-                    ]
-                    .into_iter()
-                    .fold(0.0, f32::max)
-                })
+                .map_or(f32::INFINITY, |b| skin_difference(a, b))
         })
         .fold(0.0, f32::max)
+}
+
+/// One skin region's difference from another, on [`skin_change`]'s scale.
+pub(super) fn skin_difference(a: &Region, b: &Region) -> f32 {
+    [
+        a.appearance.shadow.distance(b.appearance.shadow) / 5.0,
+        a.appearance.mid.distance(b.appearance.mid) / 5.0,
+        a.appearance.high.distance(b.appearance.high) / 5.0,
+        (a.appearance.chroma_p50 - b.appearance.chroma_p50).abs() * 128.0 / 5.0,
+        (a.appearance.tone.p50 - b.appearance.tone.p50).abs() / 0.12,
+    ]
+    .into_iter()
+    .fold(0.0, f32::max)
+}
+
+/// Whether every person's skin in `after` is closer to the reference's skin than it was in
+/// `before`: each face to the reference's face skin and each body to its body skin, or to
+/// whichever skin the reference has. A person no longer found, or a reference without skin,
+/// is not a move toward it.
+pub(super) fn skin_toward(reference: &[Region], before: &[Region], after: &[Region]) -> bool {
+    let target = |name: &str| {
+        let kind = if name.ends_with("face skin") {
+            "face skin"
+        } else {
+            "body skin"
+        };
+        reference
+            .iter()
+            .find(|r| r.name == kind)
+            .or_else(|| reference.iter().find(|r| r.name.ends_with("skin")))
+    };
+    let mut compared = false;
+    for region in before.iter().filter(|r| r.name.ends_with("skin")) {
+        let Some(target) = target(&region.name) else {
+            return false;
+        };
+        let Some(moved) = after.iter().find(|r| r.name == region.name) else {
+            return false;
+        };
+        if skin_difference(target, moved) >= skin_difference(target, region) {
+            return false;
+        }
+        compared = true;
+    }
+    compared
 }
 
 pub(super) fn skin_preserved(before: &[Region], after: &[Region]) -> bool {
@@ -281,6 +349,34 @@ mod tests {
         after[2] = region("guard:person-1 face skin", [150, 60, 45]);
         assert!(skin_preserved(&before, &before));
         assert!(!skin_preserved(&before, &after));
+    }
+
+    #[test]
+    fn skin_moves_toward_the_reference_only_when_every_person_does() {
+        // The reference shows a face only; each person's face and body are measured against it.
+        let reference = vec![region("face skin", [200, 95, 40])];
+        let before = vec![
+            region("face skin", [205, 170, 150]),
+            region("guard:person-0 face skin", [205, 170, 150]),
+            region("guard:person-1 body skin", [190, 150, 130]),
+        ];
+        let toward = vec![
+            region("face skin", [202, 130, 90]),
+            region("guard:person-0 face skin", [202, 130, 90]),
+            region("guard:person-1 body skin", [195, 120, 80]),
+        ];
+        assert!(skin_toward(&reference, &before, &toward));
+        // One person sent green is not a move toward the reference's skin.
+        let mut astray = toward.clone();
+        astray[2] = region("guard:person-1 body skin", [120, 170, 110]);
+        assert!(!skin_toward(&reference, &before, &astray));
+        // A person who is no longer found, or a reference without skin, gives nothing to move toward.
+        assert!(!skin_toward(&reference, &before, &toward[..2]));
+        assert!(!skin_toward(
+            &[region("whole image", [200, 95, 40])],
+            &before,
+            &toward
+        ));
     }
 
     #[test]

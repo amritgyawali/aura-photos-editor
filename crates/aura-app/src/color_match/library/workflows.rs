@@ -368,6 +368,7 @@ impl PortableReference {
                 favorite: self.favorite,
                 default_controls: self.default_controls,
                 thumbnail: None,
+                preview: None,
                 regions: regions.iter().map(|region| region.name.clone()).collect(),
             },
             regions,
@@ -485,6 +486,10 @@ fn import(
                     .summary
                     .thumbnail
                     .clone_from(&existing.summary.thumbnail);
+                reference
+                    .summary
+                    .preview
+                    .clone_from(&existing.summary.preview);
                 *existing = reference;
             }
         } else {

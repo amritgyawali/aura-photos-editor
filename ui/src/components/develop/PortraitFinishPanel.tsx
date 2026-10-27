@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  BODY_SLIDERS, COLOUR_FEATURES, FACE_SLIDERS, FINISH_PRESETS, LIGHT_SLIDERS, NEUTRAL_BODY, NEUTRAL_FACE, NEUTRAL_FINISH, NEUTRAL_LIGHT,
-  hexToRgb, rgbToHex, type Background, type BackgroundMode, type FeatureColours, type LightSuggestion, type LiquifyMode, type StudioFinish,
+  ATTIRE_SLIDERS, BODY_SLIDERS, COLOUR_FEATURES, FACE_SLIDERS, FINISH_PRESETS, HAIR_SLIDERS, LIGHT_SLIDERS, MAKEUP_SLIDERS, MORE_BODY_SLIDERS,
+  MORE_FACE_SLIDERS, NEUTRAL_ATTIRE, NEUTRAL_BODY, NEUTRAL_FACE, NEUTRAL_FINISH, NEUTRAL_HAIR, NEUTRAL_LIGHT, NEUTRAL_MAKEUP, NEUTRAL_SCENE,
+  NEUTRAL_SKIN, NEUTRAL_SUBJECT, SCENE_SLIDERS, SKIN_SLIDERS, SUBJECT_SLIDERS,
+  hexToRgb, rgbToHex, type Background, type BackgroundMode, type FeatureColours, type LightSuggestion, type LiquifyMode, type Slider, type StudioFinish,
 } from '../../ipc/studioFinish';
+import type { EvotoFace } from '../../ipc/evotoWorkflow';
 
 /** What dragging on the photograph does while the Liquify tab has a brush chosen. */
 export type LiquifyTool = { mode: LiquifyMode; size: number; strength: number } | null;
@@ -17,12 +20,32 @@ export type PortraitFinishPanelProps = {
   onSuggestLight?: () => Promise<LightSuggestion>;
   /** The photograph the panel shows; a measurement made for another one is discarded. */
   subject?: string;
+  /** The face picker: the faces in this photograph. Absent where it cannot run. */
+  onFindFaces?: () => Promise<EvotoFace[]>;
+  initialTab?: Tab;
+  /** What the last save could not do on this photograph, shown above the tools. */
+  notes?: string[];
 };
 
-type Tab = 'face' | 'body' | 'light' | 'liquify' | 'background' | 'makeup';
+type Tab = 'face' | 'body' | 'skin' | 'light' | 'liquify' | 'background' | 'makeup' | 'hair' | 'people' | 'faces';
 const TABS: ReadonlyArray<readonly [Tab, string]> = [
-  ['face', 'Face'], ['body', 'Body'], ['light', 'Light'], ['liquify', 'Liquify'], ['background', 'Background'], ['makeup', 'Makeup & colour'],
+  ['face', 'Face'], ['body', 'Body'], ['skin', 'Skin'], ['light', 'Light'], ['liquify', 'Liquify'], ['background', 'Background'],
+  ['makeup', 'Makeup & colour'], ['hair', 'Hair & attire'], ['people', 'People & scene'], ['faces', 'Faces'],
 ];
+
+/** One ADR-0150 group of sliders, each committing the whole group when released. */
+function SliderGroup<K extends string>({ title, list, values, neutral, disabled, onCommit }: {
+  title?: string; list: ReadonlyArray<Slider<K>>; values: Record<K, number>; neutral?: Partial<Record<K, number>>; disabled: boolean;
+  onCommit: (key: K, value: number, label: string) => void;
+}): JSX.Element {
+  return <div className="portrait-finish-group" aria-label={title}>
+    {title && <h4>{title}</h4>}
+    {list.map(([key, label, min, max, hint]) => <div key={key} title={hint}>
+      <ShapeSlider label={label} min={min} max={max} neutral={neutral?.[key] ?? 0} value={values[key] ?? 0} disabled={disabled}
+        onCommit={value => onCommit(key, value, label)} />
+    </div>)}
+  </div>;
+}
 
 /** Where a key light is put by one click, seen from the camera. */
 const LIGHT_POSITIONS: ReadonlyArray<readonly [string, number, number]> = [
@@ -57,7 +80,8 @@ const LIQUIFY_MODES: ReadonlyArray<readonly [LiquifyMode, string, string]> = [
 ];
 
 const BACKGROUND_MODES: ReadonlyArray<readonly [BackgroundMode, string]> = [
-  ['colour', 'Solid colour'], ['gradient', 'Gradient'], ['blur', 'Blur'], ['sky', 'Replace sky'],
+  ['colour', 'Solid colour'], ['keep_shadows', 'Colour, keep shadows'], ['gradient', 'Gradient'], ['blur', 'Blur'],
+  ['sky', 'Replace sky'], ['cloud_sky', 'Sky with clouds'],
 ];
 
 /**
@@ -65,8 +89,28 @@ const BACKGROUND_MODES: ReadonlyArray<readonly [BackgroundMode, string]> = [
  * and makeup, each saved as one undoable step. Nothing here is applied automatically; Auto light
  * runs only when pressed. ADR-0108, ADR-0127.
  */
-export function PortraitFinishPanel({ finish, disabled, liquify, onSave, onLiquify, onSuggestLight, subject }: PortraitFinishPanelProps): JSX.Element {
-  const [tab, setTab] = useState<Tab>('face');
+export function PortraitFinishPanel({ finish, disabled, liquify, onSave, onLiquify, onSuggestLight, subject, onFindFaces, initialTab = 'face', notes = [] }: PortraitFinishPanelProps): JSX.Element {
+  const [tab, setTab] = useState<Tab>(initialTab);
+  useEffect(() => { setTab(initialTab); }, [initialTab]);
+  const [faces, setFaces] = useState<EvotoFace[] | null>(null);
+  const [findingFaces, setFindingFaces] = useState(false);
+  useEffect(() => { setFaces(null); setFindingFaces(false); }, [subject]);
+  const findFaces = () => {
+    if (!onFindFaces) return;
+    const asked = subject;
+    setFindingFaces(true);
+    onFindFaces().then(found => { if (current.current === asked) setFaces(found); })
+      .catch(() => { if (current.current === asked) setFaces([]); })
+      .finally(() => { if (current.current === asked) setFindingFaces(false); });
+  };
+  const chosen = finish.faces ?? [];
+  const isChosen = (face: EvotoFace) => chosen.some(p => Math.hypot(p[0] - face.centre[0], p[1] - face.centre[1]) < (face.bounds[2] - face.bounds[0]) * 0.5);
+  const toggleFace = (face: EvotoFace) => {
+    const next = isChosen(face)
+      ? chosen.filter(p => Math.hypot(p[0] - face.centre[0], p[1] - face.centre[1]) >= (face.bounds[2] - face.bounds[0]) * 0.5)
+      : [...chosen, face.centre];
+    onSave({ ...finish, faces: next }, next.length ? 'Faces: chosen' : 'Faces: every face');
+  };
   const [measuring, setMeasuring] = useState(false);
   const [measured, setMeasured] = useState<{ reasons: string[]; failed: boolean } | null>(null);
   const current = useRef(subject);
@@ -97,6 +141,7 @@ export function PortraitFinishPanel({ finish, disabled, liquify, onSave, onLiqui
 
   return <div className="portrait-finish" aria-label="Portrait finishing">
     <p className="lr-hint">Reshape, light, background and makeup tools in the style of Evoto. Every change is one step in your history, and none of them is ever applied automatically.</p>
+    {notes.length > 0 && <div className="portrait-finish-notes" aria-live="polite">{notes.map(note => <p key={note} className="lr-notice">{note}</p>)}</div>}
     <div className="lr-crops" aria-label="Finishing presets">{FINISH_PRESETS.map(preset =>
       <button type="button" key={preset.id} title={preset.hint} disabled={disabled} onClick={() => onSave(preset.apply(finish), preset.name)}>{preset.name}</button>)}
     </div>
@@ -108,6 +153,8 @@ export function PortraitFinishPanel({ finish, disabled, liquify, onSave, onLiqui
       <p className="lr-hint">Applies to every face AURA finds. Draw a missed face in Portrait retouch first.</p>
       {FACE_SLIDERS.map(([key, label]) => <ShapeSlider key={key} label={label} value={finish.face[key]} disabled={disabled}
         onCommit={value => onSave({ ...finish, face: { ...finish.face, [key]: value } }, `Face: ${label}`)} />)}
+      {MORE_FACE_SLIDERS.map(([title, list]) => <SliderGroup key={title} title={title} list={list} values={finish.face} disabled={disabled}
+        onCommit={(key, value, label) => onSave({ ...finish, face: { ...finish.face, [key]: value } }, `Face: ${label}`)} />)}
       <button type="button" disabled={disabled} onClick={() => onSave({ ...finish, face: NEUTRAL_FACE }, 'Face shape reset')}>Reset face</button>
     </div>}
 
@@ -115,6 +162,8 @@ export function PortraitFinishPanel({ finish, disabled, liquify, onSave, onLiqui
       <p className="lr-hint">Applies to the main person. The background bends a little with a strong change, as in any reshaping tool.</p>
       {BODY_SLIDERS.map(([key, label]) => <ShapeSlider key={key} label={label} value={finish.body[key]} disabled={disabled}
         onCommit={value => onSave({ ...finish, body: { ...finish.body, [key]: value } }, `Body: ${label}`)} />)}
+      <SliderGroup title="More body shape" list={MORE_BODY_SLIDERS} values={finish.body} disabled={disabled}
+        onCommit={(key, value, label) => onSave({ ...finish, body: { ...finish.body, [key]: value } }, `Body: ${label}`)} />
       <button type="button" disabled={disabled} onClick={() => onSave({ ...finish, body: NEUTRAL_BODY }, 'Body shape reset')}>Reset body</button>
     </div>}
 
@@ -133,6 +182,11 @@ export function PortraitFinishPanel({ finish, disabled, liquify, onSave, onLiqui
     </div>}
 
     {tab === 'liquify' && <div role="tabpanel" aria-label="Liquify">
+      <p className="lr-hint">Background repair restores the backdrop distorted by AURA's saved shape and liquify edits. It keeps the detected subject and softens the boundary. For an imported flattened edit, use a clean original; its missing background cannot be recovered exactly.</p>
+      <ShapeSlider label="Background repair" min={0} max={100} value={finish.backgroundRepair ?? 0} disabled={disabled}
+        onCommit={backgroundRepair => onSave({ ...finish, backgroundRepair }, 'Liquify background repair')} />
+      <button type="button" disabled={disabled || (finish.backgroundRepair ?? 0) === 100}
+        onClick={() => onSave({ ...finish, backgroundRepair: 100 }, 'Liquify background repair')}>Repair background automatically</button>
       <div className="lr-crops">{LIQUIFY_MODES.map(([mode, label, hint]) =>
         <button type="button" key={mode} title={hint} aria-pressed={liquify?.mode === mode} disabled={disabled}
           onClick={() => onLiquify(liquify?.mode === mode ? null : { mode, size: liquify?.size ?? 0.06, strength: liquify?.strength ?? 0.7 })}>{label}</button>)}
@@ -158,10 +212,10 @@ export function PortraitFinishPanel({ finish, disabled, liquify, onSave, onLiqui
           onClick={() => setBackground({ ...background, mode, amount: background.amount > 0 ? background.amount : 100 }, `Background: ${label}`)}>{label}</button>)}
       </div>
       {finish.background && <>
-        {finish.background.mode !== 'blur' && <label className="lr-toggle">{finish.background.mode === 'colour' ? 'Colour' : 'Top colour'}
+        {finish.background.mode !== 'blur' && <label className="lr-toggle">{finish.background.mode === 'colour' || finish.background.mode === 'keep_shadows' ? 'Colour' : 'Top colour'}
           <input type="color" aria-label="Background colour" value={rgbToHex(background.colour)} disabled={disabled}
             onChange={event => setBackground({ ...background, colour: hexToRgb(event.target.value) }, 'Background colour')} /></label>}
-        {(finish.background.mode === 'gradient' || finish.background.mode === 'sky') && <label className="lr-toggle">{finish.background.mode === 'sky' ? 'Horizon colour' : 'Bottom colour'}
+        {(finish.background.mode === 'gradient' || finish.background.mode === 'sky' || finish.background.mode === 'cloud_sky') && <label className="lr-toggle">{finish.background.mode === 'gradient' ? 'Bottom colour' : 'Horizon colour'}
           <input type="color" aria-label="Second background colour" value={rgbToHex(background.colour2)} disabled={disabled}
             onChange={event => setBackground({ ...background, colour2: hexToRgb(event.target.value) }, 'Background colour')} /></label>}
         <ShapeSlider label={finish.background.mode === 'blur' ? 'Blur amount' : 'Amount'} min={0} max={100} value={background.amount} disabled={disabled}
@@ -172,8 +226,47 @@ export function PortraitFinishPanel({ finish, disabled, liquify, onSave, onLiqui
       </>}
     </div>}
 
+    {tab === 'skin' && <div role="tabpanel" aria-label="Skin finishing">
+      <p className="lr-hint">Measured on every face AURA finds, against that person's own skin. Choose faces in the Faces tab to limit them.</p>
+      <SliderGroup list={SKIN_SLIDERS} values={finish.skin} disabled={disabled}
+        onCommit={(key, value, label) => onSave({ ...finish, skin: { ...finish.skin, [key]: value } }, `Skin: ${label}`)} />
+      <button type="button" disabled={disabled} onClick={() => onSave({ ...finish, skin: NEUTRAL_SKIN }, 'Skin finishing reset')}>Reset skin</button>
+    </div>}
+
+    {tab === 'hair' && <div role="tabpanel" aria-label="Hair and attire">
+      <SliderGroup title="Hair and body" list={HAIR_SLIDERS} values={finish.hair} disabled={disabled}
+        onCommit={(key, value, label) => onSave({ ...finish, hair: { ...finish.hair, [key]: value } }, `Hair: ${label}`)} />
+      <SliderGroup title="Clothing and jewellery" list={ATTIRE_SLIDERS} values={finish.attire} disabled={disabled}
+        onCommit={(key, value, label) => onSave({ ...finish, attire: { ...finish.attire, [key]: value } }, `Attire: ${label}`)} />
+      <button type="button" disabled={disabled} onClick={() => onSave({ ...finish, hair: NEUTRAL_HAIR, attire: NEUTRAL_ATTIRE }, 'Hair and attire reset')}>Reset hair and attire</button>
+    </div>}
+
+    {tab === 'people' && <div role="tabpanel" aria-label="People and scene">
+      <SliderGroup title="People" list={SUBJECT_SLIDERS} values={finish.subject} neutral={{ relightDirection: -45 }} disabled={disabled}
+        onCommit={(key, value, label) => onSave({ ...finish, subject: { ...finish.subject, [key]: value } }, `People: ${label}`)} />
+      <SliderGroup title="Background" list={SCENE_SLIDERS} values={finish.scene} disabled={disabled}
+        onCommit={(key, value, label) => onSave({ ...finish, scene: { ...finish.scene, [key]: value } }, `Background: ${label}`)} />
+      <button type="button" disabled={disabled} onClick={() => onSave({ ...finish, subject: NEUTRAL_SUBJECT, scene: NEUTRAL_SCENE }, 'People and scene reset')}>Reset people and scene</button>
+    </div>}
+
+    {tab === 'faces' && <div role="tabpanel" aria-label="Choose faces">
+      <p className="lr-hint">Face, skin and makeup changes apply to every face unless you choose some here. Body, people and background changes apply to the whole photograph.</p>
+      {onFindFaces && <button type="button" disabled={disabled || findingFaces} onClick={findFaces}>{findingFaces ? 'Finding faces...' : 'Find faces'}</button>}
+      {faces && faces.length === 0 && <p role="status">No face was found. Draw a missed face in Portrait retouch.</p>}
+      {faces && faces.length > 0 && <ul className="portrait-finish-faces" aria-label="Faces in this photograph">{faces.map((face, i) => <li key={`${face.centre[0]}:${face.centre[1]}`}>
+        <label className="lr-toggle"><input type="checkbox" checked={isChosen(face)} disabled={disabled} onChange={() => toggleFace(face)} />
+          {`Face ${i + 1} - ${face.centre[0] < 0.4 ? 'left' : face.centre[0] > 0.6 ? 'right' : 'centre'}`}
+          {face.closed ? ' (eyes closed)' : ''}</label>
+      </li>)}</ul>}
+      <p>{chosen.length ? `${chosen.length} face${chosen.length === 1 ? '' : 's'} chosen.` : 'Every face.'}</p>
+      <button type="button" disabled={disabled || chosen.length === 0} onClick={() => onSave({ ...finish, faces: [] }, 'Faces: every face')}>Use every face</button>
+    </div>}
+
     {tab === 'makeup' && <div role="tabpanel" aria-label="Makeup and colour">
       <p className="lr-hint">Each colour keeps the light and shade underneath it. Skin tone is never changed here.</p>
+      <SliderGroup title="Makeup" list={MAKEUP_SLIDERS} values={finish.makeup} disabled={disabled}
+        onCommit={(key, value, label) => onSave({ ...finish, makeup: { ...finish.makeup, [key]: value } }, `Makeup: ${label}`)} />
+      <button type="button" disabled={disabled} onClick={() => onSave({ ...finish, makeup: NEUTRAL_MAKEUP }, 'Makeup reset')}>Reset makeup</button>
       {COLOUR_FEATURES.map(([key, label, fallback]) => {
         const tint = finish.colours[key];
         const colour = tint?.colour ?? hexToRgb(fallback);

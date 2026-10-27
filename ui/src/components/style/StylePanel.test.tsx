@@ -66,7 +66,7 @@ const fixtures = vi.hoisted(() => {
     STATUS,
     listProfiles: vi.fn(() => Promise.resolve([PROFILE])),
     styleStatus: vi.fn(() => Promise.resolve(STATUS)),
-    profileReport: vi.fn(() => Promise.resolve(REPORT)),
+    profileReport: vi.fn((_id: string) => Promise.resolve(REPORT)),
     adoptProfile: vi.fn().mockResolvedValue({}),
     setProjectProfile: vi.fn().mockResolvedValue({}),
     compareProfiles: vi.fn().mockResolvedValue([]),
@@ -101,6 +101,9 @@ async function mount(projectId: string | null) {
 describe('StylePanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    fixtures.listProfiles.mockResolvedValue([fixtures.PROFILE]);
+    fixtures.styleStatus.mockResolvedValue(fixtures.STATUS);
+    fixtures.profileReport.mockResolvedValue(fixtures.REPORT);
   });
 
   it('reads the profiles even with no wedding open, because a profile is not a project', async () => {
@@ -139,5 +142,29 @@ describe('StylePanel', () => {
       projectId: 'prj_1',
       profileId: 'prf_1',
     });
+  });
+
+  it('opens the active project profile on its first load instead of the first library item', async () => {
+    const second = { ...fixtures.PROFILE, profileId: 'prf_2', name: 'current' };
+    fixtures.listProfiles.mockResolvedValue([fixtures.PROFILE, second]);
+    fixtures.styleStatus.mockResolvedValue({ ...fixtures.STATUS, active: second.profileId });
+    fixtures.profileReport.mockResolvedValue({ ...fixtures.REPORT, profile: second });
+    await mount('prj_1');
+    expect((screen.getByLabelText('Profile') as HTMLSelectElement).value).toBe('prf_2');
+    expect(fixtures.profileReport).toHaveBeenLastCalledWith('prf_2');
+  });
+
+  it('keeps a newly selected report when an older request finishes afterward', async () => {
+    let finishOld!: (report: typeof fixtures.REPORT) => void;
+    const second = { ...fixtures.PROFILE, profileId: 'prf_2', name: 'newest' };
+    fixtures.listProfiles.mockResolvedValue([fixtures.PROFILE, second]);
+    fixtures.profileReport.mockImplementation(id => id === 'prf_1'
+      ? new Promise(resolve => { finishOld = resolve; })
+      : Promise.resolve({ ...fixtures.REPORT, profile: second }));
+    await mount('prj_1');
+    await act(async () => { fireEvent.change(screen.getByLabelText('Profile'), { target: { value: 'prf_2' } }); });
+    await act(async () => { finishOld(fixtures.REPORT); });
+    expect(screen.getByRole('region', { name: 'Style profile report' }).textContent).toContain('newest');
+    expect((screen.getByLabelText('Profile') as HTMLSelectElement).value).toBe('prf_2');
   });
 });

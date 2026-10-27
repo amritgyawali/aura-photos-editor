@@ -2,6 +2,7 @@ export const MAX_NATIVE_RETOUCH_EDITS = 1024;
 import { invoke } from '@tauri-apps/api/core';
 import polishedWedding from '../config/polishedWedding.json';
 import type { RecipeDto, RenderDto } from './types';
+import { EFFECT_SOURCE, EFFECT_TOOLS, isEffectTool } from './retouchEffects';
 
 export const RETOUCH_TOOLS = [
   ['color_saturation', 'Local saturation & vibrance', 'Color', 'Adjust saturation and gently boost muted colors inside your selection. Preserves linear brightness and neutral tones. Combine with a sampled color range to target a garment, backdrop or other color; protect skin manually when needed.'],
@@ -46,6 +47,8 @@ export const RETOUCH_TOOLS = [
   ['colorize', 'Hair, clothes & makeup color', 'Color', 'Choose any color, then select hair, clothing, lips or another area. Preserves the photographed light and fine detail. Reuse a saved hair or clothes selection, or paint and refine your own.'],
   ['background_color', 'Solid background color', 'Cleanup', 'Replace only the selected background with a chosen solid color. Use a saved background selection or paint it; inspect subject edges before applying.'],
   ['reshape', 'Local face & body proportions', 'Shape', 'Explicitly change width and height inside an ellipse. Use on a face, nose, waist, arm or leg. This changes photographed structure and is never part of automatic skin cleanup. Start with small changes and inspect the edges.'],
+  // Liquify, optics, colour, light and portrait effects (ADR-0131).
+  ...EFFECT_TOOLS,
 ] as const;
 export type RetouchTool = typeof RETOUCH_TOOLS[number][0];
 export type BrushPoint = [number, number, number];
@@ -132,6 +135,12 @@ export const POLISHED_WEDDING_RETOUCH: AutoRetouchOptions = {
 };
 export const DEFAULT_SKIN: SkinSettings = { tolerance: .08, edgeProtection: .8, connected: true };
 export const isSampledSkinTool = (tool: RetouchTool) => ['skin_smooth', 'skin_uniformity', 'portrait_dodge_burn'].includes(tool);
+/** What the lens-reflection search found. */
+export type FindGlareResult = {
+  faces: number;
+  regions: { region: [number, number, number, number]; confidence: number; face: number }[];
+  message: string;
+};
 export type NativeRetouchEdit = {
   id: string; tool: RetouchTool; enabled: boolean; region: [number, number, number, number];
   source: [number, number] | null; amount: number; feather: number; radius: number;
@@ -160,6 +169,7 @@ export type NativeRetouchEdit = {
 };
 export const extendedRetouchShape = (edit: NativeRetouchEdit) => Boolean(edit.selection?.inverted || edit.selection?.gradient);
 export const needsRetouchSource = (edit: NativeRetouchEdit) => ['clone', 'color_match', 'fabric_stain'].includes(edit.tool)
+  || (isEffectTool(edit.tool) && Boolean(EFFECT_SOURCE[edit.tool]?.required))
   || isSampledSkinTool(edit.tool)
   || (edit.tool === 'heal' && extendedRetouchShape(edit))
   || (edit.tool === 'patch_heal' && (Boolean(edit.mask) || edit.region[2] > .1 || edit.region[3] > .1 || extendedRetouchShape(edit)));
@@ -191,6 +201,8 @@ export const nativeRetouch = {
   review: (projectId: string, photoId: string, recipeHash: string, selection: NativeRetouchEdit, quality: PreviewQuality = 'full') => invoke<BlemishReview>('native_retouch_blemish_review',{input:{projectId,photoId,recipeHash,selection,quality}}),
   autoPortrait: (photoId: string) => invoke<RecipeDto>('enhance_portrait', { input: { photoId } }),
   autoRetouch: (projectId: string, photoId: string, options: AutoRetouchOptions, global = false) => invoke<RecipeDto>('auto_retouch', { input: { projectId, photoId, global, options } }),
+  /** Lens reflections the detector found, as glare selections to preview and apply. */
+  findGlare: (projectId: string, photoId: string) => invoke<FindGlareResult>('find_glare', { input: { projectId, photoId } }),
   edit: (projectId: string, photoId: string, action: 'list'|'append'|'update'|'remove'|'clear'|'duplicate'|'earlier'|'later', edits: NativeRetouchEdit[] = [], id: string|null = null) => invoke<NativeRetouchEdit[]>('native_retouch_edit',{input:{projectId,photoId,action,edits,id}}),
   /** The retouch view's photograph: `full` is the original's own resolution (ADR-0097), `fast` the first look. */
   preview: (projectId: string, photoId: string, before = false, quality: PreviewQuality = 'full') => invoke<RenderDto>('native_retouch_preview',{projectId,photoId,before,quality}),

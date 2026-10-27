@@ -1,4 +1,6 @@
 import { AdvancedTools } from './components/AdvancedTools';
+import { HotFeatures, type HotFeature } from './components/features/HotFeatures';
+import { StylePanel } from './components/style/StylePanel';
 import { AutomaticProgress } from './components/workflow/AutomaticProgress';
 import { FinishFolder } from './components/workflow/FinishFolder';
 import { StatusBar } from './components/workflow/StatusBar';
@@ -23,6 +25,7 @@ import { MatchLookPanel } from './components/look/MatchLookPanel';
 import { CuratePanel } from './components/curate/CuratePanel';
 import { DeliveryPanel } from './components/delivery/DeliveryPanel';
 import { PhotoStudio } from './components/develop/PhotoStudio';
+import { EffectsLibrary } from './components/effects/EffectsLibrary';
 import { GalleryPanel } from './components/gallery/GalleryPanel';
 import { QcPanel } from './components/qc/QcPanel';
 import { VirtualGrid } from './components/grid/VirtualGrid';
@@ -31,6 +34,7 @@ import { useThumbnails } from './stores/thumbnailStore';
 
 export function App(): JSX.Element {
   const [workspace, setWorkspace] = useState('start');
+  const [hotFeature, setHotFeature] = useState<HotFeature>('liquify');
   const workflowBusy = useAutomatic(automaticBusy);
   const [profile, setProfile] = useState<ProfileSelection | null>(readProfileSelection);
   const [profileNames, setProfileNames] = useState<Record<string, string>>({});
@@ -38,7 +42,7 @@ export function App(): JSX.Element {
   const [reference, setReference] = useState<ReferenceSelection | null>(readReferenceSelection);
   const [analysingReference, setAnalysingReference] = useState(false);
   const [choosingPhotos, setChoosingPhotos] = useState(false);
-  const [queuedImport, setQueuedImport] = useState<{ projectId: string; roots: string[] } | null>(null);
+  const [queuedImport, setQueuedImport] = useState<{ projectId: string; roots: string[]; autoEdit?: boolean } | null>(null);
   const [ingestReady, setIngestReady] = useState<string | null>(null);
   const changeReference = useCallback((next: ReferenceSelection | null) => { setReference(next); saveReferenceSelection(next); }, []);
   const [editing, setEditing] = useState(false);
@@ -51,6 +55,7 @@ export function App(): JSX.Element {
   const automaticConsumed = useCallback(() => setAutomaticRequest(0), []);
   const editAfterImport = useRef(false);
   const importFinished = useRef(false);
+  const importCancelled = useRef(false);
   const editBusyChanged = useCallback((busy: boolean) => {
     setEditing(busy);
     if (!busy) setRevision(value => value + 1);
@@ -240,18 +245,19 @@ export function App(): JSX.Element {
   }, [activeProjectId, loadPage, refreshProjects, setError, setProblems, setProgress]);
 
   const startImport = useCallback(
-    async (roots: string[]) => {
+    async (roots: string[], autoEdit = true) => {
       if (!activeProjectId || !inTauri()) {
         return;
       }
       try {
-        editAfterImport.current = true;
+        editAfterImport.current = autoEdit;
+        importCancelled.current = false;
         importFinished.current = false;
         setProgress({ running: true, jobId: null, done: 0, total: 0 });
         const handle = await api.startIngest({ projectId: activeProjectId, roots });
         if (!importFinished.current) {
           setProgress({ running: true, jobId: handle.jobId, done: 0, total: 0 });
-          if (!editAfterImport.current) await api.cancelJob(handle.jobId);
+          if (importCancelled.current) await api.cancelJob(handle.jobId);
         }
       } catch (error) {
         editAfterImport.current = false;
@@ -265,6 +271,7 @@ export function App(): JSX.Element {
 
   const cancelImport = useCallback(async () => {
     editAfterImport.current = false;
+    importCancelled.current = true;
     if (progress.jobId && inTauri()) {
       try { await api.cancelJob(progress.jobId); }
       catch (error) { const ipc = asIpcError(error); setError({ code: ipc.code, message: ipc.message }); }
@@ -274,8 +281,9 @@ export function App(): JSX.Element {
   useEffect(() => {
     if (queuedImport && queuedImport.projectId === activeProjectId && ingestReady === activeProjectId) {
       const roots = queuedImport.roots;
+      const autoEdit = queuedImport.autoEdit ?? true;
       setQueuedImport(null);
-      void startImport(roots);
+      void startImport(roots, autoEdit);
     }
   }, [activeProjectId, ingestReady, queuedImport, startImport]);
 
@@ -304,14 +312,14 @@ export function App(): JSX.Element {
     void refreshProjects().then(() => { setActiveProject(projectId); setWorkspace('library'); });
   }, [refreshProjects, setActiveProject]);
 
-  const chooseAndImport = async (folder = false) => {
+  const chooseAndImport = async (folder = false, forFeatures = false) => {
     if (choosingPhotos) return;
     setChoosingPhotos(true);
     try {
       const roots = folder ? [await pickPhotoFolder('Choose a folder of photos to edit')].filter((path): path is string => path !== null) : await pickPhotos();
       if (!roots.length) return;
       const target = activeProjectId ?? await createProject('My photo collection');
-      if (target) { setWorkspace('library'); setQueuedImport({ projectId: target, roots }); }
+      if (target) { setWorkspace(forFeatures ? 'hot' : 'library'); setQueuedImport({ projectId: target, roots, autoEdit: !forFeatures }); }
     } catch (cause) { const error = asIpcError(cause); setError({ code: error.code, message: error.message }); }
     finally { setChoosingPhotos(false); }
   };
@@ -322,7 +330,9 @@ export function App(): JSX.Element {
     ['start', 'Start', 'Look, reference, photos'],
     ['library', 'Photos', 'Browse your collection'],
     ['edit', 'Auto edit', 'One click, start to finish'],
+    ['effects', 'Effects', 'Every retouch tool & creative look'],
     ['look', 'Match a look', 'Your reference, your photos'],
+    ['hot', 'Hot Features', 'Portrait repair, AI looks & colour'],
     ['export', 'Export', 'Ready to share'],
     ['advanced', 'Advanced', 'Quality, curation & settings'],
   ];
@@ -349,6 +359,13 @@ export function App(): JSX.Element {
         {lastError && <div className="banner" role="alert"><span>{lastError.message}</span><button type="button" onClick={() => setError(null)}>Dismiss</button></div>}
         <div className="studio-content">
           <AutomaticProgress onFinished={() => { void refreshProjects(); if (activeProjectId) void loadPage(activeProjectId, 0, true); }} />
+          {workspace === 'hot' && <>
+            <HotFeatures selected={hotFeature} onSelect={setHotFeature} disabled={locked} photoId={focusedPhoto?.id ?? null}
+              hasPhotos={Boolean(activeProjectId && rows.length)} onAddPhotos={() => { if (inTauri()) void chooseAndImport(false, true); else setError({ code: 'desktop_required', message: 'Open the AURA desktop app to import and edit photos.' }); }} />
+            {hotFeature === 'train' && <div className="hot-training">{inTauri() ? <StylePanel projectId={activeProjectId} onError={setError} onBusyChange={setMatching} /> : <p>Open the AURA desktop app to train and save your personal AI look.</p>}</div>}
+            {progress.running && <p role="status">Importing {progress.done} of {progress.total || '…'} photos for your tools. <button type="button" onClick={() => void cancelImport()}>Cancel import</button></p>}
+            {activeProjectId && rows.length > 0 && <button type="button" disabled={locked} onClick={() => void chooseAndImport(false, true)}>Add more photos</button>}
+          </>}
           {workspace === 'start' && <div className="start-flow">
             <header className="start-hero"><span className="eyebrow">LESS EDITING. MORE CREATING.</span>
               <h1>Choose a look. Add a reference.<br /><em>Drop in your photos.</em></h1>
@@ -383,7 +400,8 @@ export function App(): JSX.Element {
             <p className="studio-footnote">Choose photos or Choose a folder imports and edits, then waits for you to review before you export.</p>
             {!inTauri() && <p className="studio-footnote">Open the AURA desktop app to import and edit your photos.</p>}
           </section>}
-          {!activeProjectId ? workspace === 'start' ? null : <section className="studio-welcome">
+          {workspace === 'effects' && <EffectsLibrary photoName={activeProjectId ? focusedPhoto?.fileName ?? null : null} disabled={locked} onOpen={() => setWorkspace('edit')} />}
+          {!activeProjectId ? workspace === 'start' || workspace === 'effects' || workspace === 'hot' ? null : <section className="studio-welcome">
             <span className="eyebrow">LESS EDITING. MORE CREATING.</span>
             <h1>Or start with<br /><em>your own photos.</em></h1>
             <p>Portraits, travel, family, or everyday moments. Start a collection, choose your photos, and let AURA balance the light. Review the result, add your touch, and export.</p>
@@ -397,7 +415,7 @@ export function App(): JSX.Element {
               <ImportWizard disabled={locked} running={progress.running} done={progress.done} total={progress.total} onStart={roots => void startImport(roots)} onCancel={() => void cancelImport()} />
               {rows.length > 0 ? <div className="studio-library"><VirtualGrid rows={rows} onNeedMore={() => void loadPage(activeProjectId, loadedPages, false)} /></div> : <div className="studio-empty"><strong>Your next great edit starts here.</strong><p>Choose a folder above. Your photos will appear here.</p></div>}
             </>}
-            <div hidden={workspace !== 'edit' && workspace !== 'look'}>
+            <div hidden={workspace !== 'edit' && workspace !== 'look' && !(workspace === 'hot' && hotFeature !== 'train')}>
               <div hidden={workspace !== 'edit'}>
               <div className="workspace-heading"><div><span className="eyebrow">LIGHT. COLOR. FINISH.</span><h1>A good starting point, in one click.</h1></div><button type="button" disabled={locked} onClick={() => setWorkspace('look')}>Match a reference look →</button></div>
               <AutopilotPanel key={activeProjectId} projectId={activeProjectId} onError={setError} onBusyChange={editBusyChanged}
@@ -408,7 +426,10 @@ export function App(): JSX.Element {
                   preview and an open retouch are exactly where they were on return. ADR-0097. */}
               {focusedPhoto && <>
                 <fieldset className="filmstrip-lock" disabled={locked}><Filmstrip rows={rows} /></fieldset>
-                <PhotoStudio key={focusedPhoto.id} projectId={activeProjectId} photoId={focusedPhoto.id} photoIds={rows.map(row=>row.id)} disabled={editing || workflowBusy} revision={revision} referenceMode={workspace === 'look'} onBusyChange={setSaving} />
+                <PhotoStudio key={focusedPhoto.id} projectId={activeProjectId} photoId={focusedPhoto.id} photoIds={rows.map(row=>row.id)} disabled={editing || workflowBusy} revision={revision}
+                  active={workspace === 'edit' || workspace === 'look' || (workspace === 'hot' && hotFeature !== 'train')}
+                  referenceMode={workspace === 'look' || (workspace === 'hot' && hotFeature === 'color')}
+                  featureMode={workspace === 'hot' && (hotFeature === 'liquify' || hotFeature === 'skin' || hotFeature === 'glare') ? hotFeature : null} onBusyChange={setSaving} />
                 <button type="button" disabled={locked} onClick={() => void loadPage(activeProjectId, loadedPages, false)}>Load more photos</button>
               </>}
             </div>

@@ -62,6 +62,8 @@ struct StoredReference {
     /// How far a look learned from its originals may move skin and clipping.
     #[serde(default)]
     learned_allowance: Option<gallery_fit::Allowance>,
+    #[serde(default)]
+    evidence: Option<gallery_fit::ReferenceEvidence>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -212,6 +214,7 @@ fn analyse(
     let mut monochrome = true;
     let mut readings = Vec::new();
     let mut palette = [0_usize; 64];
+    let mut evidence = gallery_fit::EvidenceBuilder::default();
     for file in &files {
         if cancel.is_cancelled() {
             return Err(refused(
@@ -238,8 +241,10 @@ fn analyse(
                 thumbnail = gallery_fit::thumbnail(&image);
                 dimensions = [image.width, image.height];
             }
+            let reading = measure::read_at(&file.key, &image, 256);
+            evidence.add(&file.key, reading.lighting, &image);
+            readings.push(reading);
             let image = aura_raw::thumb::scale_to(&image, 256);
-            readings.push(measure::read_at(&file.key, &image, 256));
             for pixel in image.data.chunks_exact(3) {
                 if let [r, g, b] = pixel {
                     let bin =
@@ -294,7 +299,7 @@ fn analyse(
         .filter_map(|(bucket, rows)| (rows.len() >= 4).then(|| (bucket, aggregate::fold(&rows))))
         .collect();
     let stored = StoredReference {
-        version: 3,
+        version: 4,
         analysis: analysis.clone(),
         global,
         lighting,
@@ -314,6 +319,7 @@ fn analyse(
         searched: Vec::new(),
         original_refused: None,
         learned_allowance: None,
+        evidence: evidence.finish(),
     };
     save_reference(state, &analysis.id, &stored)?;
     Ok(analysis)
@@ -355,7 +361,13 @@ fn learn_original(
     if sources.is_empty() || reference.calibration.is_some() || reference.searched.contains(&key) {
         return Ok(());
     }
-    let learned = crate::color_match::original::learn(state, project, &sources, cancel);
+    let learned = crate::color_match::original::learn(
+        state,
+        project,
+        &sources,
+        crate::color_match::original::Baseline::AutoCorrected,
+        cancel,
+    );
     if cancel.is_cancelled() {
         return Err(refused("Reference matching stopped. No edit was saved."));
     }
@@ -408,15 +420,28 @@ fn load_reference(
     let bytes = std::fs::read(profile_path(state, &input.reference_id)?).map_err(|_| {
         refused("This reference style is no longer cached. Analyse the references again.")
     })?;
-    let reference: StoredReference =
+    let mut reference: StoredReference =
         serde_json::from_slice(&bytes).map_err(|e| refused(e.to_string()))?;
-    if !matches!(reference.version, 1..=3) {
+    if !matches!(reference.version, 1..=4) {
         return Err(refused(
             "Analyse this reference again with the current version.",
         ));
     }
     if let Some(model) = &reference.calibration {
         model.validate()?;
+    }
+    let native_pixels = u64::from(reference.dimensions[0]) * u64::from(reference.dimensions[1]);
+    if reference.version < 4
+        && reference.evidence.is_none()
+        && reference.analysis.measured == 1
+        && native_pixels >= 256
+    {
+        // Older single-reference caches retained a colour preview. It supplies bounded
+        // migration evidence without requiring access to the original reference file.
+        reference.evidence = gallery_fit::ReferenceEvidence::from_preview(&reference.thumbnail);
+    }
+    if let Some(evidence) = &reference.evidence {
+        evidence.validate()?;
     }
     Ok(reference)
 }
@@ -475,6 +500,7 @@ pub(crate) fn apply_with_cancel(
     // Rebuild every match from its baseline. A calibration belongs to the selected reference,
     // so changing references or strength must replace it rather than compound it.
     baseline.extra.remove(aura_recipe::calibrated_look::KEY);
+    baseline.extra.remove(aura_recipe::reference_grade::KEY);
     let rendered = gallery_fit::render(state, &small, &baseline)?;
     let reading = measure::read("reference-baseline", &rendered);
     let target = reference
@@ -494,6 +520,9 @@ pub(crate) fn apply_with_cancel(
         baseline: &baseline,
         current: &current,
         target,
+        evidence: reference.evidence.as_ref(),
+        lighting: reading.lighting,
+        lighting_confidence: reading.lighting_confidence,
         thumbnail: if same_aspect {
             &reference.thumbnail
         } else {

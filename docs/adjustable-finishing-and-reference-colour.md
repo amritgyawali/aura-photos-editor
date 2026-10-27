@@ -65,6 +65,75 @@ scenes. Analysis checks its proposed treatment on the native decode and can redu
 that proposal; Apply checks the exact strengths you choose again. An accepted edit
 does not certify an exact reference match.
 
+### When the reference's original is in your collection
+
+If the edited reference you upload was made from a photo in the collection you are matching,
+AURA finds that photo and learns your edit from the two, pixel for pixel, instead of estimating
+it from another scene. It counts as the original when the edited file's name starts with the
+photo's name (`989A2698-Edit.jpg` and `989A2698.CR3`) or the two were taken in the same second,
+and the pixels confirm it. The panel then says **Learned from your own edit of 989A2698.CR3**,
+and every photo you match receives that same colour and tone operation. Amount scales it up to
+100%; Tone, Colour, Warmth and the fine controls are greyed out, because a learned edit has no
+separate parts. Your own edit may change skin and highlights as much as it did on its original,
+and smooth skies, walls and floors are still checked for new bands. A cropped, rotated or locally
+retouched export cannot be lined up with its original; the panel then names the photo it found,
+says why it could not use it, and estimates the look from the edited photo alone. On the
+known-look test set the learned edit left an error of 0.58 where the edited photo alone left
+3.70 ([ADR-0181](adr/ADR-0181-match-a-look-assessment-fixes.md)).
+
+### Smooth skies, walls and floors
+
+Every match is checked on the full-resolution result for new bands and colour patches in areas
+that were smooth before, at any brightness: a sky or a white backdrop as well as a shadow. If the
+requested strength would band or blotch them, AURA uses the strongest strength that does not,
+says so, or refuses and keeps your edit.
+
+### Exact colours of the reference
+
+Choose **Matching goal → Exact colours of the reference** when you want the reference's colours
+themselves, not only its edit. AURA moves your photo's colours and tones onto the reference's
+own: its tone curve, its palette in its proportions, and its split tone, with the reference's
+shadows colouring your shadows and its highlights your highlights. A different scene is repainted
+to do this: a blue sky can take the reference's warm tones. Skin goes to the reference's skin when
+both photos have people; when the reference has none, a face keeps its own colour rather than
+taking the colour of a leaf or a wall.
+
+The result is an ordinary saved look. Every strength slider works on it, Undo restores your photo
+exactly, and the Lightroom preset export carries it. It goes through the same full-resolution
+checks as any match, with a larger allowance for skin, and clipping up to what the reference
+itself clips. When the strength you asked for would band, block up a dark backdrop or blow out
+highlights on your photo, AURA saves the strongest share that passes and says so, for example
+"Saved at 60%: 80% failed this photo's smoothness, highlight or skin-colour check". It refuses
+only when no share passes.
+
+An exact copy is not always possible. Lifting a near-black JPEG backdrop to a bright reference's
+level would show the file's compression blocks, so on such a photo the match stops short and says
+so. Reference colours missing from your photo cannot appear in it. And the closest match to an
+edit, not just to the colours, still comes from the reference's own original: put the unedited
+photo in your collection and choose Natural. See
+[ADR-0182](adr/ADR-0182-exact-colours-of-the-reference.md).
+
+### Tone from a reference of another scene
+
+A reference of a different scene mixes two things: what was in front of the camera
+and what the editor did. Natural matching now estimates the editor's part of the
+**tone** by comparing the reference with ordinary finished photographs (the
+measured lightness landmarks of 37 varied photos ship with AURA; no photo does).
+A reference whose blacks sit well above any ordinary photo's reads as a matte lift;
+a reference with an ordinary tone range leaves your photo's tone alone. Your photo
+is compared the same way, so one that is flatter than a finished photo has its
+range brought back before the look is added. The panel says in one sentence what
+it concluded, and **Tone match** scales it like any other tone.
+
+This is a cautious estimate, not recovery of the editor's curve. A night scene and a
+moody edit can look alike in one photo, and in that case the change is partial. On
+the known-look test set it reduced the error against the true look on most photos
+and made fewer photos worse than the earlier matcher; see
+[ADR-0180](adr/ADR-0180-scene-prior-tone-for-match-a-look.md) for the numbers.
+Natural analysis also now finds a strength that passes the full-resolution skin,
+highlight and smoothness checks before offering it, as Palette analysis already did,
+so the match offered at 100% is one Apply accepts.
+
 Newly imported genuinely monochrome references can remove colour continuously.
 Amount, Colour and Saturation match scale this contribution, and zero restores the
 baseline. The monochrome guard preserves each person's tone and rejects new casts;

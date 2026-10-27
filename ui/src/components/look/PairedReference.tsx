@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, asIpcError, inTauri, pairedReference, pickPairedReference, type PairedReferenceReport } from '../../ipc/client';
 
 export function PairedReference({ photoId, disabled, onApply }: {
-  photoId: string; disabled: boolean; onApply: (action: () => Promise<unknown>) => Promise<void>;
+  photoId: string; disabled: boolean; onApply: (action: () => Promise<unknown>) => Promise<unknown>;
 }): JSX.Element {
   const [busy, setBusy] = useState(false);
   const [report, setReport] = useState<PairedReferenceReport | null>(null);

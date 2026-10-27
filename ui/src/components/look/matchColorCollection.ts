@@ -1,17 +1,27 @@
-import { api, asIpcError } from '../../ipc/client';
-import { colorMatch, type ColorMatchControls } from '../../ipc/colorMatch';
+import { api } from '../../ipc/client';
+import { Refusal, reasonOf } from './refusal';
+import { colorMatch, type ColorMatchControls, type ColorMatchIntent } from '../../ipc/colorMatch';
+import { engineServes } from './colorMatchEngines';
 
 export type ColorMatchOutcome = { photoId: string; name: string; outcome: 'matched' | 'unchanged' | 'failed' | 'stopped'; detail: string };
 
 /** Refit appearance for each target; never copy another photo's coordinates or correction. */
 export async function matchColorCollection(projectId: string, referenceId: string, controls: ColorMatchControls,
   cancelId: string, stopped: () => boolean, progress: (message: string) => void,
-  completed: (result: ColorMatchOutcome) => void): Promise<ColorMatchOutcome[]> {
+  completed: (result: ColorMatchOutcome) => void,
+  options: { photoIds?: readonly string[]; quality?: 'quick' | 'precise'; intent?: ColorMatchIntent } = {}): Promise<ColorMatchOutcome[]> {
   const photos = [];
   const seen = new Set<string>();
+  // Resolve membership from the collection, including photos beyond the loaded filmstrip.
+  // An explicitly empty selection never expands to the entire collection.
+  const selected = options.photoIds === undefined ? null : new Set(options.photoIds);
+  if (selected?.size === 0) return [];
   for (let offset = 0; !stopped(); offset += 240) {
     const page = await api.listImages({ projectId, offset, limit: 240, orderBy: 'timeline' });
-    for (const photo of page) if (!seen.has(photo.id)) { seen.add(photo.id); photos.push(photo); }
+    for (const photo of page) if (!seen.has(photo.id)) {
+      seen.add(photo.id);
+      if (!selected || selected.has(photo.id)) photos.push(photo);
+    }
     if (page.length < 240) break;
   }
   const results: ColorMatchOutcome[] = [];
@@ -23,17 +33,22 @@ export async function matchColorCollection(projectId: string, referenceId: strin
       const saved = await colorMatch.status(photo.id);
       if (stopped()) break;
       // Reuse the immutable baseline when changing strengths on a previous match.
-      const analysis = saved?.current && saved.reference.id === referenceId ? saved
-        : await colorMatch.prepare(photo.id, referenceId, cancelId);
+      const sameQuality = (saved?.fitting?.quality ?? 'precise') === (options.quality ?? 'precise');
+      const sameIntent = (saved?.fitting?.intent ?? 'natural') === (options.intent ?? 'natural');
+      const currentEngine = engineServes(options.intent ?? 'natural', saved?.fitting?.engine);
+      const analysis = saved?.current && saved.reference.id === referenceId && sameQuality && sameIntent && currentEngine ? saved
+        : options.intent ? await colorMatch.prepare(photo.id, referenceId, cancelId, options.quality, options.intent)
+          : options.quality ? await colorMatch.prepare(photo.id, referenceId, cancelId, options.quality)
+          : await colorMatch.prepare(photo.id, referenceId, cancelId);
       if (stopped()) break;
       const applied = await colorMatch.apply(photo.id, analysis.sessionId, controls, cancelId);
-      if (!applied.current || !applied.fullResolutionChecked || applied.photoId !== photo.id) {
-        throw new Error('This photo returned no current native-resolution colour check.');
+      if (!applied.current || !applied.fullResolutionChecked || applied.photoId !== photo.id || applied.reference.id !== referenceId) {
+        throw new Refusal('This photo returned no current native-resolution colour check.');
       }
       result = { photoId: photo.id, name: photo.fileName, outcome: applied.changed > 0 ? 'matched' : 'unchanged',
         detail: `Appearance distance ${applied.beforeDistance.toFixed(2)} → ${applied.afterDistance.toFixed(2)}.` };
     } catch (cause) {
-      result = { photoId: photo.id, name: photo.fileName, outcome: stopped() ? 'stopped' : 'failed', detail: asIpcError(cause).message };
+      result = { photoId: photo.id, name: photo.fileName, outcome: stopped() ? 'stopped' : 'failed', detail: reasonOf(cause) };
     }
     results.push(result); completed(result);
   }

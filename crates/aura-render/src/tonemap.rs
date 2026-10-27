@@ -341,8 +341,12 @@ pub fn hsl(rgb: [f32; 3], bands: &BTreeMap<String, HslShift>) -> [f32; 3] {
         return rgb;
     }
     let (hue, sat, _) = to_hsv(rgb);
-    if sat <= 1e-4 {
-        // A neutral pixel has no hue to band, and shifting one would tint the greys.
+    // A neutral pixel has no hue to band, and shifting one would tint the greys. A nearly
+    // neutral one has a hue that is mostly noise, so the bands fade in with saturation: a
+    // grey card with a trace of cast must not darken by a third because the orange slider
+    // moved.
+    let presence = hsl_presence(sat);
+    if presence <= 0.0 {
         return rgb;
     }
     let weights = band_weights(hue);
@@ -363,10 +367,26 @@ pub fn hsl(rgb: [f32; 3], bands: &BTreeMap<String, HslShift>) -> [f32; 3] {
     // Hue rotation of at most one eighth of the wheel at full travel, which is the width of
     // one band: a band that could rotate past its neighbour would let one slider undo
     // another's work.
+    h_shift *= presence;
+    s_shift *= presence;
+    l_shift *= presence;
     let rotated = rotate_hue(rgb, h_shift / 100.0 / 8.0);
     let saturated = saturate(rotated, 1.0 + s_shift / 100.0);
     let l = luma(saturated);
     set_luma(saturated, (l * (1.0 + l_shift / 100.0 * 0.5)).max(0.0))
+}
+
+/// HSV saturation below which a colour band does nothing.
+pub const HSL_NEUTRAL_SAT: f32 = 0.03;
+/// HSV saturation at which a colour band has its full effect.
+pub const HSL_FULL_SAT: f32 = 0.15;
+
+/// How much of a colour band's shift a pixel of this saturation receives: none on a neutral,
+/// all of it on a clearly coloured pixel, with a smooth ramp between.
+#[must_use]
+pub fn hsl_presence(sat: f32) -> f32 {
+    let t = ((sat - HSL_NEUTRAL_SAT) / (HSL_FULL_SAT - HSL_NEUTRAL_SAT)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
 }
 
 /// Rotate a pixel's hue by `turns` of the full wheel, holding luminance and saturation.
@@ -615,6 +635,29 @@ mod tests {
         );
         let grey = [0.35; 3];
         assert!(same(hsl(grey, &bands), grey));
+    }
+
+    #[test]
+    fn hsl_barely_moves_a_nearly_neutral_pixel() {
+        let mut bands = BTreeMap::new();
+        bands.insert(
+            "orange".to_string(),
+            HslShift {
+                h: 100,
+                s: 100,
+                l: -100,
+            },
+        );
+        // A grey card with a trace of warm cast: two per cent HSV saturation.
+        let near_grey = [0.36, 0.355, 0.3528];
+        let out = hsl(near_grey, &bands);
+        assert!(same(out, near_grey), "{out:?}");
+        // A clearly orange pixel is still moved: saturation is far above the ramp.
+        let orange = [0.6, 0.35, 0.12];
+        assert!(luma(hsl(orange, &bands)) < luma(orange) * 0.9);
+        assert!((hsl_presence(0.8) - 1.0).abs() < 1e-6);
+        // And the ramp is continuous.
+        assert!(hsl_presence(0.09) > 0.3 && hsl_presence(0.09) < 0.7);
     }
 
     #[test]
