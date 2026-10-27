@@ -1174,7 +1174,9 @@ pub fn plan(
                         .take(n)
                         .enumerate()
                         .map(|(k, s)| {
-                            let mut e = base_edit(format!("{PREFIX}jewel-{k}"), Tool::Glare, s.region, 0.5);
+                            // The reflection tool removes this share of the excess over the surface around it:
+                            // a quarter takes a burnt-out highlight down by about a sixth.
+                            let mut e = base_edit(format!("{PREFIX}jewel-{k}"), Tool::Glare, s.region, 0.25);
                             e.feather = 0.6;
                             e
                         })

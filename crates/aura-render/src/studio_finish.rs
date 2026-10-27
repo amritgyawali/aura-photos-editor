@@ -56,6 +56,34 @@ pub fn wants(recipe: &Recipe) -> bool {
     studio_finish::read(recipe).is_ok_and(|f| !f.is_identity())
 }
 
+fn subject_map(
+    frame: &Frame,
+    recipe: &Recipe,
+    finish: &studio_finish::StudioFinish,
+) -> Option<std::sync::Arc<PortraitMap>> {
+    let parsed = crate::portrait::parse(frame, &crate::portrait::hints(recipe))?;
+    Some(
+        finish
+            .subject_matte
+            .as_ref()
+            .and_then(|matte| with_subject(&parsed, matte))
+            .map_or(parsed, std::sync::Arc::new),
+    )
+}
+
+/// Check the same stored subject selection used by background repair rendering.
+#[must_use]
+pub fn background_repair_available(
+    frame: &Frame,
+    recipe: &Recipe,
+    finish: &studio_finish::StudioFinish,
+) -> bool {
+    subject_map(frame, recipe, finish).is_some_and(|map| {
+        let mask = crate::portrait::resolve(&map, Region::Background, frame.width, frame.height);
+        mask.iter().any(|v| *v < 0.2) && mask.iter().any(|v| *v > 0.8)
+    })
+}
+
 /// Apply the finish a recipe carries. A no-op for a recipe without one, and for any part that
 /// needs the portrait parse when the frame cannot supply one.
 pub(crate) fn apply(
@@ -76,19 +104,13 @@ pub(crate) fn apply(
         return;
     }
     let map = if finish.needs_parse() {
-        frame.and_then(|f| crate::portrait::parse(f, &crate::portrait::hints(recipe)))
+        frame.and_then(|f| subject_map(f, recipe, &finish))
     } else {
         None
     };
     // The people as the learned selection found them, where one was frozen into the recipe:
     // every tool that tells them from their background reads it instead of the parse's colour
     // models. ADR-0150.
-    let map = match (map, finish.subject_matte.as_ref()) {
-        (Some(parsed), Some(matte)) => {
-            Some(with_subject(&parsed, matte).map_or(parsed, std::sync::Arc::new))
-        }
-        (map, _) => map,
-    };
     if let Some(map) = map.as_deref() {
         // Measured on the photograph as parsed, before any colour or background replaces it.
         crate::studio_evoto::before_shape(rgb, w, h, &finish, map);
@@ -127,17 +149,17 @@ pub(crate) fn apply(
     for stroke in &finish.liquify {
         liquify(&mut field, stroke);
     }
-    if field.touched && finish.background_repair > 0.0 {
-        if let Some(map) = map.as_deref() {
-            field.repair_background(
-                &region(map, Region::Background, w, h),
-                finish.background_repair / 100.0,
-            );
-        }
-    }
     if field.touched {
         let source = rgb.to_vec();
-        field.resample(&source, rgb);
+        match map.as_deref() {
+            Some(map) if finish.background_repair > 0.0 => field.resample_layered(
+                &source,
+                &region(map, Region::Background, w, h),
+                finish.background_repair / 100.0,
+                rgb,
+            ),
+            _ => field.resample(&source, rgb),
+        }
     }
     // The glow blooms from the finished frame's highlights.
     crate::portrait_light::apply_glow(rgb, w, h, finish.light.glow);
@@ -709,35 +731,116 @@ fn falloff(r2: f32) -> f32 {
 }
 
 impl Field {
-    /// Restore only pixels classified as background at both ends of the warp. Checking the
-    /// source as well as the destination keeps an enlarged or moved subject from being cut off.
-    /// Uncertain boundary pixels retain their warp; the smooth ramp avoids a hard repair seam.
-    fn repair_background(&mut self, background: &[f32], amount: f32) {
-        if !self.touched || background.len() != self.w * self.h || amount <= 0.0 {
+    /// Resample with the background kept in place (ADR-0150 background repair).
+    ///
+    /// The subject is warped exactly as the field says. The background is a separate layer
+    /// whose displacement follows the subject at its edge and relaxes to `1 - amount` of the
+    /// field further out, so straight lines behind a reshaped person stay straight beyond a
+    /// short, smooth transition. Following at the edge is what keeps an uncertain, soft
+    /// boundary (out-of-focus clothing, hair) from tearing into a doubled contour or a seam,
+    /// and it means no strip of background is ever uncovered without a source. The transition
+    /// starts at two and a half times the largest displacement and is widened wherever it would
+    /// fold the layer where the warp itself does not (see `layer_relax`).
+    /// Pixels the field does not move are returned unchanged, whatever the segmentation says.
+    fn resample_layered(&self, src: &[f32], background: &[f32], amount: f32, out: &mut [f32]) {
+        let (w, h) = (self.w, self.h);
+        if self.dx.len() != w * h || background.len() != w * h || src.len() != w * h * 3 {
+            self.resample(src, out);
             return;
         }
-        let w = self.w;
-        let h = self.h;
-        self.dx
-            .par_iter_mut()
-            .zip(self.dy.par_iter_mut())
-            .enumerate()
-            .for_each(|(i, (dx, dy))| {
-                let x = (i % w) as f32;
-                let y = (i / w) as f32;
-                let sx = (x + *dx).clamp(0.0, (w - 1) as f32);
-                let sy = (y + *dy).clamp(0.0, (h - 1) as f32);
-                let (x0, y0) = (sx.floor() as usize, sy.floor() as usize);
-                let (x1, y1) = ((x0 + 1).min(w - 1), (y0 + 1).min(h - 1));
-                let (fx, fy) = (sx - x0 as f32, sy - y0 as f32);
-                let top = background[y0 * w + x0] * (1.0 - fx) + background[y0 * w + x1] * fx;
-                let bottom = background[y1 * w + x0] * (1.0 - fx) + background[y1 * w + x1] * fx;
-                let confidence = background[i].min(top * (1.0 - fy) + bottom * fy);
-                let t = ((confidence - 0.5) / 0.48).clamp(0.0, 1.0);
-                let keep = 1.0 - amount.clamp(0.0, 1.0) * t * t * (3.0 - 2.0 * t);
-                *dx *= keep;
-                *dy *= keep;
+        let amount = amount.clamp(0.0, 1.0);
+        let plate = background_plate(src, background, w, h);
+        let largest = self
+            .dx
+            .iter()
+            .zip(&self.dy)
+            .map(|(x, y)| x.hypot(*y))
+            .fold(0.0_f32, f32::max);
+        let reach = (0.03 * w.min(h) as f32).max(2.5 * largest).max(2.0);
+        let relax = self.layer_relax(background, amount, reach);
+        out.par_chunks_mut(w * 3).enumerate().for_each(|(y, row)| {
+            for x in 0..w {
+                let i = y * w + x;
+                let (dx, dy) = (self.dx[i], self.dy[i]);
+                let (sx, sy) = (x as f32 + dx, y as f32 + dy);
+                let warped = bilinear3(src, w, h, sx, sy);
+                // Within a pixel of no displacement the plain warp is kept, so the layer never
+                // repaints a soft subject edge that nothing moved.
+                let moved = dx.hypot(dy).min(1.0);
+                let gate = moved * moved * (3.0 - 2.0 * moved);
+                if gate <= 0.0 {
+                    row[x * 3..x * 3 + 3].copy_from_slice(&warped);
+                    continue;
+                }
+                let relax = relax[i];
+                let keep = 1.0 - amount * relax;
+                let subject = (1.0 - bilinear1(background, w, h, sx, sy)).clamp(0.0, 1.0);
+                let (bx, by) = (x as f32 + dx * keep, y as f32 + dy * keep);
+                // At the subject the layer is the plain warp; the filled plate fades in only as
+                // the layer straightens, so an uncertain edge is never repainted with fill.
+                let plated = bilinear3(&plate, w, h, bx, by);
+                let behind = if relax >= 1.0 {
+                    plated
+                } else {
+                    let own = bilinear3(src, w, h, bx, by);
+                    std::array::from_fn(|c| own[c] + relax * (plated[c] - own[c]))
+                };
+                for c in 0..3 {
+                    let layered = subject * warped[c] + (1.0 - subject) * behind[c];
+                    row[x * 3 + c] = if gate >= 1.0 {
+                        layered
+                    } else {
+                        warped[c] + gate * (layered - warped[c])
+                    };
+                }
+            }
+        });
+    }
+
+    /// How far the background layer relaxes from the subject's warp toward straight, per pixel:
+    /// zero at the subject, one beyond the transition. The transition starts at `reach`; where
+    /// relaxing over it would fold the layer somewhere the warp itself does not fold - heavily
+    /// stacked strokes can - it is widened, and if no width is safe the layer follows the warp
+    /// everywhere, which is the unrepaired result. Repair never doubles background content.
+    fn layer_relax(&self, background: &[f32], amount: f32, reach: f32) -> Vec<f32> {
+        let (w, h) = (self.w, self.h);
+        let distance = distance_from_subject(background, w, h);
+        let ramp = |width: f32| -> Vec<f32> {
+            distance
+                .iter()
+                .map(|d| {
+                    let t = (d / width).clamp(0.0, 1.0);
+                    t * t * (3.0 - 2.0 * t)
+                })
+                .collect()
+        };
+        if w < 2 || h < 2 || amount <= 0.0 {
+            return ramp(reach);
+        }
+        // The smallest local area scale of `p -> p + d * keep`, by forward differences.
+        let area = |keep: &dyn Fn(usize) -> f32, i: usize| {
+            let (r, d) = (i + 1, i + w);
+            let a = 1.0 + self.dx[r] * keep(r) - self.dx[i] * keep(i);
+            let b = self.dx[d] * keep(d) - self.dx[i] * keep(i);
+            let c = self.dy[r] * keep(r) - self.dy[i] * keep(i);
+            let e = 1.0 + self.dy[d] * keep(d) - self.dy[i] * keep(i);
+            (a * e - b * c).min(a).min(e)
+        };
+        let warp = |_: usize| 1.0;
+        for widen in [1.0, 1.6, 2.6, 4.2, 6.8] {
+            let relax = ramp(reach * widen);
+            let keep = |k: usize| 1.0 - amount * relax[k];
+            let folds = (0..h - 1).into_par_iter().any(|y| {
+                (0..w - 1).any(|x| {
+                    let i = y * w + x;
+                    area(&keep, i) <= 0.0 && area(&warp, i) > 0.0
+                })
             });
+            if !folds {
+                return relax;
+            }
+        }
+        vec![0.0; w * h]
     }
 
     fn new(w: usize, h: usize) -> Self {
@@ -912,6 +1015,60 @@ impl Field {
             }
         });
     }
+}
+
+/// Bilinear sample of a single plane, clamped at the frame edge.
+fn bilinear1(plane: &[f32], w: usize, h: usize, x: f32, y: f32) -> f32 {
+    let sx = x.clamp(0.0, (w - 1) as f32);
+    let sy = y.clamp(0.0, (h - 1) as f32);
+    let (x0, y0) = (sx.floor() as usize, sy.floor() as usize);
+    let (x1, y1) = ((x0 + 1).min(w - 1), (y0 + 1).min(h - 1));
+    let (fx, fy) = (sx - x0 as f32, sy - y0 as f32);
+    let top = plane[y0 * w + x0] + (plane[y0 * w + x1] - plane[y0 * w + x0]) * fx;
+    let bottom = plane[y1 * w + x0] + (plane[y1 * w + x1] - plane[y1 * w + x0]) * fx;
+    top + (bottom - top) * fy
+}
+
+/// Bilinear sample of an interleaved RGB buffer, clamped at the frame edge.
+fn bilinear3(rgb: &[f32], w: usize, h: usize, x: f32, y: f32) -> [f32; 3] {
+    let sx = x.clamp(0.0, (w - 1) as f32);
+    let sy = y.clamp(0.0, (h - 1) as f32);
+    let (x0, y0) = (sx.floor() as usize, sy.floor() as usize);
+    let (x1, y1) = ((x0 + 1).min(w - 1), (y0 + 1).min(h - 1));
+    let (fx, fy) = (sx - x0 as f32, sy - y0 as f32);
+    std::array::from_fn(|c| {
+        let a = rgb[(y0 * w + x0) * 3 + c];
+        let b = rgb[(y0 * w + x1) * 3 + c];
+        let d = rgb[(y1 * w + x0) * 3 + c];
+        let e = rgb[(y1 * w + x1) * 3 + c];
+        let top = a + (b - a) * fx;
+        let bottom = d + (e - d) * fx;
+        top + (bottom - top) * fy
+    })
+}
+
+/// How far each pixel is from the subject, in pixels (zero on it): the pixels whose
+/// background confidence is below one half.
+fn distance_from_subject(background: &[f32], w: usize, h: usize) -> Vec<f32> {
+    let subject: Vec<bool> = background.iter().map(|b| *b < 0.5).collect();
+    crate::fill::distance_to(&subject, w, h)
+}
+
+/// The photograph's background with the subject taken out and the hole filled from around it.
+///
+/// Confident background pixels are kept exactly; the subject and its soft edge are filled by
+/// push-pull from the background that meets them, which continues its colours and broad lines
+/// across a strip revealed by a reshape.
+fn background_plate(src: &[f32], background: &[f32], w: usize, h: usize) -> Vec<f32> {
+    // Certain background only: a soft hair or skin edge is filled, never copied.
+    let weight: Vec<f32> = background
+        .iter()
+        .map(|b| {
+            let t = ((b - 0.8) / 0.18).clamp(0.0, 1.0);
+            t * t * (3.0 - 2.0 * t)
+        })
+        .collect();
+    crate::fill::push_pull(src, 3, &weight, w, h)
 }
 
 /// A translation, bounded so it cannot fold: at most two fifths of the shorter radius.
@@ -1538,6 +1695,13 @@ fn body_warps(
     main: Option<&FaceGeometry>,
 ) {
     let main = main.or_else(|| map.faces.first());
+    // A body reshape needs a person, and the evidence of one is a face: found by the parse, or
+    // drawn by the photographer where it missed one. The parse's body plane and the learned
+    // subject selection both answer "what stands out", which on a still life or a pod of dolphins
+    // is not a person - a slim or a height slider would warp the frame.
+    if main.is_none() {
+        return;
+    }
     let around = main.map(|g| {
         let f = scale.face(g);
         (f.mid[0], g.size * (scale.sx + scale.sy) * 0.5)
@@ -1837,43 +2001,193 @@ mod tests {
         assert!((out[j] - src[j]).abs() < 1e-6);
     }
 
+    /// A grey frame with bright vertical background lines and a darker subject column.
+    fn lined(w: usize, h: usize) -> (Vec<f32>, Vec<f32>) {
+        let mut rgb = vec![0.3; w * h * 3];
+        let mut background = vec![1.0; w * h];
+        for y in 0..h {
+            for x in 0..w {
+                let i = y * w + x;
+                if (30..50).contains(&x) {
+                    background[i] = 0.0;
+                    rgb[i * 3..i * 3 + 3].copy_from_slice(&[0.6, 0.4, 0.3]);
+                } else if x % 10 == 1 {
+                    rgb[i * 3..i * 3 + 3].copy_from_slice(&[0.9, 0.9, 0.9]);
+                }
+            }
+        }
+        (rgb, background)
+    }
+
     #[test]
-    #[allow(clippy::float_cmp)] // Zero and foreground preservation must be exact.
+    #[allow(clippy::float_cmp)] // Background and subject preservation must be exact.
     fn background_repair_restores_lines_preserves_subject_and_respects_strength() {
         let (w, h) = (80, 60);
-        let source = ramp(w, h);
+        let (source, background) = lined(w, h);
         let mut field = Field::new(w, h);
         field.ensure();
         field.touched = true;
         field.dx.fill(3.0);
+        let mut warped = source.clone();
+        field.resample(&source, &mut warped);
+        let mut repaired = source.clone();
+        field.resample_layered(&source, &background, 1.0, &mut repaired);
+        // Background beyond the transition is exactly where it was: lines are not moved.
+        for x in [1, 5, 11, 71] {
+            let i = (20 * w + x) * 3;
+            assert_eq!(repaired[i], source[i], "x = {x}");
+        }
+        assert_ne!(warped[(20 * w + 11) * 3], source[(20 * w + 11) * 3]);
+        // The subject keeps its displacement exactly.
+        let i = (20 * w + 38) * 3;
+        assert_eq!(repaired[i], warped[i]);
+        // Beside the subject the background follows it and relaxes smoothly: each line beyond
+        // the old edge appears once along the row, never doubled.
+        let row: Vec<f32> = (47..74).map(|x| repaired[(20 * w + x) * 3]).collect();
+        let peaks = row
+            .windows(3)
+            .filter(|p| p[1] > 0.6 && p[1] >= p[0] && p[1] >= p[2])
+            .count();
+        assert_eq!(peaks, 3, "{row:?}");
+        // Half strength moves the far background half as far.
+        let mut half = source.clone();
+        field.resample_layered(&source, &background, 0.5, &mut half);
+        let i = (20 * w + 10) * 3;
+        let expected = 0.3 + 0.5 * (0.9 - 0.3);
+        assert!(
+            (half[i] - expected).abs() < 1e-5,
+            "{} vs {expected}",
+            half[i]
+        );
+    }
+
+    #[test]
+    fn the_background_layer_never_folds_beside_the_subject() {
+        let (w, h) = (120, 40);
+        let (source, background) = lined(w, h);
+        let mut field = Field::new(w, h);
+        field.ensure();
+        field.touched = true;
+        field.dx.fill(-9.0);
+        let distance = distance_from_subject(&background, w, h);
+        let reach = (0.03 * w.min(h) as f32).max(2.5 * 9.0);
+        let xs: Vec<f32> = (0..w)
+            .map(|x| {
+                let t = (distance[20 * w + x] / reach).clamp(0.0, 1.0);
+                x as f32 - 9.0 * (1.0 - t * t * (3.0 - 2.0 * t))
+            })
+            .collect();
+        assert!(xs.windows(2).all(|p| p[1] > p[0]), "{xs:?}");
+        let mut out = source.clone();
+        field.resample_layered(&source, &background, 1.0, &mut out);
+        assert!(out.iter().all(|v| v.is_finite()));
+    }
+
+    /// Folds along rows of the plain warp and of the background layer at full repair.
+    fn layer_folds(field: &Field, background: &[f32]) -> (usize, usize) {
+        let (w, h) = (field.w, field.h);
+        let largest = field
+            .dx
+            .iter()
+            .zip(&field.dy)
+            .map(|(x, y)| x.hypot(*y))
+            .fold(0.0_f32, f32::max);
+        let reach = (0.03 * w.min(h) as f32).max(2.5 * largest).max(2.0);
+        let relax = field.layer_relax(background, 1.0, reach);
+        let (mut plain, mut layer) = (0, 0);
+        for y in 0..h {
+            for x in 1..w {
+                let (i, j) = (y * w + x, y * w + x - 1);
+                if 1.0 + field.dx[i] - field.dx[j] <= 0.0 {
+                    plain += 1;
+                }
+                let keep = |k: usize| 1.0 - relax[k];
+                if 1.0 + field.dx[i] * keep(i) - field.dx[j] * keep(j) <= 0.0 {
+                    layer += 1;
+                }
+            }
+        }
+        (plain, layer)
+    }
+
+    #[test]
+    fn the_background_layer_does_not_fold_under_brush_moves() {
+        let (w, h) = (240, 160);
         let background: Vec<f32> = (0..w * h)
             .map(|i| {
-                if (30..50).contains(&(i % w)) {
+                if (100..140).contains(&(i % w)) {
                     0.0
                 } else {
                     1.0
                 }
             })
             .collect();
-        let mut full = source.clone();
-        field.resample(&source, &mut full);
-        let unchanged = field.dx.clone();
-        field.repair_background(&background, 0.0);
-        assert_eq!(field.dx, unchanged);
-        field.repair_background(&background, 0.5);
-        assert_eq!(field.dx[20 * w + 10], 1.5);
-        assert_eq!(field.dx[20 * w + 40], 3.0);
-        // A moved foreground pixel reaching the background must keep its displacement.
-        assert_eq!(field.dx[20 * w + 28], 3.0);
-        field.repair_background(&background, 1.0);
-        let mut repaired = source.clone();
-        field.resample(&source, &mut repaired);
-        for x in [5, 15, 65] {
-            let i = (20 * w + x) * 3;
-            assert_eq!(repaired[i], source[i]);
-            assert_ne!(full[i], source[i]);
+        // One move at its cap, across the subject's edge, either way: the plain warp never folds
+        // and neither may the layer.
+        for v in [400.0, -400.0] {
+            let mut field = Field::new(w, h);
+            field.add(moving([100.0, 80.0], [60.0, 60.0], 0.0, [v, 0.0]));
+            assert_eq!(layer_folds(&field, &background), (0, 0), "move {v}");
         }
-        assert_eq!(repaired[(20 * w + 40) * 3], full[(20 * w + 40) * 3]);
+        // Stacked moves can fold the plain warp; repair must not add folds of its own.
+        let mut field = Field::new(w, h);
+        for (cx, v) in [(100.0, 400.0), (140.0, -400.0), (120.0, 400.0)] {
+            field.add(moving([cx, 80.0], [60.0, 60.0], 0.0, [v, 0.0]));
+        }
+        let (plain, layer) = layer_folds(&field, &background);
+        assert!(layer <= plain, "layer {layer} > plain {plain}");
+    }
+
+    #[test]
+    #[allow(clippy::float_cmp)] // Untouched pixels must be bit-identical.
+    fn background_repair_leaves_pixels_the_field_does_not_move() {
+        let (w, h) = (80, 60);
+        let (source, mut background) = lined(w, h);
+        // A soft, uncertain edge that layering alone would repaint.
+        for y in 0..h {
+            background[y * w + 29] = 0.5;
+        }
+        let mut field = Field::new(w, h);
+        field.add(moving([60.0, 50.0], [6.0, 6.0], 0.0, [2.0, 0.0]));
+        let mut out = source.clone();
+        field.resample_layered(&source, &background, 1.0, &mut out);
+        for y in 0..40 {
+            for x in 0..w {
+                let i = (y * w + x) * 3;
+                assert_eq!(out[i..i + 3], source[i..i + 3], "({x}, {y})");
+            }
+        }
+    }
+
+    #[test]
+    fn the_background_plate_keeps_background_and_fills_the_subject_smoothly() {
+        let (w, h) = (64, 40);
+        let mut rgb = vec![0.0; w * h * 3];
+        let mut background = vec![1.0; w * h];
+        for y in 0..h {
+            for x in 0..w {
+                let i = y * w + x;
+                // A horizontal ramp the fill should continue across the hole.
+                let v = x as f32 / w as f32;
+                rgb[i * 3..i * 3 + 3].copy_from_slice(&[v, v, v]);
+                if (20..44).contains(&x) {
+                    background[i] = 0.0;
+                    rgb[i * 3..i * 3 + 3].copy_from_slice(&[1.0, 0.0, 0.0]);
+                }
+            }
+        }
+        let plate = background_plate(&rgb, &background, w, h);
+        assert!(plate.iter().all(|v| v.is_finite()));
+        for x in [0, 10, 19, 44, 63] {
+            let i = (20 * w + x) * 3;
+            assert!((plate[i] - rgb[i]).abs() < 1e-6, "kept background at {x}");
+        }
+        // No subject colour survives in the fill, and it sits between the two sides.
+        for x in 20..44 {
+            let i = (20 * w + x) * 3;
+            assert!((plate[i] - plate[i + 1]).abs() < 1e-4, "red leaked at {x}");
+            assert!((0.25..0.75).contains(&plate[i]), "fill {} at {x}", plate[i]);
+        }
     }
 
     #[test]
@@ -1986,6 +2300,27 @@ mod tests {
                 assert_eq!(folds(&field), 0, "{name} {value} folded");
             }
         }
+    }
+
+    #[test]
+    fn body_sliders_leave_a_frame_without_a_person_alone() {
+        use crate::studio_evoto::testing::{self as t, H, W};
+        let mut map = t::map();
+        map.faces.clear();
+        let scale = Scale::of(&map, W, H);
+        let shape = BodyShape {
+            slim: 100.0,
+            height: 100.0,
+            legs: 100.0,
+            ..BodyShape::default()
+        };
+        let mut field = Field::new(W, H);
+        body_warps(&mut field, &scale, &map, &shape, None);
+        assert!(!field.touched, "warped a frame with no face in it");
+        // The same frame with its face found (or drawn) is reshaped.
+        let mut field = Field::new(W, H);
+        body_warps(&mut field, &scale, &t::map(), &shape, None);
+        assert!(field.touched);
     }
 
     #[test]

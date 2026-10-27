@@ -658,27 +658,43 @@ def run(pw, port, inputs, chosen, only):
         base = proxy(person)
         start = call('studio_finish', projectId=project, photoId=person)['finish']
 
+        # Controls that only act alongside another: compared against that other value alone.
+        needs = {('light', 'direction'): ('light', 'key', 70), ('light', 'height'): ('light', 'key', 70),
+                 ('subject', 'relightDirection'): ('subject', 'relight', 70)}
+
         def finish_case(group_key, field, value):
             def run_one():
-                before_hash = recipe_hash(person)
+                prerequisite = needs.get((group_key, field))
+                reference = base
+                steps = 1
                 finish = json.loads(json.dumps(start))
+                if prerequisite:
+                    finish[prerequisite[0]][prerequisite[1]] = prerequisite[2]
+                    call('save_studio_finish', projectId=project, photoId=person, finish=finish, label='Test prerequisite')
+                    reference = proxy(person)
+                    steps = 2
+                before_hash = recipe_hash(person)
+                finish = json.loads(json.dumps(finish))
                 finish[group_key][field] = value
                 try:
                     call('save_studio_finish', projectId=project, photoId=person, finish=finish,
                          label=f'Test {group_key}.{field}')
                 except Exception as e:  # noqa: BLE001 - an out-of-range refusal is reported as such
                     if value < 0 and ('0..=100' in str(e) or 'must be' in str(e) or 'AURA-RENDER-8002' in str(e)):
-                        if recipe_hash(person) != before_hash:
+                        for _ in range(steps - 1):
+                            history(person, 'undo')
+                        if recipe_hash(person) != before_hash and steps == 1:
                             raise AssertionError('refused, but the recipe changed')
                         raise Skip('one-sided control (0..100): a negative value is refused and nothing changes')
                     raise
                 after = proxy(person)
-                history(person, 'undo')
+                for _ in range(steps):
+                    history(person, 'undo')
                 if not np.array_equal(proxy(person), base):
                     raise AssertionError('Undo did not restore the photograph exactly')
-                if after.shape != base.shape:
-                    return f'size {base.shape[1]}x{base.shape[0]} -> {after.shape[1]}x{after.shape[0]}; Undo exact'
-                diff = np.abs(after.astype(np.int16) - base.astype(np.int16))
+                if after.shape != reference.shape:
+                    return f'size {reference.shape[1]}x{reference.shape[0]} -> {after.shape[1]}x{after.shape[0]}; Undo exact'
+                diff = np.abs(after.astype(np.int16) - reference.astype(np.int16))
                 moved = float((diff.max(axis=2) > 2).mean())
                 if after.std() < 1:
                     raise AssertionError('the render became a flat colour')
@@ -725,24 +741,52 @@ def run(pw, port, inputs, chosen, only):
 
     # --------------------------------------------------------- retouch tools
     if want('retouch-tools'):
-        rt = bride
+        # On a person: the photograph with the largest detected face, the tool placed on that
+        # face (retouch tools act on skin, eyes and the light on a person, not on open water).
+        best, spot = None, [.5, .35, .08, .06]
+        for fname, pid in by_name.items():
+            if not fname.lower().endswith(('.jpg', '.png')) or fname == 'colour-chart.png':
+                continue
+            try:
+                found = call('analyse_portrait', photoId=pid).get('faces', [])
+            except Exception:  # noqa: BLE001 - a photo that cannot be parsed has no usable face
+                found = []
+            for f in found:
+                x, y, fw, fh = f['bbox']
+                if best is None or fw * fh > best[0]:
+                    best = (fw * fh, pid, fname)
+                    spot = [x + fw / 2, y + fh / 2, max(fw * .45, .02), max(fh * .45, .02)]
+        rt = best[1] if best else bride
+        report['retouchPhoto'] = best[2] if best else 'bride-as-png.png'
         history(rt, 'reset_original')
         call('native_retouch_edit', projectId=project, photoId=rt, action='clear', edits=[], id=None)
         base = proxy(rt)
         quiet = {'red_eye', 'eye_glow_fix', 'eye_clean', 'teeth', 'auto_blemish', 'acne_clear', 'frequency_heal',
                  'defringe', 'vein_reduce', 'glare', 'stretch_marks', 'texture_graft', 'mattify', 'lip_gloss', 'halation',
                  'under_eye', 'chroma_key', 'local_white_balance', 'body_hair_soften', 'shadow_remove'}
+        # Tools for scenery rather than people act on smooth gradients, a colour spill or bright
+        # highlights: tried on open water.
+        scenery = {'deband', 'color_despill', 'highlight_compress'}
+        water = bride
+        history(water, 'reset_original')
+        call('native_retouch_edit', projectId=project, photoId=water, action='clear', edits=[], id=None)
+        water_base = proxy(water)
         for tool in tool_ids():
             def tool_case(tool=tool):
+                rt_, base_, spot_ = (water, water_base, [.5, .35, .08, .06]) if tool in scenery else (rt, base, spot)
+                return run_tool(tool, rt_, base_, spot_)
+
+            def run_tool(tool, rt, base, spot):
                 warps = tool.startswith('liquify_') or tool == 'reshape'
-                edit = dict(id='test', tool=tool, enabled=True, region=[.5, .35, .08, .06], source=[.56, .36],
+                edit = dict(id='test', tool=tool, enabled=True, region=list(spot),
+                            source=[min(spot[0] + spot[2] * 1.6, .98), spot[1]],
                             amount=.6, feather=.6, radius=.008, texture=.7 if tool != 'local_sharpen' else 1.5,
                             tone=.6, warmth=.4 if warps else .25, tint=.1, targetColor=[.6, .3, .2])
                 if tool == 'acne_clear':
-                    edit['mask'] = {'strokes': [{'erase': False, 'radius': .03, 'opacity': 1, 'points': [[.5, .35, 1]]}]}
+                    edit['mask'] = {'strokes': [{'erase': False, 'radius': .03, 'opacity': 1, 'points': [[spot[0], spot[1], 1]]}]}
                 # Tools that act only on a chosen colour or above a threshold, set as a photographer
-                # would for this spot: the spill colour sampled from the spot itself, and a
-                # compression threshold the spot's highlights reach.
+                # would for the open-water spot: the spill colour sampled from the water itself, and
+                # a compression threshold its highlights reach.
                 if tool == 'color_despill':
                     edit.update(targetColor=[.13, .59, .76], tone=.5)
                 if tool == 'highlight_compress':
@@ -758,7 +802,9 @@ def run(pw, port, inputs, chosen, only):
                     raise AssertionError('Redo did not bring the retouch back exactly')
                 call('native_retouch_edit', projectId=project, photoId=rt, action='clear', edits=[], id=None)
                 h_, w_ = after.shape[:2]
-                crop = after[int(h_ * .2):int(h_ * .5), int(w_ * .35):int(w_ * .65)]
+                cy, cx = int(spot[1] * h_), int(spot[0] * w_)
+                ry, rx = max(int(spot[3] * h_ * 2), 8), max(int(spot[2] * w_ * 2), 8)
+                crop = after[max(cy - ry, 0):cy + ry, max(cx - rx, 0):cx + rx]
                 (OUT / 'tools').mkdir(exist_ok=True)
                 Image.fromarray(crop).resize((240, 240)).save(OUT / 'tools' / f'{tool}.png')
                 if changed == 0:

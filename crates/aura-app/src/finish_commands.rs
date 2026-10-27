@@ -147,20 +147,13 @@ pub fn save_studio_finish(
         });
     }
     if input.finish.background_repair > 0.0
-        && input.finish.background_repair.to_bits() != previous.background_repair.to_bits()
+        && (input.finish.background_repair.to_bits() != previous.background_repair.to_bits()
+            || finish.subject_matte != previous.subject_matte)
     {
         let frame = crate::photo_frames::CatalogFrames::new(state.clone())
             .frame(&photo, RenderLevel::Proxy2048)?;
-        let map = aura_render::portrait::parse(&frame, &aura_render::portrait::hints(&base));
-        let available = map.as_deref().is_some_and(|map| {
-            let mask = aura_render::portrait::resolve(
-                map,
-                aura_portrait::Region::Background,
-                frame.width,
-                frame.height,
-            );
-            mask.iter().any(|v| *v < 0.2) && mask.iter().any(|v| *v > 0.8)
-        });
+        let available =
+            aura_render::studio_finish::background_repair_available(&frame, &base, &finish);
         if !available {
             return Err(invalid("Background repair needs a detected subject and background. Add a missed face in Portrait regions, or use the Liquify Restore brush.").into());
         }

@@ -703,12 +703,7 @@ async fn train_profile(
 ) -> IpcResult<TrainProfileDto> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        aura_app::train_profile(
-            &app,
-            &input,
-            std::sync::Arc::new(aura_style::fixtures::EmptySource),
-            std::sync::Arc::new(aura_style::api::NeutralBaseline),
-        )
+        aura_app::style_commands::train_scanned_profile(&app, &input)
     })
     .await
     .map_err(|_| background_request_failed())?
@@ -3405,6 +3400,19 @@ async fn generate_color_match_preset(
 }
 
 #[tauri::command]
+async fn find_glare(
+    state: State<'_, AppState>,
+    input: aura_app::portrait_commands::FindGlareInput,
+) -> IpcResult<aura_app::portrait_commands::FindGlareDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::portrait_commands::find_glare(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
 async fn analyse_portrait(
     state: State<'_, AppState>,
     input: aura_app::portrait_commands::PortraitInput,
@@ -4237,6 +4245,7 @@ fn main() {
             one_click_cancel,
             activity_status,
             analyse_portrait,
+            find_glare,
             portrait_retouch,
             set_portrait_retouch,
             auto_portrait_retouch,

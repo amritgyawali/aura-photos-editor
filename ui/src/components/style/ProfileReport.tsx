@@ -21,6 +21,7 @@ import type { ImportProfileDto, ProfileReportDto } from '../../ipc/types';
 import { BucketMatrix } from './BucketMatrix';
 
 export type ProfileReportProps = {
+  disabled?: boolean;
   report: ProfileReportDto | null;
   imported?: ImportProfileDto | null;
   onAdopt?: (profileId: string) => void;
@@ -53,6 +54,7 @@ export function signatureLabel(imported: ImportProfileDto): string {
 }
 
 export function ProfileReport({
+  disabled = false,
   report,
   imported,
   onAdopt,
@@ -116,12 +118,12 @@ export function ProfileReport({
       <BucketMatrix buckets={report.perBucket} onSelect={onSelectBucket} />
 
       <footer className="profile-actions">
-        <button type="button" onClick={onCompare ? () => onCompare(profile.profileId) : undefined}>
+        <button type="button" disabled={disabled || !onCompare} onClick={onCompare ? () => onCompare(profile.profileId) : undefined}>
           Compare with what you use now
         </button>
         <button
           type="button"
-          disabled={profile.status === 'adopted'}
+          disabled={disabled || !onAdopt || !profile.usable || profile.status === 'adopted'}
           onClick={onAdopt ? () => onAdopt(profile.profileId) : undefined}
         >
           {profile.status === 'adopted' ? 'In use' : 'Use this profile'}

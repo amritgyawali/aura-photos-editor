@@ -32,6 +32,9 @@
 use std::path::Path;
 use std::sync::Arc;
 
+#[path = "style_archive.rs"]
+mod archive;
+
 use aura_core::contract::scene::ChapterId;
 use aura_core::contract::style::{SceneGroup, StyleBucket, StyleProfile, StyleQuery, StyleService};
 use aura_core::progress::{CancelToken, NullProgress};
@@ -151,7 +154,6 @@ pub fn profile_pairs(
 ///
 /// `AURA-IO-1001` when a folder cannot be read.
 pub fn scan_archive(state: &AppState, input: &ScanArchiveInput) -> IpcResult<ScanArchiveDto> {
-    let _ = state;
     let mut out = ScanArchiveDto {
         originals: 0,
         finals: 0,
@@ -188,7 +190,25 @@ pub fn scan_archive(state: &AppState, input: &ScanArchiveInput) -> IpcResult<Sca
     out.by_method = totals.into_iter().collect();
     out.weakest_method = weakest.as_str().to_string();
     out.enough = out.matched as usize >= MIN_PAIRS;
+    archive::save_scan(state, &input.name, &input.roots)?;
     Ok(out)
+}
+
+/// Train from the real local archive most recently scanned for this look.
+/// # Errors
+/// Missing/ambiguous archive evidence, decode errors or insufficient accepted pairs.
+pub fn train_scanned_profile(
+    state: &AppState,
+    input: &TrainProfileInput,
+) -> IpcResult<TrainProfileDto> {
+    let (source, archives) = archive::load(state, &input.name)?;
+    train_archives(
+        state,
+        input,
+        Arc::new(source),
+        Arc::new(aura_style::api::NeutralBaseline),
+        &archives,
+    )
 }
 
 /// Train a profile from the pairs a scan already stored.
@@ -204,6 +224,16 @@ pub fn train_profile(
     source: Arc<dyn aura_style::bucket::PairSource>,
     baseline: Arc<dyn aura_style::api::Baseline>,
 ) -> IpcResult<TrainProfileDto> {
+    train_archives(state, input, source, baseline, &[])
+}
+
+fn train_archives(
+    state: &AppState,
+    input: &TrainProfileInput,
+    source: Arc<dyn aura_style::bucket::PairSource>,
+    baseline: Arc<dyn aura_style::api::Baseline>,
+    archives: &[Archive],
+) -> IpcResult<TrainProfileDto> {
     let cancel = CancelToken::new();
     if let Some(id) = input.cancel_id.as_deref() {
         state.register_job(id, cancel.clone());
@@ -215,7 +245,7 @@ pub fn train_profile(
         baseline,
         input.name.clone(),
     );
-    let report = pass.run(&[], |_| StyleQuery::default(), &NullProgress, &cancel);
+    let report = pass.run(archives, |_| StyleQuery::default(), &NullProgress, &cancel);
     if let Some(id) = input.cancel_id.as_deref() {
         state.finish_job(id);
     }

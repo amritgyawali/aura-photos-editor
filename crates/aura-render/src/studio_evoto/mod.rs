@@ -63,7 +63,12 @@ pub(crate) fn before_shape(
         let measured = Ctx::new(w, h, map, &finish.faces).measure_chins(rgb);
         subject::double_chin_shade(rgb, &measured, finish.body.double_chin / 100.0);
     }
-    if !finish.subject.is_identity() {
+    // The people as a whole need people, and the evidence of one is a face (found, or drawn
+    // where the parse missed it). The learned subject selection answers "what stands out", which
+    // on a still life is the objects; exposure or warmth "on the people" would change most of a
+    // frame that has nobody in it.
+    let people = !map.faces.is_empty();
+    if !finish.subject.is_identity() && people {
         subject::apply(rgb, &ctx, &finish.subject);
     }
 }
