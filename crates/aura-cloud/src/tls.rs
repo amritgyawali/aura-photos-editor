@@ -13,15 +13,13 @@
 //! and records what was traded. Three things are worth having in front of you
 //! before reading the code.
 //!
-//! **The crypto is pure Rust, and that is a constraint rather than a preference.**
-//! `ring` and `aws-lc-rs`, the two providers rustls ships with, both compile C
-//! and assembly. The reference build machine for this product has no C toolchain
-//! at all - `cargo test --workspace` passes there only because every other
-//! dependency is pure Rust - so linking either of them would make the cloud half
-//! of the product unbuildable on the machine it is developed on. What is used
-//! instead is `rustls-rustcrypto`, which assembles a rustls `CryptoProvider` out
-//! of the `RustCrypto` primitives. Its own authors describe it as not yet
-//! production-grade, and the ADR says so in those words.
+//! **The crypto is `ring`, rustls's standard provider.** Until 2026-10-27 it was
+//! `rustls-rustcrypto`, because `ring` and `aws-lc-rs` compile C and assembly and the
+//! reference build machine had no C toolchain. That machine now has one (MinGW gcc
+//! under the GNU Rust toolchain), so the swap ADR-0066 promised was made: the
+//! pure-Rust provider was an alpha with no release since April 2024, and it pinned
+//! `rustls-webpki` 0.102 and `crypto-bigint` 0.5, whose advisories (RUSTSEC-2026-0382,
+//! RUSTSEC-2026-0387 and others) could only be argued around, never fixed.
 //!
 //! **Verification is on, and there is no switch that turns it off.** No
 //! `dangerous_configuration`, no "accept invalid certificates" setting, no
@@ -31,12 +29,10 @@
 //! silent interception - the right way round for a product that sends
 //! photographs of other people's weddings.
 //!
-//! **The key exchange is X25519 only.** The provider also offers P-256 and P-384,
-//! whose secret-dependent arithmetic runs through `crypto-bigint` 0.5, which is not
-//! constant-time (RUSTSEC-2026-0387) and cannot be upgraded under this provider.
-//! X25519 does not use it, and every vendor in [`crate::catalog`] offers it, so the
-//! ephemeral secret of every handshake stays out of that code. What remains of the
-//! P-256 dependency verifies server signatures, which handles public values only.
+//! **The key exchanges are `ring`'s defaults: X25519 first, then P-256 and P-384.**
+//! All three run in constant time in `ring`, so the X25519-only restriction the pure-Rust
+//! provider needed (its P-256 arithmetic was not constant-time) is gone, and a vendor that
+//! prefers P-256 is no longer refused.
 //!
 //! **Plain HTTP still works, and is still what a local model uses.** The
 //! transport picks a connector by scheme, so Ollama on `127.0.0.1` does not go
@@ -104,13 +100,9 @@ impl TlsConnector {
 
 /// The shared client configuration.
 ///
-/// The pure-Rust provider, offering X25519 as its only key exchange (see the module notes).
+/// `ring`, rustls's standard provider, with its default key exchanges (see the module notes).
 fn provider() -> rustls::crypto::CryptoProvider {
-    let mut provider = rustls_rustcrypto::provider();
-    provider
-        .kx_groups
-        .retain(|group| group.name() == rustls::NamedGroup::X25519);
-    provider
+    rustls::crypto::ring::default_provider()
 }
 
 /// Built once. Assembling it parses several hundred root certificates and
@@ -202,14 +194,22 @@ mod tests {
     fn a_configuration_can_be_built() {
         assert!(
             client_config().is_some(),
-            "the pure-Rust crypto provider refused to produce a client configuration"
+            "the crypto provider refused to produce a client configuration"
         );
     }
 
     #[test]
-    fn the_only_key_exchange_is_x25519() {
+    fn x25519_is_preferred_and_every_key_exchange_is_constant_time() {
         let groups: Vec<_> = provider().kx_groups.iter().map(|g| g.name()).collect();
-        assert_eq!(groups, vec![rustls::NamedGroup::X25519]);
+        // `ring` implements all three in constant time; X25519 is offered first.
+        assert_eq!(
+            groups,
+            vec![
+                rustls::NamedGroup::X25519,
+                rustls::NamedGroup::secp256r1,
+                rustls::NamedGroup::secp384r1
+            ]
+        );
     }
 
     #[test]
@@ -230,5 +230,28 @@ mod tests {
     #[test]
     fn the_connector_serves_https() {
         assert_eq!(TlsConnector::new().scheme(), "https");
+    }
+
+    /// A real handshake with a public AI provider: certificate chain verified against the
+    /// bundled roots, a key exchange and cipher suite agreed, and an HTTP status line read back.
+    /// No key and no photograph is sent.
+    #[test]
+    #[ignore = "live network"]
+    fn a_public_ai_provider_completes_a_verified_handshake() {
+        for host in ["api.anthropic.com", "api.openai.com"] {
+            let mut stream = TlsConnector::new()
+                .connect(host, 443, Duration::from_secs(20))
+                .unwrap_or_else(|e| panic!("{host}: {}", e.code.0));
+            let request = format!("HEAD / HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n");
+            stream.write_all(request.as_bytes()).expect("write");
+            let mut reply = Vec::new();
+            let _ = stream.read_to_end(&mut reply);
+            let text = String::from_utf8_lossy(&reply);
+            assert!(
+                text.starts_with("HTTP/1.1 "),
+                "{host}: {}",
+                &text[..text.len().min(80)]
+            );
+        }
     }
 }

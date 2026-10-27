@@ -313,12 +313,20 @@ pub fn tune(chosen: &Settings, c: &Condition, ctx: &Context) -> Tuned {
         ));
     } else if rough > 1.15 {
         s.texture = s.texture.max(0.6);
-        notes.push(format!(
-            "Skin texture is uneven (reading {:.1}%): smoothing raised to {:.0}% with pore detail kept at {:.0}%.",
-            c.roughness * 100.0,
-            s.smoothing * 100.0,
-            s.texture * 100.0
-        ));
+        notes.push(if s.smoothing > 0.005 {
+            format!(
+                "Skin texture is uneven (reading {:.1}%): smoothing raised to {:.0}% with pore detail kept at {:.0}%.",
+                c.roughness * 100.0,
+                s.smoothing * 100.0,
+                s.texture * 100.0
+            )
+        } else {
+            format!(
+                "Skin texture is uneven (reading {:.1}%): smoothing stays off in this preset; marks are repaired locally with pore detail kept at {:.0}%.",
+                c.roughness * 100.0,
+                s.texture * 100.0
+            )
+        });
     }
 
     // 2. Colour evenness follows how blotchy this face's own colour is.
@@ -397,11 +405,18 @@ pub fn tune(chosen: &Settings, c: &Condition, ctx: &Context) -> Tuned {
         scale(&mut s.iris_detail, 0.5);
         scale(&mut s.lash_definition, 0.5);
         s.pore_refine = 0.0;
-        notes.push(format!(
-            "Small face ({:.0} px between the eyes): skin work reduced to {:.0}% and fine eye detail halved.",
-            c.eye_px,
-            s.smoothing * 100.0
-        ));
+        notes.push(if s.smoothing > 0.005 {
+            format!(
+                "Small face ({:.0} px between the eyes): skin smoothing reduced to {:.0}% and fine eye detail halved.",
+                c.eye_px,
+                s.smoothing * 100.0
+            )
+        } else {
+            format!(
+                "Small face ({:.0} px between the eyes): no skin smoothing at this size and fine eye detail halved; spots too small to measure are left alone.",
+                c.eye_px
+            )
+        });
     } else if c.eye_px > 170.0 {
         s.texture = s.texture.max(0.7);
         s.smoothing_size = (s.smoothing_size * 1.25).min(1.0);

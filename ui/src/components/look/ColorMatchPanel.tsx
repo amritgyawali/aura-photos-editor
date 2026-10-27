@@ -11,7 +11,7 @@ import { ReferenceLibraryManager } from './ReferenceLibraryManager';
 import { LightroomPresetExport } from './LightroomPresetExport';
 import { toneSentence } from './toneSentence';
 import { EXACT_ENGINE, engineServes } from './colorMatchEngines';
-import { barelyChanged, reducedNote, slightMessage } from './visibleChange';
+import { barelyChanged, reducedNote, REMOVED_MESSAGE, slightMessage } from './visibleChange';
 import { COLOR_MATCH_PREFERENCES, matchPreference, preferenceOf, recommendedReferences } from './colorMatchPreferences';
 import './colorMatchWorkspace.css';
 
@@ -39,7 +39,9 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
   const [captureName, setCaptureName] = useState('Edited photo');
   const [live, setLive] = useState(false);
   const [quality, setQuality] = useState<'quick' | 'precise'>('precise');
-  const [matchIntent, setMatchIntent] = useState<ColorMatchIntent>('natural');
+  // The reference's whole look - skin, background, palette and tone - is what a photographer asks
+  // for when they pick a reference; the gentler goals are a choice away (ADR-0183).
+  const [matchIntent, setMatchIntent] = useState<ColorMatchIntent>('exact');
   const [referenceTab, setReferenceTab] = useState<'recommended' | 'mine'>('recommended');
   const [syncScope, setSyncScope] = useState<'selected' | 'collection'>('selected');
   const [liveSignal, setLiveSignal] = useState(0);
@@ -211,6 +213,10 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
     const mode = quality;
     const purpose = matchIntent;
     const strengths = structuredClone(controlsRef.current);
+    // Matching after the treatment was removed means matching again, not saving a match at 0%.
+    if (strengths.amount <= 0) {
+      strengths.amount = references.find(item => item.id === referenceId)?.defaultControls?.amount || DEFAULT_MATCH_CONTROLS.amount;
+    }
     void run(async (id, current) => {
       const latest = () => current() && sequence === intent.current && referenceId === activeReference.current;
       setMessage('Matching the selected reference to this photo…');
@@ -252,6 +258,7 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
       }
       acceptReport(result); setControls(result.controls);
       setMessage(reducedNote(result) + (barelyChanged(result) ? slightMessage(result)
+        : result.changed && result.controls.amount === 0 ? REMOVED_MESSAGE
         : result.changed ? 'Colour strengths saved. Use Undo to compare.' : 'These strengths did not change the saved edit.'));
     });
   });
@@ -348,10 +355,12 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
       const value = event.target.value;
       const next = value === 'palette' || value === 'exact' ? value : 'natural';
       matchIntentRef.current = next; setMatchIntent(next); requestLive();
-    }}><option value="natural">Natural look</option><option value="palette">Reference palette and tone</option>
-      <option value="exact">Exact colours of the reference</option></select></label>
-    <p className="lr-hint">Natural look keeps a different scene's tonal balance. Reference palette and tone makes a stronger match to the reference's colour distribution, with native skin and highlight protection. Scene content can affect the result.</p>
-    {matchIntent === 'exact' && <p className="lr-hint" data-testid="colour-match-exact-hint">Exact colours gives this photo the reference&apos;s own colours and tones: its palette in its proportions and its tone curve. A different scene is repainted in them, so a blue sky can take the reference&apos;s warm tones. Bands, extra clipping and large skin changes are still refused.</p>}
+    }}><option value="exact">Full look of the reference</option>
+      <option value="palette">Softer: palette and tone</option>
+      <option value="natural">Subtle: keep own colours</option></select></label>
+    <p className="lr-hint">Full look gives this photo the reference&apos;s whole look: skin, background and every colour. Softer moves the palette and tone part of the way and protects skin and highlights. Subtle only borrows the edit and keeps a different scene&apos;s own colours, so on a very different photo it changes little.</p>
+    {matchIntent !== 'exact' && <p className="lr-hint" data-testid="colour-match-gentle-hint">This goal keeps much of this photo&apos;s own colour. For the reference&apos;s full look, choose Full look of the reference.</p>}
+    {matchIntent === 'exact' && <p className="lr-hint" data-testid="colour-match-exact-hint">Skin takes the reference&apos;s skin colour, and everything else its palette in its proportions and its tone curve. A different scene is repainted in them, so a blue sky can take the reference&apos;s warm tones. Bands and extra clipping are still refused, and skin may change only toward the reference&apos;s skin.</p>}
     <label>Matching mode<select aria-label="Matching mode" value={quality} disabled={strengthsLocked} onChange={event => {
       const next = event.target.value === 'quick' ? 'quick' : 'precise';
       qualityRef.current = next; setQuality(next); requestLive();

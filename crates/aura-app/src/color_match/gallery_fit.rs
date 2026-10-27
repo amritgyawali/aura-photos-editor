@@ -70,6 +70,10 @@ pub(crate) struct Allowance {
     pub skin: f32,
     /// The largest increase in the fraction of clipped pixels.
     pub clipping: f32,
+    /// Skin may also move further than `skin` when the move brings it closer to the reference's
+    /// own skin: the reference's exact colours ask for its skin (ADR-0183).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub toward_reference: bool,
 }
 
 impl Default for Allowance {
@@ -77,6 +81,7 @@ impl Default for Allowance {
         Self {
             skin: 1.0,
             clipping: 0.01,
+            toward_reference: false,
         }
     }
 }

@@ -135,6 +135,12 @@ export const POLISHED_WEDDING_RETOUCH: AutoRetouchOptions = {
 };
 export const DEFAULT_SKIN: SkinSettings = { tolerance: .08, edgeProtection: .8, connected: true };
 export const isSampledSkinTool = (tool: RetouchTool) => ['skin_smooth', 'skin_uniformity', 'portrait_dodge_burn'].includes(tool);
+/** What the lens-reflection search found. */
+export type FindGlareResult = {
+  faces: number;
+  regions: { region: [number, number, number, number]; confidence: number; face: number }[];
+  message: string;
+};
 export type NativeRetouchEdit = {
   id: string; tool: RetouchTool; enabled: boolean; region: [number, number, number, number];
   source: [number, number] | null; amount: number; feather: number; radius: number;
@@ -195,6 +201,8 @@ export const nativeRetouch = {
   review: (projectId: string, photoId: string, recipeHash: string, selection: NativeRetouchEdit, quality: PreviewQuality = 'full') => invoke<BlemishReview>('native_retouch_blemish_review',{input:{projectId,photoId,recipeHash,selection,quality}}),
   autoPortrait: (photoId: string) => invoke<RecipeDto>('enhance_portrait', { input: { photoId } }),
   autoRetouch: (projectId: string, photoId: string, options: AutoRetouchOptions, global = false) => invoke<RecipeDto>('auto_retouch', { input: { projectId, photoId, global, options } }),
+  /** Lens reflections the detector found, as glare selections to preview and apply. */
+  findGlare: (projectId: string, photoId: string) => invoke<FindGlareResult>('find_glare', { input: { projectId, photoId } }),
   edit: (projectId: string, photoId: string, action: 'list'|'append'|'update'|'remove'|'clear'|'duplicate'|'earlier'|'later', edits: NativeRetouchEdit[] = [], id: string|null = null) => invoke<NativeRetouchEdit[]>('native_retouch_edit',{input:{projectId,photoId,action,edits,id}}),
   /** The retouch view's photograph: `full` is the original's own resolution (ADR-0097), `fast` the first look. */
   preview: (projectId: string, photoId: string, before = false, quality: PreviewQuality = 'full') => invoke<RenderDto>('native_retouch_preview',{projectId,photoId,before,quality}),

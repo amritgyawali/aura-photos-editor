@@ -298,6 +298,8 @@ fn apply_from(
             crate::retouch_striae::apply(rgb, width, height, edit, &coverage);
         } else if edit.tool == Tool::FrequencyHeal {
             crate::retouch_clear::apply(rgb, width, height, edit, &coverage);
+        } else if edit.tool == Tool::Glare {
+            crate::glare::apply(rgb, width, height, edit, &coverage);
         } else if edit.tool == Tool::Defringe {
             crate::retouch_defringe::apply(rgb, width, height, edit, &coverage);
         } else if edit.tool == Tool::AcneClear {
@@ -738,7 +740,7 @@ fn apply_one(
                             edit.tool == Tool::Colorize,
                         );
                     }
-                    Tool::Mattify | Tool::Glare => {
+                    Tool::Mattify => {
                         let threshold = (luma(center) * 0.8).max(0.12);
                         let highlight =
                             ((lum - threshold) / (1.0 - threshold).max(0.1)).clamp(0.0, 1.0);

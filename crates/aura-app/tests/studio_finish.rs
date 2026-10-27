@@ -370,3 +370,130 @@ fn background_repair_refuses_a_frame_without_a_detected_subject() {
     .finish
     .is_identity());
 }
+
+#[test]
+fn background_repair_uses_the_saved_subject_matte_and_rechecks_a_changed_selection() {
+    let dir = tempfile::tempdir().expect("temp");
+    let path = dir.path().join("manual-subject.jpg");
+    std::fs::write(
+        &path,
+        encode_jpeg(
+            &Rgb8 {
+                width: 64,
+                height: 64,
+                data: vec![110; 64 * 64 * 3],
+            },
+            95,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let f = import(&path, dir);
+    let mut alpha = vec![0; 64 * 64];
+    for y in 16..48 {
+        for x in 16..48 {
+            alpha[y * 64 + x] = 255;
+        }
+    }
+    let mut finish = StudioFinish {
+        background_repair: 100.0,
+        subject_matte: Some(aura_recipe::retouch_tools::Matte::encode(
+            [0.0, 0.0, 1.0, 1.0],
+            64,
+            64,
+            &alpha,
+        )),
+        ..StudioFinish::default()
+    };
+    let save = |finish: &StudioFinish| {
+        finish_commands::save_studio_finish(
+            &f.state,
+            &SaveStudioFinishInput {
+                project_id: f.project.clone(),
+                photo_id: f.photo.clone(),
+                finish: finish.clone(),
+                label: None,
+            },
+        )
+    };
+    let saved = save(&finish).expect("an explicit subject selection must agree with the renderer");
+    finish.subject_matte = Some(aura_recipe::retouch_tools::Matte::encode(
+        [0.0, 0.0, 1.0, 1.0],
+        64,
+        64,
+        &vec![255; 64 * 64],
+    ));
+    assert!(
+        save(&finish).is_err(),
+        "changing the selection must recheck foreground/background support"
+    );
+    let unchanged = finish_commands::studio_finish(
+        &f.state,
+        &StudioFinishInput {
+            project_id: f.project,
+            photo_id: f.photo,
+        },
+    )
+    .unwrap();
+    assert_eq!(unchanged.recipe.recipe_hash, saved.recipe.recipe_hash);
+}
+
+fn save(f: &Fixture, finish: StudioFinish) -> finish_commands::StudioFinishDto {
+    finish_commands::save_studio_finish(
+        &f.state,
+        &SaveStudioFinishInput {
+            project_id: f.project.clone(),
+            photo_id: f.photo.clone(),
+            finish,
+            label: None,
+        },
+    )
+    .expect("save")
+}
+
+#[test]
+fn people_tools_on_a_photograph_with_no_face_say_so_and_background_tools_do_not() {
+    let dir = tempfile::tempdir().expect("temp");
+    let path = dir.path().join("no-one.jpg");
+    let blank = Rgb8 {
+        width: 64,
+        height: 64,
+        data: vec![110; 64 * 64 * 3],
+    };
+    std::fs::write(&path, encode_jpeg(&blank, 95).unwrap()).unwrap();
+    let f = import(&path, dir);
+    let mut body = StudioFinish::default();
+    body.body.slim = 40.0;
+    assert_eq!(
+        save(&f, body).notes,
+        vec![finish_commands::NO_PERSON_NOTE.to_string()]
+    );
+    let mut subject = StudioFinish::default();
+    subject.subject.exposure = 30.0;
+    assert_eq!(
+        save(&f, subject).notes,
+        vec![finish_commands::NO_PERSON_NOTE.to_string()]
+    );
+    // The background needs no person, so nothing is reported.
+    let mut scene = StudioFinish::default();
+    scene.scene.brightness = 30.0;
+    assert!(save(&f, scene).notes.is_empty());
+}
+
+#[test]
+fn people_tools_on_a_portrait_report_nothing() {
+    let dir = tempfile::tempdir().expect("temp");
+    let path = dir.path().join("portrait.jpg");
+    let p = portrait(&PortraitSpec::default());
+    let rgb = Rgb8 {
+        width: p.width,
+        height: p.height,
+        data: p.rgb.clone(),
+    };
+    std::fs::write(&path, encode_jpeg(&rgb, 95).expect("jpeg")).expect("write");
+    let f = import(&path, dir);
+    let mut body = StudioFinish::default();
+    body.body.slim = 40.0;
+    body.face.eye_size = 20.0;
+    assert!(save(&f, body).notes.is_empty());
+}

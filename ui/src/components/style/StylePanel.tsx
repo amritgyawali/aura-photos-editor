@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { asIpcError, style as styleApi } from '../../ipc/client';
 import type {
@@ -55,6 +55,12 @@ export function StylePanel({ projectId, onError, onBusyChange }: StylePanelProps
   const [comparison, setComparison] = useState<StyleComparisonDto[]>([]);
   const [candidateName, setCandidateName] = useState<string | null>(null);
   const [bucket, setBucket] = useState<string | null>(null);
+  const generation = useRef(0);
+  const selection = useRef<string | null>(null);
+  const operation = useRef(false);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [trainingBusy, setTrainingBusy] = useState(false);
+  useEffect(() => { onBusyChange?.(actionBusy || trainingBusy); return () => onBusyChange?.(false); }, [actionBusy, trainingBusy, onBusyChange]);
 
   const fail = useCallback(
     (error: unknown) => {
@@ -63,67 +69,75 @@ export function StylePanel({ projectId, onError, onBusyChange }: StylePanelProps
     [onError],
   );
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (preferredId?: string) => {
+    const ticket = ++generation.current;
     try {
-      const nextProfiles = await styleApi.listProfiles();
+      const [nextProfiles, nextStatus] = await Promise.all([
+        styleApi.listProfiles(), projectId ? styleApi.styleStatus(projectId) : Promise.resolve(null),
+      ]);
+      if (ticket !== generation.current) return;
       setProfiles(nextProfiles);
-      if (projectId) {
-        setStatus(await styleApi.styleStatus(projectId));
-      } else {
-        setStatus(null);
-      }
+      setStatus(nextStatus);
       // Prefer the project's active profile; fall back to whichever exists.
-      const preferred = selected ?? status?.active ?? nextProfiles[0]?.profileId ?? null;
+      const wanted = preferredId ?? selection.current;
+      const preferred = nextProfiles.some(profile => profile.profileId === wanted) ? wanted
+        : nextProfiles.find(profile => profile.profileId === nextStatus?.active)?.profileId ?? nextProfiles[0]?.profileId ?? null;
+      selection.current = preferred;
+      setSelected(preferred);
+      setReport(null); setBucket(null); setComparison([]);
       if (preferred) {
-        setSelected(preferred);
-        setReport(await styleApi.profileReport(preferred));
-      } else {
-        setReport(null);
+        const next = await styleApi.profileReport(preferred);
+        if (ticket === generation.current) setReport(next);
       }
     } catch (error) {
-      fail(error);
+      if (ticket === generation.current) fail(error);
     }
-    // `status` is deliberately not a dependency: it is written by this callback, and reading
-    // the previous value to choose a default is what makes the first load pick the active
-    // profile rather than the first one in the list.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fail, projectId, selected]);
+  }, [fail, projectId]);
 
   useEffect(() => {
+    selection.current = null; setSelected(null); setReport(null); setStatus(null); setComparison([]);
     void reload();
+    return () => { generation.current += 1; };
   }, [reload]);
 
   const compare = useCallback(
     async (candidateId: string) => {
-      if (!projectId) {
+      if (!projectId || operation.current) {
         return;
       }
+      operation.current = true; setActionBusy(true);
+      const ticket = generation.current;
       try {
-        setComparison(await styleApi.compareProfiles({ projectId, candidateId }));
+        const rows = await styleApi.compareProfiles({ projectId, candidateId });
+        if (ticket !== generation.current) return;
+        setComparison(rows);
         setCandidateName(
           profiles.find((profile) => profile.profileId === candidateId)?.name ?? candidateId,
         );
         onError(null);
       } catch (error) {
-        fail(error);
-      }
+        if (ticket === generation.current) fail(error);
+      } finally { operation.current = false; setActionBusy(false); }
     },
     [fail, onError, profiles, projectId],
   );
 
   const adopt = useCallback(
     async (profileId: string) => {
+      if (operation.current) return;
+      operation.current = true; setActionBusy(true);
+      const ticket = generation.current;
       try {
         await styleApi.adoptProfile({ profileId });
         if (projectId) {
           await styleApi.setProjectProfile({ projectId, profileId });
         }
+        if (ticket !== generation.current) return;
         onError(null);
-        setSelected(profileId);
-        await reload();
+        await reload(profileId);
       } catch (error) {
-        fail(error);
-      }
+        if (ticket === generation.current) fail(error);
+      } finally { operation.current = false; setActionBusy(false); }
     },
     [fail, onError, projectId, reload],
   );
@@ -146,11 +160,12 @@ export function StylePanel({ projectId, onError, onBusyChange }: StylePanelProps
           Profile
           <select
             value={selected ?? ''}
+            disabled={actionBusy || trainingBusy}
             onChange={(event) => {
               const next = event.target.value || null;
-              setSelected(next);
+              selection.current = next; setSelected(next); setReport(null); setBucket(null); setComparison([]);
               if (next) {
-                void styleApi.profileReport(next).then(setReport).catch(fail);
+                void reload(next);
               }
             }}
           >
@@ -164,17 +179,19 @@ export function StylePanel({ projectId, onError, onBusyChange }: StylePanelProps
       ) : null}
 
       <TeachMyAi
+        disabled={actionBusy}
+        key={projectId ?? 'no-project'}
         projectId={projectId}
-        onBusyChange={onBusyChange}
+        onBusyChange={setTrainingBusy}
         onTrained={(profileId) => {
-          setSelected(profileId);
-          void reload();
+          void reload(profileId);
         }}
-        onError={(message) => onError({ code: 'AURA-ML-5100', message })}
+        onError={(message) => onError(message ? { code: 'AURA-ML-5100', message } : null)}
       />
 
       <ProfileReport
         report={report}
+        disabled={actionBusy || trainingBusy}
         onAdopt={(profileId) => void adopt(profileId)}
         onCompare={(profileId) => void compare(profileId)}
         onSelectBucket={(key) => setBucket(key)}
