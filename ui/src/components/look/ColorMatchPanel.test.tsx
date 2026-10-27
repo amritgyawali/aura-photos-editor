@@ -154,3 +154,16 @@ it('cancels analysis on photo navigation while the component stays mounted', asy
   expect(api.cancelJob).toHaveBeenCalled();
   expect(screen.queryByTestId('colour-match-measurement')).toBeNull();
 });
+
+it('says how the match was made', async () => {
+  vi.mocked(colorMatch.prepare).mockResolvedValue({ ...analysis, fitting: { engine: 'reference-grade-transfer-v2', refinementCandidates: 0,
+    uniqueRenders: 2, cachedProposals: 0, transfer: { method: 'learnedEdit', learnedFrom: 'IMG_0001.CR3' } } });
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
+  await screen.findByRole('option', { name: reference.name });
+  fireEvent.click(screen.getByRole('button', { name: 'Analyse reference match' }));
+  expect((await screen.findByTestId('colour-match-method')).textContent).toContain('learned from IMG_0001.CR3');
+  vi.mocked(colorMatch.prepare).mockResolvedValue({ ...analysis, fitting: { engine: 'reference-grade-transfer-v2', refinementCandidates: 4,
+    uniqueRenders: 2, cachedProposals: 0, transfer: { method: 'appearance' } } });
+  fireEvent.click(screen.getByRole('button', { name: 'Analyse reference match' }));
+  await waitFor(() => expect(screen.getByTestId('colour-match-method').textContent).toContain('Import the original'));
+});

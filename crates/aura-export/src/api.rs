@@ -356,11 +356,16 @@ impl<'a> ExportPass<'a> {
                 // 4e. Write, read back, hash. A failure here stops the job.
                 let path = root.join(&planned.rel_path);
                 let written = write_and_verify(&path, &bytes, job.verify)?;
-                reasons.push(DeliveryReason::plain(if written.verified {
-                    DeliveryCode::WrittenAndVerified
-                } else {
-                    DeliveryCode::WrittenUnverified
-                }));
+                // Keep delivery facts ahead of optional processing disclosures: the bounded
+                // reason list is also the store's source for verified sidecar counts.
+                reasons.insert(
+                    0,
+                    DeliveryReason::plain(if written.verified {
+                        DeliveryCode::WrittenAndVerified
+                    } else {
+                        DeliveryCode::WrittenUnverified
+                    }),
+                );
                 if written.verified {
                     verified_count += 1;
                 }
@@ -369,11 +374,15 @@ impl<'a> ExportPass<'a> {
                 // 4f. The sidecar, when the set asked for one.
                 let frame = self.field.frame(planned.image);
                 if set.sidecar {
-                    if let Some(recipe) = &frame.recipe_json {
+                    if let Some(recipe) = sharpened
+                        .recipe_json
+                        .as_deref()
+                        .or(frame.recipe_json.as_deref())
+                    {
                         let sidecar_path =
                             path.with_extension(aura_core::contract::delivery::SIDECAR_EXT);
                         write_and_verify(&sidecar_path, recipe.as_bytes(), job.verify)?;
-                        reasons.push(DeliveryReason::plain(DeliveryCode::SidecarWritten));
+                        reasons.insert(0, DeliveryReason::plain(DeliveryCode::SidecarWritten));
                         sidecars += 1;
                     }
                 }

@@ -109,6 +109,7 @@ mod tests {
             data: Samples::Eight(data),
             colour: DeliveryColour::Srgb,
             render_hash: "0".repeat(64),
+            recipe_json: None,
         }
     }
 
@@ -154,6 +155,7 @@ mod tests {
             data: Samples::Eight(vec![0; 5]),
             colour: DeliveryColour::Srgb,
             render_hash: "0".repeat(64),
+            recipe_json: None,
         };
         assert!(encode(&bad, 90, &MetadataPolicy::default()).is_err());
     }
@@ -166,6 +168,7 @@ mod tests {
             data: Samples::Sixteen(vec![40000_u16; 8 * 8 * 3]),
             colour: DeliveryColour::Srgb,
             render_hash: "0".repeat(64),
+            recipe_json: None,
         };
         let (bytes, _) = encode(&src, 90, &MetadataPolicy::default()).unwrap();
         let mut d = zune_jpeg::JpegDecoder::new(&bytes[..]);

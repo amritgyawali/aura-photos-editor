@@ -499,6 +499,7 @@ fn encode_jpeg(image: &aura_raw::codec::Rgb8) -> aura_core::AuraResult<Vec<u8>> 
         data: aura_export::read::Samples::Eight(image.data.clone()),
         colour: aura_core::contract::delivery::DeliveryColour::Srgb,
         render_hash: String::new(),
+        recipe_json: None,
     };
     let policy = aura_core::contract::delivery::MetadataPolicy::default();
     aura_export::jpeg::encode(&rendered, 95, &policy).map(|(bytes, _)| bytes)

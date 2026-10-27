@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, asIpcError, inTauri } from '../../ipc/client';
-import { colorMatch, DEFAULT_MATCH_CONTROLS, pickColorReference, pickColorReferences, type ColorMatchControls,
+import { type MatchMethod, colorMatch, DEFAULT_MATCH_CONTROLS, pickColorReference, pickColorReferences, type ColorMatchControls,
   type ColorMatchReport, type ColorReference, type ReferenceMetadata } from '../../ipc/colorMatch';
 import { matchColorCollection, type ColorMatchOutcome } from './matchColorCollection';
 import { FINE_MATCH_FIELDS } from '../../ipc/colorMatchDetails';
@@ -11,6 +11,12 @@ import { ReferenceLibraryManager } from './ReferenceLibraryManager';
 const SLIDERS = [
   ['amount', 'Match amount'], ['tone', 'Tone match'], ['color', 'Colour match'], ['whiteBalance', 'Warmth match'],
 ] as const;
+
+function methodSentence(method: MatchMethod, learnedFrom?: string): string {
+  if (method === 'sameFrame') return 'This photo is the reference\'s own frame, so its edit was measured directly.';
+  if (method === 'learnedEdit') return `The edit was learned from ${learnedFrom ?? 'the reference\'s original'} and applied to this photo unchanged.`;
+  return 'No original of this reference is in the collection, so its colour and tone were matched part of the way. Import the original the reference was edited from into this collection to apply the exact edit.';
+}
 
 export function ColorMatchPanel({ photoId, projectId, disabled, revision, onApply }: {
   photoId: string; projectId?: string; disabled: boolean; revision?: string;
@@ -205,6 +211,7 @@ export function ColorMatchPanel({ photoId, projectId, disabled, revision, onAppl
       <p data-testid="colour-match-measurement">Appearance distance: {report.beforeDistance.toFixed(2)} → {report.afterDistance.toFixed(2)}.
         {' '}{report.fullResolutionChecked ? 'Checked on native-resolution renders.' : 'Analysis preview; apply to check native-resolution renders.'}
         {report.protectedFields > 0 && ` ${report.protectedFields} manual fields protected.`}</p>
+      {report.fitting?.transfer?.method && <p data-testid="colour-match-method">{methodSentence(report.fitting.transfer.method, report.fitting.transfer.learnedFrom)}</p>}
     </>}
     {busy && <><p role="status">{message ?? 'Measuring colour and checking the image…'}</p>
       <button type="button" onClick={() => { stopped.current = true; if (job.current) void api.cancelJob(job.current).catch(cause => setError(asIpcError(cause).message)); }}>Stop colour matching</button></>}

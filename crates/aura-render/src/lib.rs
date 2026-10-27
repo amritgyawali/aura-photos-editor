@@ -121,6 +121,7 @@ pub mod perf;
 pub mod portrait;
 pub mod portrait_light;
 pub mod profiles;
+pub mod reference_grade;
 pub mod restore;
 pub mod retouch;
 mod retouch_acne;

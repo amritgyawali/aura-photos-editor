@@ -8,10 +8,17 @@ export type ColorReference = {
   group?: string; favorite?: boolean; defaultControls?: ColorMatchControls; thumbnail?: string;
 };
 export type ReferenceMetadata = { name?: string; group?: string; favorite?: boolean; defaultControls?: ColorMatchControls };
+/** How a match was made: the reference's own frame, an edit learned from its original, or appearance only. */
+export type MatchMethod = 'sameFrame' | 'learnedEdit' | 'appearance';
+export type TransferDiagnostics = { method?: MatchMethod; learnedFrom?: string; contentSimilarity?: number };
 export type ColorMatchReport = {
   sessionId: string; photoId: string; reference: ColorReference; controls: ColorMatchControls;
   matchedRegions: string[]; beforeDistance: number; afterDistance: number; changed: number;
   protectedFields: number; fullResolutionChecked: boolean; current: boolean;
+  fitting?: { engine: string; refinementCandidates: number; uniqueRenders: number; cachedProposals: number;
+    gradeCandidates?: number; nativeCandidateChecked?: boolean; nativeBacktrackFactor?: number;
+    structureSimilarity?: number | null; regularizationWeight?: number; transfer?: TransferDiagnostics };
+  referenceMonochrome?: boolean;
 };
 export const colorMatch = {
   list: () => invoke<ColorReference[]>('list_color_references'),

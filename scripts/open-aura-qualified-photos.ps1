@@ -37,6 +37,22 @@ if (Test-Path -LiteralPath $advancedManifest) {
         $qualificationCatalog = $advancedQualification
     }
 }
+$comprehensiveQualification = Join-Path $qualificationRoot 'output\aura-comprehensive-final-2026-10-22\catalog\catalog.sqlite'
+$comprehensiveManifest = Join-Path $qualificationRoot 'output\aura-comprehensive-final-2026-10-22\results.json'
+if (Test-Path -LiteralPath $comprehensiveManifest) {
+    $comprehensiveEvidence = Get-Content -LiteralPath $comprehensiveManifest -Raw | ConvertFrom-Json
+    if ($comprehensiveEvidence.completed -and $comprehensiveEvidence.originalsUnchanged -and (Test-Path -LiteralPath $comprehensiveQualification)) {
+        $qualificationCatalog = $comprehensiveQualification
+    }
+}
+$sidecarQualification = Join-Path $qualificationRoot 'output\aura-comprehensive-sidecars-retry-final-2026-10-22\catalog\catalog.sqlite'
+$sidecarManifest = Join-Path $qualificationRoot 'output\aura-comprehensive-sidecars-retry-final-2026-10-22\results.json'
+if (Test-Path -LiteralPath $sidecarManifest) {
+    $sidecarEvidence = Get-Content -LiteralPath $sidecarManifest -Raw | ConvertFrom-Json
+    if ($sidecarEvidence.completed -and $sidecarEvidence.originalsUnchanged -and $sidecarEvidence.sidecarsVerified -and (Test-Path -LiteralPath $sidecarQualification)) {
+        $qualificationCatalog = $sidecarQualification
+    }
+}
 if (-not (Test-Path -LiteralPath $qualificationExe) -or -not (Test-Path -LiteralPath $qualificationCatalog)) {
     throw 'Build AURA and complete the supplied-photo qualification first.'
 }

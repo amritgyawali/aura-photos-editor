@@ -29,6 +29,7 @@ fn frame(sixteen: bool, colour: DeliveryColour) -> Rendered {
         },
         colour,
         render_hash: "base".into(),
+        recipe_json: None,
     }
 }
 

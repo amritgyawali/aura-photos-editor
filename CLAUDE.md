@@ -146,6 +146,7 @@ Never load two phase files into one session.
 | How a release ships | `docs/release-process.md` |
 | What leaves the machine, and what does not | `docs/privacy.md` |
 | Reference-look decisions | `docs/adr/ADR-0063-reference-look-matching.md` |
+| Reference colour matching: learned edit from the reference's original, appearance by measured trust, the `reference_grade_v1` stage | `docs/adr/ADR-0160-reference-colour-matching-by-learned-edit-and-distribution-transfer.md`, `crates/aura-recipe/src/reference_grade.rs`, `crates/aura-render/src/reference_grade.rs`, `crates/aura-app/src/color_match/{transfer,edit,matcher}.rs`, harnesses `one_shoot_one_look` (`AURA_GRADE_SHOOT`) and `real_expert_edits_matched_across_photographs` (`AURA_GRADE_PAIRS`) fed by `crates/aura-app/tests/reference_grade_pairs.rs` |
 | What matching a look does, in the product's own words | `docs/match-a-look.md` |
 | Look evaluation gates | `tests/eval/look_eval.rs` |
 | Edit profiles (the start screen's looks, validated JSON) | `crates/aura-app/config/edit_profiles.json` |

@@ -43,6 +43,8 @@ fn seed(state: &AppState) {
     };
     for (id, name) in [("a".repeat(64), "Warm"), ("b".repeat(64), "Cool")] {
         let reference = Reference {
+            small_rgb: Vec::new(),
+            achromatic: false,
             engine: ENGINE.into(),
             summary: ReferenceSummary {
                 id: id.clone(),

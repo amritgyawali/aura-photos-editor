@@ -1,5 +1,9 @@
 # Matching a look
 
+For one uploaded edited photo and a new batch, use the
+[single-reference colour matching workflow](reference-grade-matching.md).
+The gallery-derived workflow below has separate measurement and coverage rules.
+
 You have seen an account whose photographs look the way you want yours to look. This is how AURA
 gets you there, and what it will and will not do on the way.
 

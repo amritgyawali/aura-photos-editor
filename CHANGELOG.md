@@ -2,6 +2,70 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Reference colour matching by learned edit - 2026-10-23
+
+- Learn the exact edit from the reference's original - the photo being matched, or one in
+  the collection named like the reference - fitted from statistics and refined pixel by pixel,
+  and apply that edit to every other photo of the batch (ADR-0160).
+- Without the original, match appearance part of the way by measured trust per component,
+  never moving a photo away from the reference's look; the panel says which path was taken.
+- Keep two axes per photo: a measuring axis consistent between a photo and its edit, and a
+  strict neutral axis whose evidence alone decides how much cast crosses between scenes.
+- Regularise the chroma curve and lightness zones; Apply reports rather than refuses.
+- Real-photo harnesses: `one_shoot_one_look` (`AURA_GRADE_SHOOT`) and
+  `real_expert_edits_matched_across_photographs` (`AURA_GRADE_PAIRS`), fed by
+  `tests/reference_grade_pairs.rs`. See [ADR-0160](docs/adr/ADR-0160-reference-colour-matching-by-learned-edit-and-distribution-transfer.md).
+
+## Robust reference-grade estimation - 2026-10-23
+
+- Bound spatial samples across image aspect ratios and avoid fixed-grid texture aliasing.
+- Improve neutral-axis estimation and preserve sampled selective-colour details.
+- Retain the best intermediate fit, preserve identity for matching measurements,
+  and check cancellation between fitting updates.
+- Version cached measurements and surface stale references with refresh instructions.
+  See the [reference-grade workflow](docs/reference-grade-matching.md) for limits.
+
+## Adaptive reference colour fitting - 2026-10-22
+
+- Search signed corrections, individual curve anchors and supported colour bands;
+  fit separate shadow, midtone and highlight casts through native grading wheels.
+- Add reversible monochrome-reference handling with per-person tone and cast guards.
+- Use structure evidence and edit regularization to limit scene-driven overfitting.
+  Check proposals on native renders and backtrack before publishing analysis.
+- Preserve old sessions and descriptor-only portable libraries. Reject applied
+  strengths that worsen native appearance distance beyond numerical tolerance.
+- Record real-photo comparisons, including the rejected unregularized prototype,
+  in the [adaptive matcher report](docs/reports/AURA-adaptive-colour-matching-2026-10-22.md).
+  Universal exact colour/tone matching remains unverified.
+
+## Single-image reference workspace and colour transfer tests - 2026-10-22
+
+- Open single-image reference matching directly in **Match a look**, beside the
+  existing preview and filmstrip. Preserve the editor's saved work and panel state.
+- Download and import two original-resolution references, match each to two supplied
+  photo previews, verify exports and run a separate native CR3/reference test.
+- Record 18 controlled known-grade comparisons and remaining split-tone and
+  monochrome limitations in the [colour-match report](docs/reports/AURA-reference-colour-match-2026-10-22.md).
+  Exact grade cloning and Evoto parity remain unverified.
+- Verify delivered colour independently, adjust four matches and export a native
+  4480 × 6720 CR3 as JPEG/PNG. Lossless files preserve the applied treatment exactly;
+  [the export report](docs/reports/AURA-exported-colour-verification-2026-10-22.md)
+  retains the remaining reference-colour, tone and white-balance differences.
+
+## Colour history, recipe sidecar repairs and comprehensive desktop audit - 2026-10-22
+
+- Keep repeated Levels, selective-colour and local-colour saves out of Undo
+  history, including edits below canonical recipe precision. Retain validation
+  and stale-revision protection.
+- Write requested recipe sidecars from the exact rendered edit, retain the snapshot
+  through resizing and sharpening, and preserve accurate sidecar delivery counts.
+- Add a regression for identical and subprecision colour saves and an isolated
+  desktop audit of older tools, semantic selections, material tools, reference
+  management and export formats.
+- Reopen the 27 supplied RAW edits in the rebuilt application and record
+  per-tool coverage, original-file hashes and export verification in the
+  [comprehensive report](docs/reports/AURA-comprehensive-test-2026-10-22.md).
+
 ## Advanced methods and existing-tool repairs - 2026-10-22
 
 - Add 25 further colour, 25 spatial and 25 selection mechanisms; each catalogue
