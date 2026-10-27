@@ -30,6 +30,7 @@ pub(crate) mod gallery_fit;
 mod grade;
 mod library;
 mod matcher;
+pub(crate) mod original;
 pub use matcher::TransferDiagnostics;
 mod refine;
 mod transfer;

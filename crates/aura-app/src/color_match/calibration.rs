@@ -154,10 +154,24 @@ pub(super) fn fit(
     edited: &Rgb8,
     cancel: &CancelToken,
 ) -> AuraResult<(CalibratedLook, CalibrationReport)> {
+    fit_pairs(&[(original, edited)], cancel)
+}
+
+/// One look learned from several original/edited pairs at once. Each pair shows the edit on the
+/// colours of its own scene; pooled, they show it on more of the colours a batch will contain, so
+/// less of the batch depends on how the cubic extrapolates. Every pair must correspond.
+pub(super) fn fit_pairs(
+    pairs_in: &[(&Rgb8, &Rgb8)],
+    cancel: &CancelToken,
+) -> AuraResult<(CalibratedLook, CalibrationReport)> {
     check_cancel(cancel)?;
-    let rows = pairs(original, edited)?;
-    if !content::similarity(&content::thumbnail(edited), original).is_some_and(|s| s >= 0.9) {
-        return Err(invalid("Choose the original of this exact edited photo, with the same framing and orientation."));
+    let mut rows = Vec::new();
+    for (original, edited) in pairs_in {
+        let these = pairs(original, edited)?;
+        if !content::similarity(&content::thumbnail(edited), original).is_some_and(|s| s >= 0.9) {
+            return Err(invalid("Choose the original of this exact edited photo, with the same framing and orientation."));
+        }
+        rows.extend(these);
     }
     let mut cells = [0_usize; 64];
     for row in rows.iter().filter(|row| !row.validation) {

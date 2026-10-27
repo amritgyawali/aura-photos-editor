@@ -151,6 +151,7 @@ Never load two phase files into one session.
 | Edit profiles (the start screen's looks, validated JSON) | `crates/aura-app/config/edit_profiles.json` |
 | How edit profiles adapt, and how learned ones are measured | `docs/edit-profiles.md` |
 | Lightroom panel parity decisions | `docs/adr/ADR-0070-lightroom-panel-parity.md` |
+| A reference look learned from its own original found in the collection; real-photo look-transfer harness (ignored, `AURA_LOOK_PHOTOS`, `AURA_LOOK_PAIR`, `AURA_LOOK_CALIB`) and the camera-file check (ignored, `AURA_ORIGINAL_SHOOT`) | `docs/adr/ADR-0161-learn-a-reference-look-from-its-original-in-the-collection.md`, `crates/aura-app/src/color_match/original.rs`, `learn_original` in `crates/aura-app/src/reference_style.rs`, `crates/aura-app/src/color_match/transfer/tests/looks.rs`, `crates/aura-app/tests/reference_original_discovery.rs` |
 | Every Lightroom feature and where it lives in AURA | `docs/lightroom-parity.md` |
 | Learning a profile from RAW before/after pairs | `ml/edit-profiles/fetch_fivek_pairs.py` + `crates/aura-app/tests/profile_fit.rs` |
 | One-click intelligent editing and step history | `docs/adr/ADR-0081-intelligent-auto-edit-and-step-history.md`, `crates/aura-app/src/smart_edit.rs`, `crates/aura-app/src/portrait_features.rs` |

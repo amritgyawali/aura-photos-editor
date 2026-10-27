@@ -8,6 +8,7 @@ use aura_core::AuraResult;
 use aura_raw::codec::Rgb8;
 use aura_recipe::{schema, EditSource, Recipe};
 use aura_render::Frame;
+use serde::{Deserialize, Serialize};
 
 use super::calibration;
 use super::{appearance, check_cancel, content, grade, refine, rendered, skin_guard, AppState};
@@ -52,6 +53,28 @@ pub(crate) fn calibrate(
     calibration::fit(&baseline, &edited.image, cancel)
 }
 
+/// How much a calibrated look may change people's skin and the clipped area. The defaults are the
+/// pilot limits every estimate is held to. A look learned from the photographer's own edit of a
+/// frame in the collection may move them as far as that edit moved them on its original, because
+/// the change is the photographer's choice rather than an inference.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct Allowance {
+    /// The largest skin change, in multiples of the pilot limits.
+    pub skin: f32,
+    /// The largest increase in the fraction of clipped pixels.
+    pub clipping: f32,
+}
+
+impl Default for Allowance {
+    fn default() -> Self {
+        Self {
+            skin: 1.0,
+            clipping: 0.01,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct Request<'a> {
     pub full: &'a Frame,
@@ -62,6 +85,8 @@ pub(crate) struct Request<'a> {
     pub monochrome: bool,
     pub strength: f32,
     pub cancel: &'a CancelToken,
+    /// Applies to a calibrated look only; parameter fits keep the pilot limits.
+    pub allowance: Allowance,
 }
 
 #[derive(Debug)]
@@ -380,10 +405,15 @@ pub(crate) fn apply_calibrated(
         let image = rendered(state, request.full, &proposal)?;
         let distance = calibrated_distance(&native, &image, &evaluator);
         let readings = appearance::readings(&image, &regions);
+        let skin_ok = if request.monochrome {
+            skin_guard(&before_regions, &readings, true)
+        } else {
+            appearance::skin_change(&before_regions, &readings) <= request.allowance.skin
+        };
         if distance.is_finite()
             && distance + 1e-4 < after
-            && appearance::clipped(&image) <= clipped + 0.01
-            && skin_guard(&before_regions, &readings, request.monochrome)
+            && appearance::clipped(&image) <= clipped + request.allowance.clipping
+            && skin_ok
         {
             best = proposal;
             after = distance;

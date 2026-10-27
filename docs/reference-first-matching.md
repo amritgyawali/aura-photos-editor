@@ -23,6 +23,32 @@ palette. Local retouch, changed illumination, clipped detail and colours absent
 from the pair remain limitations. Chosen profiles intentionally stack beneath
 the learned transformation, and skin/highlight guards can reduce its strength.
 
+You often don't need to pick the original yourself. When you apply one edited
+photo to a collection that contains its camera file, AURA finds that file and
+learns the edit from it. A file counts as the original when the edited photo's
+name starts with its name (`989A2698-Edit.jpg` and `989A2698.CR3`) or when it
+was taken in the same second. AURA then learns the edit from the two photos,
+exactly as if you had chosen the pair, and applies that same edit to every
+photo in the collection. Each result says which photo the look was learned
+from. A reference folder works the same way: every edited photo whose original
+is in the collection is used, up to eight, and they are learned together as one
+edit. More of your own edited frames cover more of a wedding's colours, which
+left about 11 % of the difference instead of 15 % in the same tests. A cropped or retouched export, or a different frame with the same name,
+fails the pixel checks, and AURA estimates the look from the edited photo alone
+instead. Measured on real photos, learning from the original leaves about 15 %
+of the colour difference that the edited photo alone leaves at about 84 %
+([ADR-0161](adr/ADR-0161-learn-a-reference-look-from-its-original-in-the-collection.md)).
+On five wedding camera files with a Lightroom-style preset, it brought the
+average difference from 3.56 to 1.47, where the edited photo alone reached
+2.51. Highlights, Shadows and Clarity work locally, so a single learned colour
+operation can only carry them part of the way to other frames. Because the
+look is your own edit, it may change skin and highlights as much as your edit
+did on its original, rather than being held to the stricter limits that
+protect skin from an estimate. If a photo looked like the original but could
+not be used, the result says why. So if you want the batch to match as closely
+as possible, include the edited frame's original in the collection, export it
+uncropped, and keep its file name.
+
 The calibration is part of the saved recipe. Repeat application replaces it,
 zero strength removes it exactly, and switching to an ordinary reference clears
 the previous calibration. Protected recipe fields, Undo/Redo, cancellation and

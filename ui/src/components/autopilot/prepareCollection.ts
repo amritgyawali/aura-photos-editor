@@ -76,6 +76,7 @@ export async function prepareCollection(projectId: string, stopped: () => boolea
     if (stopped()) break;
     onProgress(`Editing photo ${index + 1} of ${photos.length}: ${photo.fileName}`);
     let result: PreparedPhoto;
+    let learnedFrom: string | undefined;
     try {
       // A profile already contains the measured correction, so it replaces the plain enhancement.
       const adaptations: string[] = [];
@@ -92,9 +93,10 @@ export async function prepareCollection(projectId: string, stopped: () => boolea
       checkStop();
       if (reference) {
         onProgress(`Matching reference style ${index + 1} of ${photos.length}: ${photo.fileName}`);
-        if (cancelId) await referenceStyle.apply(photo.id, reference.analysis.id, reference.strength, profile ?? null, cancelId);
-        else if (profile) await referenceStyle.apply(photo.id, reference.analysis.id, reference.strength, profile);
-        else await referenceStyle.apply(photo.id, reference.analysis.id, reference.strength);
+        const matched = cancelId ? await referenceStyle.apply(photo.id, reference.analysis.id, reference.strength, profile ?? null, cancelId)
+          : profile ? await referenceStyle.apply(photo.id, reference.analysis.id, reference.strength, profile)
+          : await referenceStyle.apply(photo.id, reference.analysis.id, reference.strength);
+        learnedFrom = matched?.learnedFrom;
         checkStop();
       }
       // Drain both reads before moving on, even if one fails, to bound native render work.
@@ -106,7 +108,9 @@ export async function prepareCollection(projectId: string, stopped: () => boolea
       if (preview.status === 'rejected') throw preview.reason;
       const look = profile ? `${profileName ?? profile.profileId} profile at ${Math.round(profile.strength * 100)}%` : 'Local exposure, contrast, highlights and shadows';
       const detail = reference
-        ? `${profile ? `${look}, then m` : 'M'}atched to ${reference.analysis.origin} at ${Math.round(reference.strength * 100)}% strength. Tone, white balance and color fit checked at native resolution. Manual settings protected. ${adaptations.join(' ')}`
+        ? `${profile ? `${look}, then m` : 'M'}atched to ${reference.analysis.origin} at ${Math.round(reference.strength * 100)}% strength. ${learnedFrom
+          ? `The edit was learned from your own edit of ${learnedFrom} and applied as the same color and tone operation.`
+          : 'Tone, white balance and color fit checked at native resolution.'} Manual settings protected. ${adaptations.join(' ')}`
         : `${look} saved. Preview rendered. Manual settings protected.${adaptations.length ? ` ${adaptations.join(' ')}` : ''}`;
       result = { photoId: photo.id, name: photo.fileName, outcome: 'ready', detail, settings: savedSettings(saved.value) };
     } catch (error) {

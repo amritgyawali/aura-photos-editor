@@ -133,7 +133,9 @@ export type ReferenceAnalysis = {
   calibration?: { trainingSamples: number; validationSamples: number; meanError: number; p95Error: number; occupiedColorCells: number };
 };
 export type ReferenceSelection = { analysis: ReferenceAnalysis; strength: number };
-export type ApplyReport = { changed: number; beforeDistance: number; afterDistance: number; protectedFields: number };
+export type ApplyReport = { changed: number; beforeDistance: number; afterDistance: number; protectedFields: number;
+  /** The reference's own original, found in the collection, that the look was learned from. */
+  learnedFrom?: string };
 
 export type HslShift = { h: number; s: number; l: number };
 export type ProfileAdjust = {

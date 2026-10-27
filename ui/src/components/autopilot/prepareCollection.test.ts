@@ -95,6 +95,16 @@ it('applies the selected reference to each new photo before rendering it', async
   expect(results.every(photo => photo.outcome === 'ready' && photo.detail.includes('@reference'))).toBe(true);
 });
 
+it('says when the look was learned from the reference photo\'s own original', async () => {
+  vi.mocked(referenceStyle.apply).mockResolvedValue({ changed: 3, learnedFrom: '989A2698.CR3' } as never);
+  const selection = { analysis: { id: 'style', origin: 'Studio look' }, strength: 1 };
+  const results = await prepareCollection('project', () => false, vi.fn(), vi.fn(), selection as never);
+  expect(results.every(photo => photo.detail.includes('learned from your own edit of 989A2698.CR3'))).toBe(true);
+  vi.mocked(referenceStyle.apply).mockResolvedValue({} as never);
+  const estimated = await prepareCollection('project', () => false, vi.fn(), vi.fn(), selection as never);
+  expect(estimated.some(photo => photo.detail.includes('learned from'))).toBe(false);
+});
+
 it('passes the active cancellation job into each native reference fit', async () => {
   const selection = { analysis: { id: 'style', origin: '@reference' }, strength: 0.8 };
   await prepareCollection('project', () => false, vi.fn(), vi.fn(), selection as never,

@@ -2,6 +2,18 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Reference looks learned from their own original - 2026-10-23
+
+- Match a look with one edited photo now finds that photo's camera original in the collection
+  (by file name or capture time, confirmed by pixels) and learns the edit from the pair, so every
+  photo receives the photographer's actual colour and tone operation instead of an estimate.
+- A reference folder learns one look from every edited photo whose original is in the collection
+  (up to eight pairs pooled), falling back to the best single pair when the pooled fit is refused.
+- Real-photo measurement harness for reference matching: twelve known looks across 31 real
+  scenes, with held-out photos. The edited reference alone leaves 84 % of the colour difference;
+  learning from its original leaves 15 %. See
+  [ADR-0161](docs/adr/ADR-0161-learn-a-reference-look-from-its-original-in-the-collection.md).
+
 ## Calibrated original/edited reference transfer - 2026-10-23
 
 - Learn a shared global RGB transformation from an aligned original/edited pair

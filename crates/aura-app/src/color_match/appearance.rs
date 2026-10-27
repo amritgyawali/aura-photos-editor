@@ -163,6 +163,32 @@ pub(super) fn distance(reference: &[Region], actual: &[Region]) -> f32 {
     }
 }
 
+/// How far each person's skin moved, as the largest of [`skin_preserved`]'s five readings
+/// divided by its limit: at most one is within the pilot limits. A person who is no longer
+/// found is an unbounded change.
+pub(super) fn skin_change(before: &[Region], after: &[Region]) -> f32 {
+    before
+        .iter()
+        .filter(|r| r.name.ends_with("skin"))
+        .map(|a| {
+            after
+                .iter()
+                .find(|b| b.name == a.name)
+                .map_or(f32::INFINITY, |b| {
+                    [
+                        a.appearance.shadow.distance(b.appearance.shadow) / 5.0,
+                        a.appearance.mid.distance(b.appearance.mid) / 5.0,
+                        a.appearance.high.distance(b.appearance.high) / 5.0,
+                        (a.appearance.chroma_p50 - b.appearance.chroma_p50).abs() * 128.0 / 5.0,
+                        (a.appearance.tone.p50 - b.appearance.tone.p50).abs() / 0.12,
+                    ]
+                    .into_iter()
+                    .fold(0.0, f32::max)
+                })
+        })
+        .fold(0.0, f32::max)
+}
+
 pub(super) fn skin_preserved(before: &[Region], after: &[Region]) -> bool {
     before.iter().filter(|r| r.name.ends_with("skin")).all(|a| {
         after.iter().find(|b| b.name == a.name).is_some_and(|b| {
