@@ -1,6 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { api, asIpcError, inTauri, pickPhotoFolder } from '../../ipc/client';
 import { referenceStyle, type ReferenceSelection } from './referenceStyle';
+import { pickColorReference } from '../../ipc/colorMatch';
 
 type Props = {
   selection: ReferenceSelection | null;
@@ -25,17 +26,27 @@ export function InstagramStyle({ selection, disabled, onChange, onBusyChange, on
   const cancelId = useRef('');
 
   /** Measure reference photos the photographer already has: a folder, or their Instagram data export. */
-  const analyse = async (fromExport: boolean) => {
+  const analyse = async (fromExport: boolean, single = false, paired = false) => {
     if (running.current || disabled || !inTauri()) return;
     running.current = true; stopped.current = false;
     cancelId.current = `reference-${crypto.randomUUID()}`;
     setBusy(true); onBusyChange(true); setError(null);
-    setStatus(fromExport ? 'Choose the unzipped folder Instagram sent you.' : 'Choose a folder of reference photos.');
+    setStatus(single ? 'Choose an edited reference photo.' : fromExport ? 'Choose the unzipped folder Instagram sent you.' : 'Choose a folder of reference photos.');
     try {
-      const folder = await pickPhotoFolder(fromExport ? 'Choose your unzipped Instagram data export' : 'Choose a folder of at least 8 reference photos');
+      let original: string | undefined;
+      if (paired) {
+        setStatus('Choose the original, unedited version of your reference.');
+        original = await pickColorReference('Choose the original unedited reference photo') ?? undefined;
+        if (!original || stopped.current) { setStatus('Stopped. Your previous style is unchanged.'); return; }
+        setStatus('Now choose the edited version of that exact photo, with the same framing.');
+      }
+      const folder = single ? await pickColorReference()
+        : await pickPhotoFolder(fromExport ? 'Choose your unzipped Instagram data export' : 'Choose a folder of at least 8 reference photos');
       if (!folder || stopped.current) { setStatus('Stopped. Your previous style is unchanged.'); return; }
-      setStatus('Measuring white balance, tonal range, contrast and color in the reference photos…');
-      const analysis = await referenceStyle.analyse(address.trim(), folder, cancelId.current, fromExport);
+      setStatus('Measuring tonal curves, color palettes, hue relationships and lighting in the reference photos…');
+      const analysis = original
+        ? await referenceStyle.analyse(address.trim(), folder, cancelId.current, fromExport, original)
+        : await referenceStyle.analyse(address.trim(), folder, cancelId.current, fromExport);
       if (stopped.current) { setStatus('Stopped. Your previous style is unchanged.'); return; }
       onChange({ analysis, strength: 0.8 });
       setStatus(`Style ready from ${analysis.measured} photos. New imports will use this reference automatically.`);
@@ -55,6 +66,8 @@ export function InstagramStyle({ selection, disabled, onChange, onBusyChange, on
       <label htmlFor="reference-name">Whose look is this?{compact ? ' (optional)' : ' (optional, for your own reference)'}</label>
       <input id="reference-name" type="text" value={address} onChange={event => setAddress(event.target.value)} placeholder="A photographer, a magazine, your own best work…" />
       <div className="reference-options">
+        <button type="button" className="is-primary" disabled={!inTauri()} onClick={() => void analyse(false, true)}>Upload edited reference photo</button>
+        <button type="button" disabled={!inTauri()} onClick={() => void analyse(false, true, true)}>Use original + edited pair</button>
         <button type="button" className="is-primary" disabled={!inTauri()} onClick={() => void analyse(false)}>Choose reference photos</button>
         <button type="button" disabled={!inTauri()} onClick={() => void analyse(true)}>Use my Instagram data export</button>
       </div>
@@ -65,13 +78,16 @@ export function InstagramStyle({ selection, disabled, onChange, onBusyChange, on
     {analysis && selection && <div className="reference-ready">
       <div className="reference-palette" aria-label="Measured reference palette">{analysis.colors.map(color => <span key={color} style={{ backgroundColor: color }} title={color} />)}</div>
       <div><span className="eyebrow">REFERENCE READY</span><h2>{analysis.origin || 'Your reference style'}</h2><p>{analysis.measured} photos analyzed · {analysis.skipped} unreadable</p></div>
+      {analysis.calibration && <p>Color transformation learned from your original and edited reference. Each photo uses this shared grade, with checks to protect skin and highlights.</p>}
+      {!analysis.calibration && <p>Adapts the reference’s tone, color and hue to each photo. Look strength controls how much of the result you apply.</p>}
       <div className="reference-traits"><span>{analysis.brightness < 0.4 ? 'Deep tones' : analysis.brightness > 0.65 ? 'Light tones' : 'Balanced tones'}</span><span>{analysis.contrast > 0.7 ? 'Strong contrast' : 'Soft contrast'}</span><span>{analysis.warmth > 3 ? 'Warm color lean' : analysis.warmth < -3 ? 'Cool color lean' : 'Neutral color lean'}</span></div>
       <label className="reference-strength">Look strength <output>{Math.round(selection.strength * 100)}%</output><input type="range" min={0} max={100} value={Math.round(selection.strength * 100)} disabled={disabled || busy} onChange={event => onChange({ ...selection, strength: Number(event.target.value) / 100 })} /></label>
       <div className="import-actions"><button type="button" className="is-primary" disabled={disabled || busy} onClick={onAddPhotos}>Choose your photos</button>
         {onApply && <button type="button" disabled={disabled || busy} onClick={onApply}>Apply to this collection</button>}
         <button type="button" disabled={disabled || busy} onClick={() => onChange(null)}>Clear reference</button></div>
       <p className="reference-note">Applies automatically to new imports. Strength changes affect existing photos when you press Apply. Your manual settings stay protected.</p>
+      <p className="reference-note">For more consistent transfer across different scenes, use an original + edited pair with identical framing. The pair should differ in global color and tone; local retouch, lighting changes and clipped detail cannot be reproduced by a shared grade.</p>
     </div>}
-    <p className="reference-note">At least 8 JPEG or PNG photos. Use photos you have the right to use - your own work, or images you have saved for personal reference. For your own Instagram, request your data from Instagram (Settings → Your activity → Download your information), unzip it and choose the folder. AURA reads only what you choose and downloads nothing. Matching estimates the visible style - it cannot recover exact editing settings or recreate lighting.</p>
+    <p className="reference-note">Upload one edited JPEG, PNG or TIFF, or choose a folder of at least 8 reference photos. Use photos you have the right to use - your own work, or images you have saved for personal reference. For your own Instagram, request your data from Instagram (Settings → Your activity → Download your information), unzip it and choose the folder. AURA reads only what you choose and downloads nothing. Matching estimates the visible style - it cannot recover exact editing settings or recreate lighting.</p>
   </section>;
 }

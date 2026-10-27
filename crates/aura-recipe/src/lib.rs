@@ -80,6 +80,7 @@ pub mod contract {
     pub mod recipe;
 }
 
+pub mod calibrated_look;
 pub mod color_lab;
 pub mod errors;
 pub mod fixtures;
@@ -89,6 +90,7 @@ pub mod local_masks;
 pub mod material_lab;
 pub mod migrate;
 pub mod reference_grade;
+pub mod retouch_intensity;
 pub mod retouch_tools;
 pub mod schema;
 pub mod sidecar;

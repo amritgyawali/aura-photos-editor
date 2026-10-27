@@ -14,6 +14,9 @@ import { MasksPanel, type BrushSettings, type MaskTool } from './MasksPanel';
 import { coverageDataUrl } from './rgbImage';
 import { PairedReference } from '../look/PairedReference';
 import { ColorMatchPanel } from '../look/ColorMatchPanel';
+import { ReferenceComparison } from '../look/ReferenceComparison';
+import type { ColorReference } from '../../ipc/colorMatch';
+import { useStore } from '../../state/store';
 import { localMasks, masksOf, type MaskCoverage, type MaskSource } from '../../ipc/localMasks';
 import type { BrushStroke } from '../../ipc/nativeRetouch';
 import { PortraitFinishPanel, type LiquifyTool } from './PortraitFinishPanel';
@@ -26,6 +29,8 @@ import { ColorLabPanel } from './ColorLabPanel';
 import { WorkflowLabPanel } from './WorkflowLabPanel';
 import { PhotoAnalysisPanel } from './PhotoAnalysisPanel';
 import { FramingPanel } from './FramingPanel';
+import { EvotoWorkflowPanel } from './EvotoWorkflowPanel';
+import { evotoWorkflow } from '../../ipc/evotoWorkflow';
 import { probePixel } from './framingMath';
 import { framingWorkflows } from '../../ipc/framingWorkflows';
 import { maskWorkflows } from '../../ipc/maskWorkflows';
@@ -41,6 +46,7 @@ const EDITOR_PANELS = [
   ['texturefidelity', 'Texture fidelity'], ['colourstability', 'Colour stability'], ['deliveryintegrity', 'Delivery integrity'],
 ] as const;
 type EditorPanel = typeof EDITOR_PANELS[number][0];
+import { useEffectRequest } from '../../state/effectRequest';
 
 /** The crop a recipe shows, as normalised edges of the whole frame. */
 function cropOf(recipe: RecipeDto | null): [number, number, number, number] {
@@ -51,8 +57,10 @@ function cropOf(recipe: RecipeDto | null): [number, number, number, number] {
   return [0, 0, 1, 1];
 }
 
-export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision = 0, referenceMode = false, onBusyChange }: {
+export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision = 0, referenceMode = false, featureMode = null, active = true, onBusyChange }: {
   projectId: string; photoId: string; photoIds?: readonly string[]; disabled: boolean; revision?: number; referenceMode?: boolean; onBusyChange: (busy: boolean) => void;
+  featureMode?: 'liquify' | 'skin' | 'glare' | null;
+  active?: boolean;
 }): JSX.Element {
   const [recipe, setRecipe] = useState<RecipeDto | null>(null);
   const [history, setHistory] = useState<HistoryDto | null>(null);
@@ -60,8 +68,16 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
   const [writeError, setWriteError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [retouchOpen, setRetouchOpen] = useState(false);
+  const inRetouch = retouchOpen || featureMode === 'skin' || featureMode === 'glare';
   const [panel, setPanel] = useState<EditorPanel>('all');
-  const shows = (value: EditorPanel) => referenceMode ? value === 'references' : panel === 'all' || panel === value;
+  const [comparisonReference, setComparisonReference] = useState<ColorReference | null>(null);
+  const selection = useStore(state => state.selection);
+  const selectedPhotoIds = useMemo(() => [...selection], [selection]);
+  const referenceWorkspace = referenceMode || (featureMode === null && panel === 'references');
+  const shows = (value: EditorPanel) => referenceMode ? value === 'references' : featureMode === 'liquify' ? value === 'portrait' : panel === 'all' || panel === value;
+  // A tool chosen in the Effects library opens Retouch, which then picks the tool up. ADR-0135.
+  const effectRequest = useEffectRequest(state => state.request);
+  useEffect(() => { if (effectRequest && !referenceMode && featureMode === null) setRetouchOpen(true); }, [effectRequest, referenceMode, featureMode]);
   const writing = useRef(false);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<'essentials' | 'advanced'>('essentials');
@@ -94,6 +110,11 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
   // Evoto-style finishing (ADR-0108): the liquify brush, when one is chosen.
   const [liquifyTool, setLiquifyTool] = useState<LiquifyTool>(null);
   useEffect(() => {
+    if (featureMode !== null) setRetouchOpen(false);
+    setLiquifyTool(null); setMaskTool(null); setView('edited');
+    drag.current = null; setSketch(null);
+  }, [featureMode]);
+  useEffect(() => {
     if (!referenceMode) return;
     setRetouchOpen(false); setPicking(false); setMaskTool(null); setLiquifyTool(null);
     setProbing(false); drag.current = null; setSketch(null);
@@ -109,15 +130,15 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
   // disk (ADR-0097): a fast first look while the full-quality preview is made.
   const [loaded, setLoaded] = useState(0);
   const version = recipe?.photoId === photoId && recipe.recipeHash ? recipe.recipeHash : loaded ? `load-${loaded}` : null;
-  const editedPreview = useProgressivePreview(version && !retouchOpen ? `${projectId}:${photoId}:edited:${version}` : null, photoId,
+  const editedPreview = useProgressivePreview(version && !inRetouch ? `${projectId}:${photoId}:edited:${version}` : null, photoId,
     quality => develop.renderImage(quality === 'full' ? { photoId, level: 'full', purpose: 'interactive' }
       : { photoId, level: 'screen', screen: [1600, 1600], purpose: 'interactive' }), refresh,
     () => nativeRetouch.live(projectId, photoId, 'edited'));
-  const originalPreview = useProgressivePreview(version && !retouchOpen ? `${projectId}:${photoId}:original` : null, photoId,
+  const originalPreview = useProgressivePreview(version && !inRetouch ? `${projectId}:${photoId}:original` : null, photoId,
     quality => nativeRetouch.original(projectId, photoId, quality), refresh);
   // Edits wait for the first look at a new version; the full-quality one follows unblocked.
-  const waiting = Boolean(version) && !retouchOpen && !editedPreview.current && !editedPreview.error;
-  useEffect(() => { if (!retouchOpen) onBusyChange(busy || loading || waiting); }, [busy, loading, waiting, onBusyChange, retouchOpen]);
+  const waiting = Boolean(version) && !inRetouch && !editedPreview.current && !editedPreview.error;
+  useEffect(() => { if (!inRetouch) onBusyChange(busy || loading || waiting); }, [busy, loading, waiting, onBusyChange, inRetouch]);
   const render: RenderDto | null = editedPreview.image;
   const edited = useMemo(() => previewSource(render), [render]);
   const original = useMemo(() => previewSource(originalPreview.image), [originalPreview.image]);
@@ -143,7 +164,12 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
   }, [photoId, projectId]);
   const masks = useMemo(() => masksOf(recipe), [recipe]);
   const finish = useMemo(() => finishOf(recipe), [recipe]);
-  const saveFinish = (next: StudioFinish, label: string) => void write(() => studioFinish.save(projectId, photoId, next, label));
+  // What the last finishing save could not do here (people tools with no face), for the panel.
+  const [finishNotes, setFinishNotes] = useState<string[]>([]);
+  const saveFinish = (next: StudioFinish, label: string) => void write(async () => {
+    const saved = await studioFinish.save(projectId, photoId, next, label);
+    setFinishNotes(saved?.notes ?? []);
+  });
   const crop = useMemo(() => cropOf(recipe), [recipe]);
   // The selected mask's coverage, for the red overlay, refreshed with every saved change.
   useEffect(() => {
@@ -156,7 +182,7 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
   const overlaid = useMemo(() => render && coverage ? coverageDataUrl(render, coverage, 0.5, [235, 40, 40], crop) : null, [render, coverage, crop]);
   useEffect(() => {
     let active = true;
-    if (retouchOpen) { setLoading(false); return; }
+    if (inRetouch) { setLoading(false); return; }
     setError(null); setLoading(true);
     if (!inTauri()) {
       setError('Open the AURA desktop app to edit this photograph.'); setLoading(false); return;
@@ -167,18 +193,22 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
     }).catch(cause => { if (active) setError(asIpcError(cause).message); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [photoId, projectId, refresh, revision, retouchOpen]);
+  }, [photoId, projectId, refresh, revision, inRetouch]);
 
-  const write = useCallback(async (action: () => Promise<unknown>) => {
-    if (writing.current) return;
+  /** Run one saving action. Resolves to null when it saved, or to the reason it did not, so a
+   *  tool that started the save can end its own progress state instead of reporting success. */
+  const write = useCallback(async (action: () => Promise<unknown>): Promise<string | null> => {
+    if (writing.current) return 'Another edit is still being saved. No edit was saved; try again when it finishes.';
     writing.current = true;
     setBusy(true); setWriteError(null);
-    try { await action(); setRefresh(value => value + 1); }
+    try { await action(); setRefresh(value => value + 1); return null; }
     catch (cause) {
-      setWriteError(asIpcError(cause).message);
+      const message = asIpcError(cause).message;
+      setWriteError(message);
       // Reconcile with saved state even if an operation failed after a partial
       // write. A rejected edit does not make the preview unreadable.
       setRefresh(value => value + 1);
+      return message;
     }
     finally { writing.current = false; setBusy(false); }
   }, []);
@@ -253,7 +283,7 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
     });
   };
 
-  if (retouchOpen) return <NativeRetouchWorkspace key={`${projectId}:${photoId}`} projectId={projectId} photoId={photoId} disabled={disabled} revision={revision} onBusyChange={onBusyChange} onClose={() => setRetouchOpen(false)} />;
+  if (retouchOpen || featureMode === 'skin' || featureMode === 'glare') return <NativeRetouchWorkspace key={`${projectId}:${photoId}:${featureMode}`} projectId={projectId} photoId={photoId} disabled={disabled} revision={revision} feature={featureMode === 'skin' || featureMode === 'glare' ? featureMode : undefined} onBusyChange={onBusyChange} onClose={() => setRetouchOpen(false)} />;
 
   return <section className="photo-studio" aria-label="Photo editor">
     <div className="studio-toolbar">
@@ -264,7 +294,7 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
     </div>
     {problem && <p role="alert">{problem} <button type="button" onClick={() => setRefresh(value => value + 1)}>Retry preview</button></p>}
     {writeError && <p role="alert">Edit could not be saved: {writeError} <button type="button" onClick={() => setWriteError(null)}>Dismiss edit error</button></p>}
-    <nav hidden={referenceMode} className="editor-panel-navigation" aria-label="Editing panels">
+    <nav hidden={referenceMode || featureMode !== null} className="editor-panel-navigation" aria-label="Editing panels">
       {EDITOR_PANELS.map(([value, label]) => <button type="button" key={value} aria-pressed={panel === value}
         disabled={busy || disabled} onClick={() => {
           setPanel(value); setPicking(false); setMaskTool(null); setLiquifyTool(null);
@@ -274,8 +304,9 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
       <button type="button" disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)}
         onClick={() => { setRetouchOpen(true); setPicking(false); }}>Precision retouch</button>
     </nav>
-    <div className="studio-layout editor-panel-layout">
+    <div className={`studio-layout editor-panel-layout${referenceWorkspace ? ' is-reference-workspace' : ''}`}>
       <div className="editor-preview-column">
+        <ReferenceComparison enabled={referenceWorkspace} reference={comparisonReference}>
         <div className={`studio-canvas${picking ? ' studio-picking' : ''}${maskTool || liquifyTool ? ' studio-masking' : ''}`} aria-busy={busy || loading || waiting}
           onPointerDown={event => {
             if ((!maskTool && !liquifyTool) || view !== 'edited' || busy) return;
@@ -326,6 +357,7 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
             {(busy || loading || waiting) && <span className="studio-updating" role="status">Updating preview…</span>}
           </> : <p>{problem ? 'Photo preview unavailable' : 'Loading your photograph…'}</p>}
         </div>
+        </ReferenceComparison>
         {colorError && <p role="alert">Colour-only preview: {colorError}</p>}
         <button type="button" aria-pressed={probing} disabled={!displayedRender || view === 'split'} onClick={() => { setProbing(!probing); setPicking(false); setMaskTool(null); setLiquifyTool(null); }}>Inspect RGB / Lab point</button>
         {probing && <p className="lr-hint">Click the displayed photograph. Readout measures rendered sRGB and CIE Lab D65, not source RAW sensor values.</p>}
@@ -367,11 +399,15 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
             })}
             onSave={(next, label) => void write(() => localMasks.save(projectId, photoId, next, label))} />
         </div></details>
-        <details className="lr-section" hidden={!shows('portrait')} open={panel === 'portrait' || liquifyTool !== null}><summary>Portrait studio: face, body, background, makeup</summary><div className="lr-section-body">
+        <details className="lr-section" hidden={!shows('portrait')} open={featureMode === 'liquify' || panel === 'portrait' || liquifyTool !== null}><summary>Portrait studio: face, body, background, makeup</summary><div className="lr-section-body">
           <PortraitFinishPanel finish={finish} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)}
-            liquify={liquifyTool} onSave={saveFinish} subject={`${projectId}/${photoId}`}
+            liquify={liquifyTool} onSave={saveFinish} subject={`${projectId}/${photoId}`} initialTab={featureMode === 'liquify' ? 'liquify' : 'face'} notes={finishNotes}
             onSuggestLight={() => studioFinish.suggestLight(projectId, photoId)}
+            onFindFaces={() => evotoWorkflow.faces(projectId, photoId).then(found => found.faces)}
             onLiquify={tool => { setLiquifyTool(tool); if (tool) { setMaskTool(null); setView('edited'); setPicking(false); } }} />
+        </div></details>
+        <details className="lr-section" hidden={!shows('portrait')}><summary>Framing, delivery and review: ID photo, crops, cut-out, social</summary><div className="lr-section-body">
+          <EvotoWorkflowPanel projectId={projectId} photoId={photoId} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)} onWrite={write} />
         </div></details>
         {render && edited && <Histogram render={render} />}
         {notice && <p role="status" className="lr-notice">{notice}</p>}
@@ -431,7 +467,9 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
         </div>
       </fieldset>
       <div hidden={!shows('references')} className="editor-reference-panel" aria-label="Reference matching panel">
-      <ColorMatchPanel key={`colour:${projectId}:${photoId}`} projectId={projectId} photoId={photoId} revision={recipe?.recipeHash} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)} onApply={write} />
+      <ColorMatchPanel key={`colour:${projectId}:${photoId}`} projectId={projectId} photoId={photoId} revision={recipe?.recipeHash}
+        active={active && shows('references')} selectedPhotoIds={selectedPhotoIds} onReferenceChange={setComparisonReference}
+        disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)} onApply={write} />
       <PairedReference key={`paired:${projectId}:${photoId}`} photoId={photoId} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)} onApply={write} />
       </div>
       </div>

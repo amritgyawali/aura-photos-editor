@@ -103,6 +103,52 @@ fn raw_auto_edit_is_independent_of_the_embedded_camera_jpeg_brightness() {
         globals[0], globals[1],
         "camera JPEG tone must not change the edit of identical sensor data"
     );
+    let reference_path = dir.path().join("edited-reference.png");
+    image::RgbImage::from_fn(96, 64, |x, y| {
+        image::Rgb([80 + x as u8, 65 + y as u8, 55 + (x / 2) as u8])
+    })
+    .save(&reference_path)
+    .unwrap();
+    let reference = aura_app::reference_style::analyse_reference(
+        &state,
+        &aura_app::reference_style::AnalyseReferenceInput {
+            address: "Same RAW reference".into(),
+            folder: reference_path.to_string_lossy().into_owned(),
+            cancel_id: "raw-reference-analysis".into(),
+            export: false,
+            original: None,
+        },
+    )
+    .unwrap();
+    let matched: Vec<serde_json::Value> = photos
+        .iter()
+        .map(|photo| {
+            aura_app::reference_style::apply_reference(
+                &state,
+                &aura_app::reference_style::ApplyReferenceInput {
+                    photo_id: photo.id.clone(),
+                    reference_id: reference.id.clone(),
+                    strength: 0.8,
+                    profile_id: None,
+                    profile_strength: None,
+                    cancel_id: None,
+                },
+            )
+            .unwrap();
+            let recipe = aura_app::image_recipe(
+                &state,
+                &DevelopImageInput {
+                    photo_id: photo.id.clone(),
+                },
+            )
+            .unwrap();
+            serde_json::from_str::<serde_json::Value>(&recipe.body).unwrap()["global"].clone()
+        })
+        .collect();
+    assert_eq!(
+        matched[0], matched[1],
+        "reference fitting must use the sensor decode, not the embedded camera JPEG"
+    );
     for (path, bytes) in paths {
         assert_eq!(std::fs::read(path).unwrap(), bytes);
     }
@@ -276,6 +322,7 @@ fn photo_roundtrip(is_png: bool) {
             folder: reference_folder.to_string_lossy().into(),
             cancel_id: "analyse-test".into(),
             export: false,
+            original: None,
         },
     )
     .expect("valid photo fixture and successful operation");
@@ -285,6 +332,7 @@ fn photo_roundtrip(is_png: bool) {
         photo_id: photo.clone(),
         reference_id: style.id.clone(),
         strength: 0.8,
+        cancel_id: None,
         profile_id: None,
         profile_strength: None,
     };

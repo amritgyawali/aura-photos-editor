@@ -33,22 +33,24 @@ pub(super) fn similarity(reference: &[u8], actual: &Rgb8) -> Option<f32> {
     if actual.len() != BYTES {
         return None;
     }
-    let luma = |bytes: &[u8], index: usize| {
-        let channel = |offset: usize| {
-            bytes
-                .get(index * 3 + offset)
-                .copied()
-                .map_or(0.0, f32::from)
-        };
-        channel(0) * 0.2126 + channel(1) * 0.7152 + channel(2) * 0.0722
+    let luminances = |bytes: &[u8]| {
+        bytes
+            .chunks_exact(3)
+            .filter_map(|pixel| {
+                let &[r, g, b] = pixel else { return None };
+                Some(f32::from(r) * 0.2126 + f32::from(g) * 0.7152 + f32::from(b) * 0.0722)
+            })
+            .collect::<Vec<_>>()
     };
+    let reference = luminances(reference);
+    let actual = luminances(&actual);
     let (mut dot, mut norm_a, mut norm_b) = (0.0_f64, 0.0_f64, 0.0_f64);
     for row in 0..EDGE as usize - 1 {
         for column in 0..EDGE as usize - 1 {
             let i = row * EDGE as usize + column;
             for j in [i + 1, i + EDGE as usize] {
-                let a = f64::from(luma(reference, j) - luma(reference, i));
-                let b = f64::from(luma(&actual, j) - luma(&actual, i));
+                let a = f64::from(*reference.get(j)? - *reference.get(i)?);
+                let b = f64::from(*actual.get(j)? - *actual.get(i)?);
                 dot += a * b;
                 norm_a += a * a;
                 norm_b += b * b;

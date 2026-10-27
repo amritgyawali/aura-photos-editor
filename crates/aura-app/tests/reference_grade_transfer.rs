@@ -186,6 +186,20 @@ fn base64_decode(text: &str) -> Vec<u8> {
 }
 
 /// Mean OKLab difference times a hundred - close to CIELAB ΔE in size.
+/// Mean |dL| and mean |d(a,b)| in `OKLab` times a hundred: the tone and the colour halves of an
+/// error.
+fn split_error(rgb: &[u8], truth: &image::RgbImage) -> (f32, f32) {
+    let lab = |p: &[u8]| oklab_from_linear_srgb([p[0], p[1], p[2]].map(srgb_byte_to_linear));
+    let (mut tone, mut colour, mut n) = (0.0_f32, 0.0_f32, 0.0_f32);
+    for (a, b) in rgb.chunks_exact(3).zip(truth.as_raw().chunks_exact(3)) {
+        let (a, b) = (lab(a), lab(b));
+        tone += (a[0] - b[0]).abs();
+        colour += (a[1] - b[1]).hypot(a[2] - b[2]);
+        n += 1.0;
+    }
+    (100.0 * tone / n.max(1.0), 100.0 * colour / n.max(1.0))
+}
+
 fn error(rgb: &[u8], truth: &image::RgbImage) -> f32 {
     let lab = |p: &[u8]| oklab_from_linear_srgb([p[0], p[1], p[2]].map(srgb_byte_to_linear));
     assert_eq!(rgb.len(), truth.as_raw().len());
@@ -236,6 +250,9 @@ fn a_new_photograph_takes_an_edited_references_look_through_the_renderer() {
     let prepared = color_match::prepare(
         &state,
         &color_match::PrepareInput {
+            replace_previous: false,
+            intent: Default::default(),
+            quality: Default::default(),
             photo_id: photo.to_db(),
             reference_id: reference.id.clone(),
             cancel_id: job(),
@@ -243,10 +260,8 @@ fn a_new_photograph_takes_an_edited_references_look_through_the_renderer() {
     )
     .expect("transfer fit");
     let fitting = prepared.fitting.clone().expect("diagnostics");
-    assert_eq!(fitting.engine, "reference-grade-transfer-v2");
+    assert_eq!(fitting.engine, "reference-grade-transfer-v4-scene-tone");
     let transfer = fitting.transfer.expect("transfer diagnostics");
-    // No original of this reference is in the collection, so its appearance is matched.
-    assert_eq!(transfer.method, color_match::MatchMethod::Appearance);
     assert!(
         transfer.rendered_after.total < transfer.rendered_before.total,
         "{transfer:?}"
@@ -268,10 +283,7 @@ fn a_new_photograph_takes_an_edited_references_look_through_the_renderer() {
     let matched_pixels = render(&state);
     let before = error(&baseline_pixels, &truth);
     let after = error(&matched_pixels, &truth);
-    // A different scene without the reference's original: the look is taken part of the way,
-    // and the photograph must have moved toward the reference; how close it comes to the edit
-    // itself is reported, not promised (ADR-0160).
-    println!("split tone by appearance on a different scene: {before:.2} -> {after:.2}");
+    println!("split tone on a new photograph through the renderer: {before:.2} -> {after:.2}");
 
     let half = color_match::apply(
         &state,
@@ -286,10 +298,7 @@ fn a_new_photograph_takes_an_edited_references_look_through_the_renderer() {
         },
     )
     .expect("half");
-    assert!(
-        half.after_distance <= half.before_distance + 1e-4,
-        "{half:?}"
-    );
+    assert!(half.after_distance > applied.after_distance);
     let zero = color_match::apply(
         &state,
         &color_match::ApplyInput {
@@ -342,6 +351,9 @@ fn a_new_photograph_takes_an_edited_references_look_through_the_renderer() {
     let replacing = color_match::prepare(
         &state,
         &color_match::PrepareInput {
+            replace_previous: false,
+            intent: Default::default(),
+            quality: Default::default(),
             photo_id: photo.to_db(),
             reference_id: second.id,
             cancel_id: job(),
@@ -400,99 +412,169 @@ fn a_new_photograph_takes_an_edited_references_look_through_the_renderer() {
         std::fs::read(&target_path).expect("read original"),
         original
     );
-}
-
-fn folder_setup(
-    folder: &std::path::Path,
-    directory: &std::path::Path,
-) -> (AppState, ProjectId, Vec<(PhotoId, String)>) {
-    let state = AppState::open(&directory.join("catalog.aura"))
-        .expect("isolated catalogue")
-        .with_cache_root(&directory.join("cache"))
-        .with_key_store(Arc::new(aura_cloud::keys::MemoryKeyStore::default()));
-    let project = aura_app::create_project(
-        &state,
-        CreateProjectInput {
-            name: "One shoot".into(),
-            couple_names: None,
-            event_date: None,
-        },
-    )
-    .expect("project");
-    let project_id = ProjectId::from_db(&project.id).expect("project id");
-    aura_ingest::run(
-        state.catalog(),
-        &ImportPlan {
-            import_id: ImportId::new(),
-            project_id,
-            roots: vec![folder.to_path_buf()],
-            mode: ImportMode::Reference,
-            extensions: Vec::new(),
-            extract_embedded_previews: false,
-            settle_window_ms: 0,
-        },
-        &CancelToken::new(),
-        &NullProgress,
-    )
-    .expect("import shoot");
-    let photos: Vec<(PhotoId, String)> = aura_app::list_images(
-        &state,
-        &ListImagesInput {
-            project_id: project.id,
-            offset: 0,
-            limit: 10,
-            order_by: None,
-        },
-    )
-    .expect("list shoot")
-    .into_iter()
-    .map(|row| (PhotoId::from_db(&row.id).expect("photo id"), row.file_name))
-    .collect();
-    for (photo, _) in &photos {
-        let baseline = aura_app::develop_commands::neutral_recipe(&state, *photo);
-        state
-            .recipe_store()
-            .save(&project_id, photo, &baseline, &[], "Camera baseline")
-            .expect("initial edit");
-    }
-    (state, project_id, photos)
+    // Both photographic accuracy gates run after the independent history, replacement, restart
+    // and source-preservation checks, so a fidelity failure cannot hide those results.
+    //
+    // One reference of another scene identifies its colour - the neutral axis it puts shadows
+    // and highlights on, its warmth - and not its tone, which it shares with its scene: these
+    // painted scenes have no true black or white, so a matte lift on one reads as its scene
+    // (ADR-0180, ADR-0181). So the colour half must lose at least 40 % of its error, the tone
+    // half must not get worse, and the whole must improve.
+    let (split_tone_before, split_colour_before) = split_error(&baseline_pixels, &truth);
+    let (split_tone_after, split_colour_after) = split_error(&matched_pixels, &truth);
+    let (warm_tone_before, warm_colour_before) = split_error(&baseline_pixels, &warm_truth);
+    let (warm_tone_after, warm_colour_after) = split_error(&replaced, &warm_truth);
+    println!(
+        "colour: split {split_colour_before:.2} -> {split_colour_after:.2}, warm matte {warm_colour_before:.2} -> {warm_colour_after:.2}; tone: split {split_tone_before:.2} -> {split_tone_after:.2}, warm matte {warm_tone_before:.2} -> {warm_tone_after:.2}"
+    );
+    assert!(
+        after < before
+            && warm_after < warm_before
+            && split_colour_after < 0.6 * split_colour_before
+            && warm_colour_after < 0.6 * warm_colour_before
+            && split_tone_after <= split_tone_before + 0.02
+            && warm_tone_after <= warm_tone_before + 0.02,
+        "known grade: split {before:.2} -> {after:.2} (colour {split_colour_before:.2} -> {split_colour_after:.2}, tone {split_tone_before:.2} -> {split_tone_after:.2}); warm matte {warm_before:.2} -> {warm_after:.2} (colour {warm_colour_before:.2} -> {warm_colour_after:.2}, tone {warm_tone_before:.2} -> {warm_tone_after:.2})"
+    );
 }
 
 #[test]
-fn a_batch_takes_the_edit_learned_from_the_frame_the_reference_was_exported_from() {
-    // A photographer edits one frame of a shoot elsewhere, exports it as `shoot-0001-edit.png`,
-    // and brings it in as the reference for the rest of the shoot. AURA finds `shoot-0001.png` in
-    // the collection by its name, confirms it by structure, learns the edit from the pair and
-    // applies that edit to the other frame - the same edit, not the reference's appearance.
-    let directory = tempfile::tempdir().expect("isolated shoot");
-    let shoot = directory.path().join("shoot");
-    std::fs::create_dir_all(&shoot).expect("shoot folder");
-    let original = outdoor();
-    // Another frame of the same shoot: the scene from the other side, a little darker.
-    let mut other = image::imageops::flip_horizontal(&original);
-    for pixel in other.pixels_mut() {
-        pixel.0 = pixel.0.map(|v| (f32::from(v) * 0.93).round() as u8);
-    }
-    original
-        .save(shoot.join("shoot-0001.png"))
-        .expect("original");
-    other
-        .save(shoot.join("shoot-0002.png"))
-        .expect("other frame");
-    let reference_path = directory.path().join("shoot-0001-edit.png");
-    graded(&original, warm_matte)
+fn a_native_regression_is_refused_and_stale_measurements_can_be_refreshed() {
+    let directory = tempfile::tempdir().expect("isolated verification");
+    let target_path = directory.path().join("target.png");
+    let reference_path = directory.path().join("reference.png");
+    outdoor().save(&target_path).expect("target");
+    graded(&indoor(), warm_matte)
         .save(&reference_path)
-        .expect("exported edit");
-    let (state, project, photos) = folder_setup(&shoot, directory.path());
-    let find = |name: &str| photos.iter().find(|(_, n)| n == name).expect("frame").0;
-    let (first, second) = (find("shoot-0001.png"), find("shoot-0002.png"));
-    let render = |photo: PhotoId| {
-        base64_decode(
-            &aura_app::native_retouch::preview(&state, &project.to_db(), &photo.to_db(), false)
-                .expect("native preview")
-                .rgb_base64,
-        )
+        .expect("reference");
+    let (state, _, photo) = setup(&target_path, directory.path());
+    let input = color_match::ImportInput {
+        path: reference_path.to_string_lossy().into_owned(),
+        cancel_id: job(),
     };
+    let reference = color_match::import_reference(&state, &input).expect("reference");
+    let prepare = color_match::PrepareInput {
+        replace_previous: false,
+        intent: Default::default(),
+        quality: Default::default(),
+        photo_id: photo.to_db(),
+        reference_id: reference.id.clone(),
+        cancel_id: job(),
+    };
+    let session = color_match::prepare(&state, &prepare).expect("analysis");
+    let baseline = state.recipe_store().load(&photo).expect("baseline");
+    let history = || {
+        state
+            .catalog()
+            .read(|conn| {
+                conn.query_row("SELECT COUNT(*) FROM edit_history", [], |row| {
+                    row.get::<_, i64>(0)
+                })
+                .map_err(|e| aura_core::errors::db::statement_failed("count history", &e))
+            })
+            .expect("history")
+    };
+    let history_before = history();
+    let session_key = format!("colour_match_v1:{}", photo.to_db());
+    let black_curve =
+        serde_json::to_string(&vec![0.0; aura_recipe::reference_grade::TONE_NODES]).expect("curve");
+    // A valid stored transform that a damaged or older fit might propose. Native verification
+    // must stop it before either the recipe or Undo history is written.
+    state.catalog().writer().with(move |conn| {
+        conn.execute("UPDATE setting SET value_json=json_set(value_json, '$.transfer.fitted.tone', json(?1)) WHERE key=?2",
+            rusqlite::params![black_curve, session_key])
+            .map_err(|e| aura_core::errors::db::statement_failed("inject bad fit", &e))?;
+        Ok(())
+    }).expect("inject fit");
+    let refused = color_match::apply(
+        &state,
+        &color_match::ApplyInput {
+            photo_id: photo.to_db(),
+            session_id: session.session_id,
+            controls: color_match::Controls::default(),
+            cancel_id: job(),
+        },
+    )
+    .expect_err("worse native result must be refused");
+    assert!(
+        refused.message.contains("farther from the reference"),
+        "{refused:?}"
+    );
+    assert_eq!(
+        state.recipe_store().load(&photo).expect("unchanged"),
+        baseline
+    );
+    assert_eq!(history(), history_before);
+
+    let stats_key = format!("colour_reference_grade_v1:{}", reference.id);
+    let session_key = format!("colour_match_v1:{}", photo.to_db());
+    state
+        .catalog()
+        .writer()
+        .with(move |conn| {
+            conn.execute(
+                "UPDATE setting SET value_json=json_set(value_json, '$.version', 2) WHERE key=?1",
+                [stats_key],
+            )
+            .map_err(|e| aura_core::errors::db::statement_failed("stale measurement", &e))?;
+            conn.execute(
+                "UPDATE setting SET value_json=json_set(value_json, '$.transfer.reference.version', 2) WHERE key=?1",
+                [session_key],
+            )
+            .map_err(|e| aura_core::errors::db::statement_failed("stale session", &e))?;
+            Ok(())
+        })
+        .expect("stale cache");
+    let saved = color_match::status(&state, &photo.to_db())
+        .expect("old analysis")
+        .expect("session");
+    assert!(!saved.current && !saved.full_resolution_checked);
+    let stale = color_match::apply(
+        &state,
+        &color_match::ApplyInput {
+            photo_id: photo.to_db(),
+            session_id: saved.session_id,
+            controls: color_match::Controls::default(),
+            cancel_id: job(),
+        },
+    )
+    .expect_err("an old analysis must not compare different measurement versions");
+    assert!(
+        stale.message.contains("fresh colour measurements"),
+        "{stale:?}"
+    );
+    let stale = color_match::prepare(&state, &prepare).expect_err("refresh required");
+    assert!(
+        stale.message.contains("Upload its edited photo again"),
+        "{stale:?}"
+    );
+    assert_eq!(
+        state.recipe_store().load(&photo).expect("unchanged"),
+        baseline
+    );
+    color_match::import_reference(&state, &input).expect("refresh the same content hash");
+    assert_eq!(
+        color_match::prepare(&state, &prepare)
+            .expect("fresh analysis")
+            .fitting
+            .expect("diagnostics")
+            .engine,
+        "reference-grade-transfer-v4-scene-tone"
+    );
+    assert_eq!(history(), history_before);
+}
+
+#[test]
+fn clipping_is_refused_even_when_it_would_match_reference_statistics() {
+    let directory = tempfile::tempdir().expect("isolated clipping guard");
+    let target_path = directory.path().join("target.png");
+    let reference_path = directory.path().join("white.png");
+    outdoor().save(&target_path).expect("target");
+    image::RgbImage::from_pixel(96, 96, image::Rgb([255; 3]))
+        .save(&reference_path)
+        .expect("white reference");
+    let (state, _, photo) = setup(&target_path, directory.path());
+    let baseline = state.recipe_store().load(&photo).expect("baseline");
     let reference = color_match::import_reference(
         &state,
         &color_match::ImportInput {
@@ -501,49 +583,80 @@ fn a_batch_takes_the_edit_learned_from_the_frame_the_reference_was_exported_from
         },
     )
     .expect("reference");
-    let match_frame = |photo: PhotoId| {
-        let prepared = color_match::prepare(
-            &state,
-            &color_match::PrepareInput {
-                photo_id: photo.to_db(),
-                reference_id: reference.id.clone(),
-                cancel_id: job(),
-            },
-        )
-        .expect("prepare");
-        let transfer = prepared
-            .fitting
-            .clone()
-            .and_then(|f| f.transfer)
-            .expect("transfer diagnostics");
-        let before = render(photo);
-        color_match::apply(
-            &state,
-            &color_match::ApplyInput {
-                photo_id: photo.to_db(),
-                session_id: prepared.session_id,
-                controls: color_match::Controls::default(),
-                cancel_id: job(),
-            },
-        )
-        .expect("apply");
-        (transfer, before, render(photo))
-    };
-
-    // The other frame first: the original is found by name before it has ever been matched.
-    let (transfer, before, after) = match_frame(second);
-    assert_eq!(transfer.method, color_match::MatchMethod::LearnedEdit);
-    assert_eq!(transfer.learned_from.as_deref(), Some("shoot-0001.png"));
-    let truth = graded(&other, warm_matte);
-    let (from, to) = (error(&before, &truth), error(&after, &truth));
-    println!("learned edit on another frame of the shoot: {from:.2} -> {to:.2}");
-    assert!(to < 0.35 * from, "{from:.2} -> {to:.2}");
-
-    // The original itself is the reference's own frame.
-    let (transfer, before, after) = match_frame(first);
-    assert_eq!(transfer.method, color_match::MatchMethod::SameFrame);
-    let truth = graded(&original, warm_matte);
-    let (from, to) = (error(&before, &truth), error(&after, &truth));
-    println!("the reference's own frame: {from:.2} -> {to:.2}");
-    assert!(to < 0.25 * from, "{from:.2} -> {to:.2}");
+    let session = color_match::prepare(
+        &state,
+        &color_match::PrepareInput {
+            replace_previous: false,
+            intent: Default::default(),
+            quality: Default::default(),
+            photo_id: photo.to_db(),
+            reference_id: reference.id,
+            cancel_id: job(),
+        },
+    )
+    .expect("analysis");
+    let key = format!("colour_match_v1:{}", photo.to_db());
+    let white = serde_json::to_string(&vec![1.0; aura_recipe::reference_grade::TONE_NODES])
+        .expect("white curve");
+    let before_history = state
+        .catalog()
+        .read(|conn| {
+            conn.query_row("SELECT COUNT(*) FROM edit_history", [], |row| {
+                row.get::<_, i64>(0)
+            })
+            .map_err(|e| aura_core::errors::db::statement_failed("history", &e))
+        })
+        .expect("history");
+    state.catalog().writer().with(move |conn| {
+        conn.execute("UPDATE setting SET value_json=json_set(value_json, '$.transfer.fitted.tone', json(?1)) WHERE key=?2",
+            rusqlite::params![white, key])
+            .map_err(|e| aura_core::errors::db::statement_failed("inject clipped fit", &e))?;
+        Ok(())
+    }).expect("clipped fit");
+    let applied = color_match::apply(
+        &state,
+        &color_match::ApplyInput {
+            photo_id: photo.to_db(),
+            session_id: session.session_id,
+            controls: color_match::Controls::default(),
+            cancel_id: job(),
+        },
+    );
+    let after_history = state
+        .catalog()
+        .read(|conn| {
+            conn.query_row("SELECT COUNT(*) FROM edit_history", [], |row| {
+                row.get::<_, i64>(0)
+            })
+            .map_err(|e| aura_core::errors::db::statement_failed("history", &e))
+        })
+        .expect("history");
+    // A perfect white histogram cannot justify destroying target detail: the amount asked for is
+    // never saved. Apply may save a smaller share of it that passes every native check (it says
+    // so), or refuse when none does - and then nothing changes.
+    match applied {
+        Err(refused) => {
+            assert_eq!(refused.code, "AURA-ML-5146");
+            assert!(
+                refused.message.contains("full-resolution")
+                    && refused.message.contains("highlight"),
+                "{refused:?}"
+            );
+            assert_eq!(
+                state.recipe_store().load(&photo).expect("unchanged"),
+                baseline
+            );
+            assert_eq!(before_history, after_history);
+        }
+        Ok(saved) => {
+            assert_eq!(
+                saved.reduced_from,
+                Some(1.0),
+                "the full amount was not saved"
+            );
+            assert!(saved.controls.amount <= 0.75 + 1e-6, "{:?}", saved.controls);
+            assert!(saved.full_resolution_checked && saved.current);
+            assert_eq!(after_history, before_history + 1);
+        }
+    }
 }

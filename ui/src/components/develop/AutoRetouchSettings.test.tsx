@@ -5,6 +5,17 @@ import type { RecipeDto } from '../../ipc/types';
 import { DEFAULT_AUTO_RETOUCH, DEFAULT_RETOUCH_SETTINGS, POLISHED_WEDDING_RETOUCH } from '../../ipc/nativeRetouch';
 import { automaticLabel } from './NativeRetouchWorkspace';
 
+it('starts Hot Features skin cleanup with freckles protected and supports explicit freckle removal', () => {
+  const run = vi.fn();
+  render(<AutoRetouchSettings initialSkinPreset disabled={false} onRun={run} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face + body skin' }));
+  expect(run).toHaveBeenLastCalledWith(expect.objectContaining({ eyes: false, teeth: false, refine: false,
+    settings: expect.objectContaining({ keepFreckles: true, keepMoles: true, texture: 1, smoothing: 0 }) }));
+  fireEvent.click(screen.getByRole('radio', { name: 'Acne & freckles' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Auto retouch: Face + body skin' }));
+  expect(run).toHaveBeenLastCalledWith(expect.objectContaining({ settings: expect.objectContaining({ removeDarkMarks: true, keepFreckles: false, keepMoles: true }) }));
+});
+
 const naturalRecipe = { body: JSON.stringify({ studio_portrait_auto_v1: { options: { ...DEFAULT_AUTO_RETOUCH, settings: DEFAULT_RETOUCH_SETTINGS } } }) } as RecipeDto;
 
 describe('automatic retouch settings', () => {
@@ -155,6 +166,7 @@ it('keeps frequency healing and the texture graft off unless a preset or a perso
   expect(DEFAULT_RETOUCH_SETTINGS.frequencyHeal).toBe(0);
   expect(DEFAULT_RETOUCH_SETTINGS.textureGraft).toBe(0);
   for (const [id, , values] of PRESETS) {
+    if (id === 'skin_natural' || id === 'skin_freckles') continue;
     if (id === 'polished_wedding' || id === 'bright_polished' || id === 'beauty_fashion' || id === 'pro' || id === 'acne_only' || id === 'skin_cleanup' || id === 'detailed_skin' || id === 'portrait_finish' || id === 'smooth_finish' || id === 'body_finish') continue;
     expect(values.frequencyHeal ?? 0).toBe(0);
     expect(values.textureGraft ?? 0).toBe(0);

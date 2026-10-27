@@ -1,8 +1,15 @@
 # Matching a look
 
-For one uploaded edited photo and a new batch, use the
-[single-reference colour matching workflow](reference-grade-matching.md).
-The gallery-derived workflow below has separate measurement and coverage rules.
+The main screen now supports **Upload edited reference photo** as well as a folder
+of references. See the [reference-first workflow](reference-first-matching.md) for
+native per-photo fitting, strength, cancellation and validation.
+The main screen also supports **Use original + edited pair** to learn a shared
+global RGB transformation from corresponding pixels and transfer it across
+different scenes. See the same guide for validation and limits.
+
+The advanced lighting-bucket gallery workflow below has separate measurement and
+coverage rules. The studio's [reference colour matching panel](reference-grade-matching.md)
+is also a separate workflow.
 
 You have seen an account whose photographs look the way you want yours to look. This is how AURA
 gets you there, and what it will and will not do on the way.

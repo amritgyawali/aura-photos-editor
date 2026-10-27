@@ -164,7 +164,7 @@ fn faces_on_colour_frames() {
             .iter()
             .map(|f| {
                 format!(
-                    "{}@{:.0},{:.0} s{:.0} r{:.0} n{} e{} m{} sk{:.2} c{:.2}",
+                    "{}@{:.0},{:.0} s{:.0} r{:.0} n{} e{} h{} m{} sk{:.2} c{:.2}",
                     f.source.as_str(),
                     f.center[0] * k,
                     f.center[1] * k,
@@ -172,6 +172,7 @@ fn faces_on_colour_frames() {
                     f.roll.to_degrees(),
                     f.neighbours,
                     f.eyes_measured,
+                    f.eye_hits,
                     u8::from(f.mouth_measured),
                     f.skin_fraction,
                     f.confidence

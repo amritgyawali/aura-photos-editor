@@ -39,9 +39,17 @@ pub(super) fn apply(grade: &mut ColourGrade, offsets: &[f32; 6], strength: f32) 
 
 pub(super) fn search(
     initial_distance: f32,
+    evaluate: impl FnMut(&[f32; 6]) -> AuraResult<f32>,
+) -> AuraResult<([f32; 6], f32, usize)> {
+    search_from(&[0.0; 6], initial_distance, evaluate)
+}
+
+pub(super) fn search_from(
+    initial: &[f32; 6],
+    initial_distance: f32,
     mut evaluate: impl FnMut(&[f32; 6]) -> AuraResult<f32>,
 ) -> AuraResult<([f32; 6], f32, usize)> {
-    let mut best = [0.0_f32; 6];
+    let mut best = initial.map(|v| v.clamp(-MAX_CAST, MAX_CAST));
     let mut distance = initial_distance;
     let mut evaluations = 0;
     for step in [12.0, 6.0, 3.0] {
@@ -49,8 +57,8 @@ pub(super) fn search(
             let center = best;
             for sign in [-1.0, 1.0] {
                 let mut candidate = center;
-                if let (Some(value), Some(&middle)) = (candidate.get_mut(axis), center.get(axis)) {
-                    *value = (middle + sign * step).clamp(-MAX_CAST, MAX_CAST);
+                if let Some(value) = candidate.get_mut(axis) {
+                    *value = (*value + sign * step).clamp(-MAX_CAST, MAX_CAST);
                 }
                 let value = evaluate(&candidate)?;
                 evaluations += 1;
@@ -115,5 +123,19 @@ mod tests {
         assert_eq!(offsets, [-12.0, -6.0, 0.0, 0.0, 9.0, 0.0]);
         assert_eq!(distance, 0.0);
         assert_eq!(evaluations, MAX_EVALUATIONS);
+    }
+
+    #[test]
+    fn revisiting_casts_keeps_the_incumbent_and_can_refine_it() {
+        let initial = [-12.0, -6.0, 0.0, 0.0, 9.0, 0.0];
+        let loss = |v: &[f32; 6]| (v[0] + 15.0).powi(2) + (v[4] - 12.0).powi(2);
+        let (offsets, distance, _) =
+            search_from(&initial, loss(&initial), |v| Ok(loss(v))).unwrap();
+        assert_eq!(offsets[0], -15.0);
+        assert_eq!(offsets[4], 12.0);
+        assert_eq!(distance, 0.0);
+        let (kept, score, _) = search_from(&initial, 0.0, |_| Ok(f32::NAN)).unwrap();
+        assert_eq!(kept, initial);
+        assert_eq!(score, 0.0);
     }
 }

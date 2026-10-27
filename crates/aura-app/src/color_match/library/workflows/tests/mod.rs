@@ -56,6 +56,7 @@ fn seed(state: &AppState) {
                 favorite: false,
                 default_controls: None,
                 thumbnail: None,
+                preview: Some("data:image/jpeg;base64,local-only".into()),
                 regions: vec!["whole image".into()],
             },
             regions: vec![super::super::super::appearance::Region {
@@ -194,6 +195,7 @@ fn portable_library_round_trips_and_refuses_descriptor_collisions_and_bad_data()
         .expect("document");
     assert!(
         !document.contains("thumbnail")
+            && !document.contains("preview")
             && !document.contains("points")
             && !document.contains("path")
     );

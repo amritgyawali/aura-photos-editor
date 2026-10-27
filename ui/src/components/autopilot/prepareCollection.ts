@@ -1,4 +1,5 @@
-import { api, asIpcError, develop, editProfiles, type ProfileSelection } from '../../ipc/client';
+import { api, develop, editProfiles, type ApplyReport, type ProfileSelection } from '../../ipc/client';
+import { Refusal, reasonOf } from '../look/refusal';
 import { referenceStyle, type ReferenceSelection } from '../look/referenceStyle';
 import { nativeRetouch } from '../../ipc/nativeRetouch';
 import { portraitMessage } from '../develop/PortraitAutoReport';
@@ -22,6 +23,21 @@ function savedSettings(recipe: RecipeDto): string | undefined {
     if (retouch) parts.push(retouch);
     return parts.join(' · ') || undefined;
   } catch { return undefined; }
+}
+
+/** What the reference stage did to this photo, said truthfully: a match that changed nothing is
+ *  not reported as a match. */
+function matchSentence(look: string | null, origin: string, strength: number, matched: ApplyReport | undefined): string {
+  if (matched && matched.changed === 0 && strength > 0) {
+    const kept = matched.protectedFields > 0
+      ? 'your own settings on this photo were kept, so the look had nothing left to change'
+      : "no version of the look kept this photo's smooth gradients, skin tones and highlights while bringing it closer to the reference";
+    return `${look ? `${look} saved. ` : ''}Not matched to ${origin}: ${kept}. The photo was left as it was.`;
+  }
+  const how = matched?.learnedFrom
+    ? `The edit was learned from your own edit of ${matched.learnedFrom} and applied as the same color and tone operation.`
+    : 'Tone, white balance and color fit checked at native resolution.';
+  return `${look ? `${look}, then m` : 'M'}atched to ${origin} at ${Math.round(strength * 100)}% strength. ${how}`;
 }
 
 const RETOUCH_LABELS: Record<string, string> = {
@@ -53,7 +69,7 @@ function adaptedRetouch(report: unknown): string | undefined {
 /** A real pixel-based baseline before optional model stages. Every outcome is reviewable. */
 export async function prepareCollection(projectId: string, stopped: () => boolean,
   onProgress: (message: string) => void, onPhoto: (photo: PreparedPhoto) => void, reference?: ReferenceSelection | null, profile?: ProfileSelection | null,
-  profileName?: string, photoIds?: readonly string[]): Promise<PreparedPhoto[]> {
+  profileName?: string, photoIds?: readonly string[], cancelId?: string): Promise<PreparedPhoto[]> {
   const selected = photoIds ? new Set(photoIds) : null;
   if (selected?.size === 0) return [];
   const photos = [];
@@ -70,12 +86,13 @@ export async function prepareCollection(projectId: string, stopped: () => boolea
   }
   const outcomes: PreparedPhoto[] = [];
   const checkStop = () => {
-    if (stopped()) throw new Error('Stopped before preview verification. Completed edits are saved; retry this photo to finish.');
+    if (stopped()) throw new Refusal('Stopped before preview verification. Completed edits are saved; retry this photo to finish.');
   };
   for (const [index, photo] of photos.entries()) {
     if (stopped()) break;
     onProgress(`Editing photo ${index + 1} of ${photos.length}: ${photo.fileName}`);
     let result: PreparedPhoto;
+    let matched: ApplyReport | undefined;
     try {
       // A profile already contains the measured correction, so it replaces the plain enhancement.
       const adaptations: string[] = [];
@@ -92,8 +109,9 @@ export async function prepareCollection(projectId: string, stopped: () => boolea
       checkStop();
       if (reference) {
         onProgress(`Matching reference style ${index + 1} of ${photos.length}: ${photo.fileName}`);
-        if (profile) await referenceStyle.apply(photo.id, reference.analysis.id, reference.strength, profile);
-        else await referenceStyle.apply(photo.id, reference.analysis.id, reference.strength);
+        matched = cancelId ? await referenceStyle.apply(photo.id, reference.analysis.id, reference.strength, profile ?? null, cancelId)
+          : profile ? await referenceStyle.apply(photo.id, reference.analysis.id, reference.strength, profile)
+          : await referenceStyle.apply(photo.id, reference.analysis.id, reference.strength);
         checkStop();
       }
       // Drain both reads before moving on, even if one fails, to bound native render work.
@@ -105,11 +123,11 @@ export async function prepareCollection(projectId: string, stopped: () => boolea
       if (preview.status === 'rejected') throw preview.reason;
       const look = profile ? `${profileName ?? profile.profileId} profile at ${Math.round(profile.strength * 100)}%` : 'Local exposure, contrast, highlights and shadows';
       const detail = reference
-        ? `${profile ? `${look}, then m` : 'M'}atched to ${reference.analysis.origin} at ${Math.round(reference.strength * 100)}% strength. Tone, white balance and color fit checked in rendered previews. Manual settings protected. ${adaptations.join(' ')}`
+        ? `${matchSentence(profile ? look : null, reference.analysis.origin, reference.strength, matched)} Manual settings protected. ${adaptations.join(' ')}`
         : `${look} saved. Preview rendered. Manual settings protected.${adaptations.length ? ` ${adaptations.join(' ')}` : ''}`;
       result = { photoId: photo.id, name: photo.fileName, outcome: 'ready', detail, settings: savedSettings(saved.value) };
     } catch (error) {
-      result = { photoId: photo.id, name: photo.fileName, outcome: 'failed', detail: asIpcError(error).message };
+      result = { photoId: photo.id, name: photo.fileName, outcome: 'failed', detail: reasonOf(error) };
     }
     outcomes.push(result);
     onPhoto(result);

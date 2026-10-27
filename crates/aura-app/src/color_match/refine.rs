@@ -59,7 +59,7 @@ impl Axis {
                 .as_array()
                 .get(index)
                 .copied()
-                .unwrap_or_default(),
+                .unwrap_or(0.0),
             Self::Saturation(band) => delta.hsl.get(band).s,
             Self::Luminance(band) => delta.hsl.get(band).l,
         }

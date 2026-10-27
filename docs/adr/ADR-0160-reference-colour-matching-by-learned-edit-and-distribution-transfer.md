@@ -3,6 +3,19 @@
 Date: 2026-10-23. Extends ADR-0130 and ADR-0131; replaces the slider fit for references measured
 by this build.
 
+**Status (2026-10-27): the distribution transfer is what main runs; the learned edit is superseded
+by ADR-0161.** This record was written in an older worktree and merged after main had moved on.
+The `reference_grade_v1` recipe extension and renderer stage, the transfer fitter and its
+appearance path are on main (`crates/aura-recipe/src/reference_grade.rs`,
+`crates/aura-render/src/reference_grade.rs`, `crates/aura-app/src/color_match/{transfer,matcher}.rs`,
+`crates/aura-app/tests/reference_grade_transfer.rs`), extended since by ADR-0180 to ADR-0183. The
+same-frame and learned-edit paths described below (`color_match/edit.rs`, `transfer/pairs.rs`,
+`transfer.method` on the wire) and the harnesses `one_shoot_one_look`,
+`real_expert_edits_matched_across_photographs` and `tests/reference_grade_pairs.rs` were not
+merged: learning a look from the reference's own original is ADR-0161's `color_match/original.rs`
+and `learned.rs`. The measurements below were made with this branch's code and are kept as the
+evidence the design rested on.
+
 ## Context
 
 The request was for colour and tone - grading, white balance, colour tone and colour effects - to

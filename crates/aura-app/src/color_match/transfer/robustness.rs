@@ -28,10 +28,8 @@ fn a_dominant_object_does_not_replace_the_neutral_axis() {
 fn an_object_without_neutrals_has_no_white_balance_evidence() {
     let labs = vec![[0.5, 0.15, 0.08]; 2000];
     let stats = measure(&labs);
-    // The measuring axis may follow the object, consistently for a photograph and its edit; what
-    // must be empty is the evidence that would let another scene take it as a cast.
-    assert!(stats.neutral_weight.iter().all(|w| w.abs() < 1e-6));
-    assert!(stats.neutral.iter().all(|c| c[0].hypot(c[1]) < 1e-6));
+    assert!(stats.axis_weight.iter().all(|w| w.abs() < 1e-6));
+    assert!(stats.axis.iter().all(|c| c[0].hypot(c[1]) < 1e-6));
     assert!(
         !stats.achromatic,
         "a single coloured subject is not a monochrome edit"
@@ -52,6 +50,90 @@ fn split_tone_evidence_is_kept_separate_at_different_lightnesses() {
     let (axis, evidence) = neutral_axis(&labs);
     assert!(evidence[2] > 0.9 && evidence[6] > 0.9);
     assert!(axis[2][1] < -0.02 && axis[6][1] > 0.02);
+}
+
+#[test]
+fn a_small_lightness_interval_can_supply_a_neutral_minority() {
+    // Only 5% of the image occupies this interval, and 1% is neutral. The rest of the
+    // photograph must not determine whether those neutral samples can provide evidence.
+    let cast = [0.008, -0.015];
+    let labs: Vec<_> = (0..10_000)
+        .map(|i| {
+            if i < 100 {
+                [0.625, cast[0], cast[1]]
+            } else if i < 500 {
+                [0.625, 0.15, 0.06]
+            } else {
+                [0.2, -0.12, 0.08]
+            }
+        })
+        .collect();
+    let (axis, evidence) = neutral_axis(&labs);
+    assert!(evidence[5] > 0.9);
+    assert!((axis[5][0] - cast[0]).hypot(axis[5][1] - cast[1]) < 1e-5);
+}
+
+#[test]
+fn a_near_grey_wall_does_not_override_supported_white_and_shadow_anchors() {
+    let labs: Vec<_> = (0..10_000)
+        .map(|i| {
+            if i < 1000 {
+                [0.875, 0.001, 0.003]
+            } else if i < 2000 {
+                [0.25, -0.008, -0.02]
+            } else {
+                [0.5, 0.01, 0.025]
+            }
+        })
+        .collect();
+    let (axis, evidence) = neutral_axis(&labs);
+    assert!(evidence[7] > 0.9 && evidence[2] > 0.9);
+    assert!(evidence[4].abs() < 1e-6, "wall evidence {}", evidence[4]);
+    assert!(
+        axis[4][1] < 0.0,
+        "unsupported node interpolates between anchors: {:?}",
+        axis[4]
+    );
+}
+
+#[test]
+fn unrelated_colour_scenes_keep_their_colour_and_object_brightness() {
+    let pixels = samples(&super::tests::outdoor(), TARGET_SAMPLES);
+    let mut reference = measure(&pixels.iter().map(|p| p.lab).collect::<Vec<_>>());
+    // Change scene statistics without providing corresponding pixels or a neutral cast.
+    reference.lightness.iter_mut().for_each(|v| *v *= 0.65);
+    reference.sector_light.iter_mut().for_each(|v| *v *= 0.6);
+    reference.zone_chroma.iter_mut().for_each(|v| *v *= 0.5);
+    let fitted = fit(&reference, &pixels, None);
+    let output = transformed(&fitted.grade, &pixels);
+    // Object brightness and colourfulness are scene content and are not copied: no pixel's
+    // colour moves, and lightness moves only through one curve shared by every pixel - so two
+    // pixels never swap order, and a tone change stays bounded (ADR-0180). A reference this much
+    // darker than ordinary photographs may legitimately darken the photograph somewhat.
+    let worst_colour = output
+        .iter()
+        .zip(&pixels)
+        .map(|(o, i)| (o[1] - i.lab[1]).hypot(o[2] - i.lab[2]))
+        .fold(0.0_f32, f32::max);
+    assert!(
+        worst_colour < 0.01,
+        "unrelated object colours changed: {worst_colour}"
+    );
+    let mut order: Vec<(f32, f32)> = pixels
+        .iter()
+        .zip(&output)
+        .map(|(i, o)| (i.lab[0], o[0]))
+        .collect();
+    order.sort_by(|a, b| a.0.total_cmp(&b.0));
+    assert!(
+        order.windows(2).all(|w| w[1].1 >= w[0].1 - 1e-4),
+        "tone is not one rising curve"
+    );
+    let worst_tone = order
+        .iter()
+        .map(|(i, o)| (i - o).abs())
+        .fold(0.0_f32, f32::max);
+    assert!(worst_tone <= 0.2, "tone moved by {worst_tone}");
 }
 
 #[test]

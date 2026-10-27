@@ -6,6 +6,22 @@ import { PortraitFinishPanel } from './PortraitFinishPanel';
 
 afterEach(cleanup);
 
+it('opens background repair directly and preserves existing shape edits when applied', () => {
+  const onSave = vi.fn();
+  const finish = { ...NEUTRAL_FINISH, face: { ...NEUTRAL_FINISH.face, slim: 20 } };
+  render(<PortraitFinishPanel finish={finish} initialTab="liquify" disabled={false} liquify={null} onSave={onSave} onLiquify={vi.fn()} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Repair background automatically' }));
+  expect(onSave).toHaveBeenCalledWith({ ...finish, backgroundRepair: 100 }, 'Liquify background repair');
+});
+
+it('shows what the last save could not do on this photograph', () => {
+  const note = 'No face was found in this photograph, so the face, body, skin, makeup and people adjustments have nothing to act on and leave it unchanged.';
+  const { rerender } = render(<PortraitFinishPanel finish={NEUTRAL_FINISH} disabled={false} liquify={null} onSave={vi.fn()} onLiquify={vi.fn()} notes={[note]} />);
+  expect(screen.getByText(note)).toBeTruthy();
+  rerender(<PortraitFinishPanel finish={NEUTRAL_FINISH} disabled={false} liquify={null} onSave={vi.fn()} onLiquify={vi.fn()} notes={[]} />);
+  expect(screen.queryByText(note)).toBeNull();
+});
+
 it('a face slider commits one labelled save when released', () => {
   const onSave = vi.fn();
   render(<PortraitFinishPanel finish={NEUTRAL_FINISH} disabled={false} liquify={null} onSave={onSave} onLiquify={vi.fn()} />);

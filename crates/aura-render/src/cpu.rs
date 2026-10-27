@@ -145,6 +145,7 @@ impl CpuEngine {
     ) -> AuraResult<(Vec<u8>, u32, u32)> {
         let _image_work = self.image_work();
         aura_recipe::schema::Validation::check(recipe)?;
+        // Where each saved operation acts, whatever its slider says (ADR-0130).
         let edits = aura_recipe::retouch_tools::read(recipe)?;
         if only.is_some_and(|id| !edits.iter().any(|e| e.id == id)) {
             return Err(aura_core::errors::render::recipe_invalid(
@@ -233,7 +234,7 @@ impl CpuEngine {
         let _image_work = self.image_work();
         aura_recipe::schema::Validation::check(recipe)?;
         aura_recipe::retouch_tools::validate(std::slice::from_ref(draft))?;
-        let mut prior = aura_recipe::retouch_tools::read(recipe)?;
+        let mut prior = aura_recipe::retouch_intensity::scaled_stack(recipe)?;
         if let Some(id) = replace {
             let index = prior.iter().position(|edit| edit.id == id).ok_or_else(|| {
                 aura_core::errors::render::recipe_invalid(
@@ -417,7 +418,7 @@ impl CpuEngine {
         image: Option<&str>,
     ) -> AuraResult<RenderedImage> {
         let started = self.clock.monotonic_us();
-        let retouch = aura_recipe::retouch_tools::read(recipe)?;
+        let retouch = aura_recipe::retouch_intensity::effective(recipe)?;
         let clamped = recipe.clamped();
         let plan = graph::plan(&clamped, purpose, frame.kind, self.caps);
 
@@ -507,7 +508,7 @@ impl CpuEngine {
         let (mut rgb, width, height, notes, stats) =
             Self::before_retouch(frame, recipe, plan, level, stats);
         // Explicit authoring runs in interactive previews and exports, before final geometry.
-        if let Ok(edits) = aura_recipe::retouch_tools::read(recipe) {
+        if let Ok(edits) = aura_recipe::retouch_intensity::effective(recipe) {
             let mattes = aura_recipe::retouch_tools::read_mattes(recipe).unwrap_or_default();
             crate::retouch_tools::apply_with_mattes(
                 &mut rgb,
@@ -772,6 +773,7 @@ impl CpuEngine {
         {
             let _t = crate::perf::step("render.reference_grade");
             crate::reference_grade::apply(&mut rgb, recipe);
+            crate::calibrated_look::apply(&mut rgb, recipe);
         }
         // ---- sharpening ----------------------------------------------------------------
         if plan.stages.contains(&Stage::Sharpen) {
@@ -838,7 +840,7 @@ impl CpuEngine {
         checkpoints: &crate::retouch_cache::Checkpoints,
     ) -> AuraResult<(Vec<f32>, u32, u32, Vec<RenderNote>)> {
         use crate::retouch_cache::{may_resume, prefix_keys, stack_key, Checkpoint, Latest};
-        let edits = aura_recipe::retouch_tools::read(recipe).unwrap_or_default();
+        let edits = aura_recipe::retouch_intensity::effective(recipe).unwrap_or_default();
         let mattes = aura_recipe::retouch_tools::read_mattes(recipe).unwrap_or_default();
         // Everything that reaches the buffer before the stack: the photograph, the size, the
         // purpose, and the recipe without the stack and without the stages after it.
@@ -853,6 +855,7 @@ impl CpuEngine {
         before.extra.remove(aura_recipe::color_lab::KEY);
         before.extra.remove(aura_recipe::spatial_lab::KEY);
         before.extra.remove(aura_recipe::reference_grade::KEY);
+        before.extra.remove(aura_recipe::calibrated_look::KEY);
         before.global.sharpen.amount = 0;
         before.global.effects = aura_recipe::Effects::default();
         before.geometry = aura_recipe::Geometry::default();

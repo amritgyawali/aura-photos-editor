@@ -22,6 +22,8 @@ use rayon::prelude::*;
 
 use crate::contract::render::OutputColour;
 
+mod palette;
+
 /// Samples in each one-dimensional lookup table built from the stored curves.
 const LUT: usize = 1024;
 /// Sector spacing in radians.
@@ -138,6 +140,8 @@ pub struct Evaluator {
     light: Vec<f32>,
     zone: Vec<f32>,
     skin: f32,
+    skin_fidelity: f32,
+    palette: Option<aura_recipe::reference_grade::PaletteMap>,
 }
 
 impl Evaluator {
@@ -165,6 +169,8 @@ impl Evaluator {
             light: grade.hue_light.clone(),
             zone: grade.zone_gain.clone(),
             skin: grade.skin,
+            skin_fidelity: grade.skin_fidelity,
+            palette: grade.palette.clone(),
         }
     }
 
@@ -224,11 +230,32 @@ impl Evaluator {
             cast[0] -= protect * 0.8 * across[0];
             cast[1] -= protect * 0.8 * across[1];
         }
-        [
+        let mut result = [
             out_lightness,
             relative[0] + source[0] + cast[0],
             relative[1] + source[1] + cast[1],
-        ]
+        ];
+        if let Some(map) = &self.palette {
+            palette::apply(map, &mut result);
+        }
+        // Keep this weight independent of lightness. Fading a displacement cap across a
+        // narrow lightness interval can reverse an otherwise monotone tone gradient.
+        let fidelity = self.skin_fidelity * skin_likeness([0.6, a, b]);
+        if fidelity > 0.0 {
+            // Bound the joint result, including neutral-axis and tone changes. Limiting
+            // hue alone cannot prevent a strong palette fit from recolouring a face.
+            let delta = [result[1] - a, result[2] - b];
+            let scale = (0.025 / delta[0].hypot(delta[1]).max(1e-6)).min(1.0);
+            let protected = [
+                lightness + (result[0] - lightness).clamp(-0.08, 0.08),
+                a + delta[0] * scale,
+                b + delta[1] * scale,
+            ];
+            for (value, safe) in result.iter_mut().zip(protected) {
+                *value += fidelity * (safe - *value);
+            }
+        }
+        result
     }
 
     /// The whole display transform: linear sRGB in `0..=1` to linear sRGB in `0..=1`.
@@ -272,6 +299,12 @@ pub(crate) fn apply(rgb: &mut [f32], recipe: &Recipe) {
         return;
     }
     let evaluator = Evaluator::new(&grade);
+    map_display(rgb, |display| evaluator.linear_srgb(display));
+}
+
+/// Execute a display-linear colour mapping and return to the original working domain.
+/// Shared by fitted reference transforms so preview and export use one shoulder round trip.
+pub(super) fn map_display(rgb: &mut [f32], mapping: impl Fn([f32; 3]) -> [f32; 3] + Sync) {
     let to_display = crate::output::working_to_output(OutputColour::Srgb);
     let ceiling = filmic_lite(crate::output::DISPLAY_PEAK);
     let back = |linear: [f32; 3]| {
@@ -285,7 +318,7 @@ pub(crate) fn apply(rgb: &mut [f32], recipe: &Recipe) {
         ];
         let rolled = [r, g, b].map(|v| filmic_lite(v.max(0.0)));
         let display = crate::colour::apply_f32(to_display, rolled).map(|v| v.clamp(0.0, 1.0));
-        let graded = evaluator.linear_srgb(display);
+        let graded = mapping(display);
         if graded
             .iter()
             .zip(display)
@@ -341,6 +374,44 @@ mod tests {
         }
         let white = oklab_from_linear_srgb([1.0; 3]);
         assert!((white[0] - 1.0).abs() < 1e-3 && white[1].abs() < 1e-3 && white[2].abs() < 1e-3);
+    }
+
+    #[test]
+    fn palette_skin_fidelity_bounds_joint_tone_and_colour_without_dimming_other_colours() {
+        let mut grade = grade();
+        grade.cast_out.fill([-0.06, 0.06]);
+        grade.tone = grade.tone.iter().map(|v| (v + 0.2).min(1.0)).collect();
+        let unprotected = Evaluator::new(&grade);
+        grade.skin_fidelity = 1.0;
+        let protected = Evaluator::new(&grade);
+        let skin = [0.65, 0.06, 0.06];
+        assert!((skin_likeness(skin) - 1.0).abs() < 1e-5);
+        let output = protected.oklab(skin);
+        assert!((output[0] - skin[0]).abs() <= 0.08001);
+        assert!((output[1] - skin[1]).hypot(output[2] - skin[2]) <= 0.02501);
+        let blue = [0.6, 0.01, -0.12];
+        assert_eq!(
+            unprotected.oklab(blue).map(f32::to_bits),
+            protected.oklab(blue).map(f32::to_bits)
+        );
+    }
+
+    #[test]
+    fn palette_skin_fidelity_preserves_a_monotone_fixed_colour_tone_ramp() {
+        let mut grade = ReferenceGrade::identity();
+        grade
+            .tone
+            .iter_mut()
+            .for_each(|v| *v = (*v + 0.25).min(1.0));
+        grade.skin_fidelity = 1.0;
+        let evaluator = Evaluator::new(&grade);
+        let mut previous = 0.0;
+        for step in 0..=1024 {
+            let lightness = step as f32 / 1024.0;
+            let result = evaluator.oklab([lightness, 0.06, 0.06]);
+            assert!(result[0] + 1e-6 >= previous, "tone reversal at {lightness}");
+            previous = result[0];
+        }
     }
 
     #[test]
