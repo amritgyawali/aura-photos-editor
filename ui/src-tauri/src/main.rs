@@ -703,12 +703,7 @@ async fn train_profile(
 ) -> IpcResult<TrainProfileDto> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        aura_app::train_profile(
-            &app,
-            &input,
-            std::sync::Arc::new(aura_style::fixtures::EmptySource),
-            std::sync::Arc::new(aura_style::api::NeutralBaseline),
-        )
+        aura_app::style_commands::train_scanned_profile(&app, &input)
     })
     .await
     .map_err(|_| background_request_failed())?
@@ -3392,45 +3387,26 @@ async fn color_match_status(
 }
 
 #[tauri::command]
-async fn quick_color_match(
+async fn generate_color_match_preset(
     state: State<'_, AppState>,
-    input: aura_app::color_match::QuickMatchInput,
-) -> IpcResult<aura_app::color_match::QuickMatchReport> {
-    let app = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || aura_app::color_match::quick_match(&app, &input))
-        .await
-        .map_err(|_| background_request_failed())?
-}
-
-#[tauri::command]
-async fn recommend_color_references(
-    state: State<'_, AppState>,
-    input: aura_app::color_match::RecommendInput,
-) -> IpcResult<Vec<aura_app::color_match::Recommendation>> {
+    input: aura_app::color_match::PresetInput,
+) -> IpcResult<aura_app::color_match::PresetReport> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        aura_app::color_match::recommend_references(&app, &input)
+        aura_app::color_match::generate_lightroom_preset(&app, &input)
     })
     .await
     .map_err(|_| background_request_failed())?
 }
 
 #[tauri::command]
-async fn color_reference_preview(
+async fn find_glare(
     state: State<'_, AppState>,
-    reference_id: String,
-) -> IpcResult<Option<String>> {
-    aura_app::color_match::reference_preview(state.inner(), &reference_id)
-}
-
-#[tauri::command]
-async fn color_match_presets(
-    state: State<'_, AppState>,
-    input: aura_app::color_match::PresetInput,
-) -> IpcResult<Vec<aura_app::color_match::ColorMatchPreset>> {
+    input: aura_app::portrait_commands::FindGlareInput,
+) -> IpcResult<aura_app::portrait_commands::FindGlareDto> {
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        aura_app::color_match::color_match_presets(&app, &input)
+        aura_app::portrait_commands::find_glare(&app, &input)
     })
     .await
     .map_err(|_| background_request_failed())?
@@ -3669,6 +3645,19 @@ async fn preview_edit_profile(
     let app = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         aura_app::edit_profiles::preview_edit_profile(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn retouch_intensity(
+    state: State<'_, AppState>,
+    input: aura_app::retouch_intensity::IntensityInput,
+) -> IpcResult<aura_app::retouch_intensity::IntensityReport> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::retouch_intensity::intensity(&app, &input)
     })
     .await
     .map_err(|_| background_request_failed())?
@@ -4112,6 +4101,62 @@ async fn suggest_portrait_light(
     .map_err(|_| background_request_failed())?
 }
 
+/// The faces in one photograph and how open each eye is, for the face picker. ADR-0150.
+#[tauri::command]
+async fn evoto_faces(
+    state: State<'_, AppState>,
+    input: aura_app::evoto_workflow::PhotoInput,
+) -> IpcResult<aura_app::evoto_workflow::FacesDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::evoto_workflow::evoto_faces(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+/// An ID photograph, a measured crop or a level eye line, saved as one manual edit. ADR-0150.
+#[tauri::command]
+async fn apply_evoto_framing(
+    state: State<'_, AppState>,
+    input: aura_app::evoto_workflow::FramingInput,
+) -> IpcResult<aura_app::evoto_workflow::FramingDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::evoto_workflow::apply_evoto_framing(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+/// A cut-out, grid, carousel, before and after or enlargement, written into a chosen folder. ADR-0150.
+#[tauri::command]
+async fn evoto_export(
+    state: State<'_, AppState>,
+    input: aura_app::evoto_workflow::ExportInput,
+) -> IpcResult<aura_app::evoto_workflow::ExportDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::evoto_workflow::evoto_export(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+/// The photographs in a collection with a face whose eyes look closed. ADR-0150.
+#[tauri::command]
+async fn blink_check(
+    state: State<'_, AppState>,
+    input: aura_app::evoto_workflow::BlinkInput,
+) -> IpcResult<aura_app::evoto_workflow::BlinkDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::evoto_workflow::blink_check(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
 /// "Connect Claude" / "Connect ChatGPT": open the provider's own key page in the browser.
 /// The address comes from the catalogue, never from the window. ADR-0108 section 5.
 #[tauri::command]
@@ -4200,6 +4245,7 @@ fn main() {
             one_click_cancel,
             activity_status,
             analyse_portrait,
+            find_glare,
             portrait_retouch,
             set_portrait_retouch,
             auto_portrait_retouch,
@@ -4208,6 +4254,7 @@ fn main() {
             native_retouch_edit,
             automatic_finish_state,
             adjust_automatic_finish,
+            retouch_intensity,
             native_retouch_blemish_review,
             native_retouch_selection_preview,
             native_retouch_saved_selection,
@@ -4218,6 +4265,10 @@ fn main() {
             studio_finish,
             save_studio_finish,
             suggest_portrait_light,
+            evoto_faces,
+            apply_evoto_framing,
+            evoto_export,
+            blink_check,
             open_provider_page,
             native_retouch_preview,
             photo_original,
@@ -4255,11 +4306,8 @@ fn main() {
             apply_regional_color_match,
             prepare_color_match,
             apply_color_match,
-            quick_color_match,
-            recommend_color_references,
-            color_reference_preview,
-            color_match_presets,
             color_match_status,
+            generate_color_match_preset,
             enhance_photo,
             enhance_portrait,
             auto_retouch,

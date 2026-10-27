@@ -3,6 +3,8 @@
 Date: 2026-10-24. Extends ADR-0130, ADR-0131, ADR-0139 and ADR-0160. Number chosen clear of
 the 0141-0169 range other branches may take.
 
+**Status (2026-10-27): superseded, kept as a record.** This was written in an older worktree, and the one-click screen and look fit described here were not merged. Main built the same workflow in its own Color Match panel (`ui/src/components/look/ColorMatchPanel.tsx`: Recommended and My References, strengths up to Extreme, Save Preset, Sync to a collection), and ADR-0183's Full look is how main moves a photo of another scene further toward a reference. `color_match/one_click.rs`, `transfer/look.rs`, the four one-click IPC commands, `ColorMatchStudio` and `scripts/test-color-match-gui.py` exist only on the `feat/evoto-color-match` branch. The measurements below were made with that branch's code.
+
 ## Context
 
 The photographer asked for Evoto's AI Color Match screen in AURA: choose a reference photo

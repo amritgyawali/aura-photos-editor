@@ -118,6 +118,8 @@ const PORTRAIT_FINISH: Partial<RetouchSettings> = { ...ACNE_ONLY, cleanupPasses:
 /** Starting points modelled on common retouching looks; every control stays adjustable. */
 export const PRESETS: Preset[] = [
   ['natural', 'Natural', {}],
+  ['skin_natural', 'Acne · keep freckles', { ...ACNE_ONLY, removeDarkMarks: false, keepFreckles: true, keepMoles: true, texture: 1 }],
+  ['skin_freckles', 'Acne & freckles', { ...ACNE_ONLY, keepMoles: true, texture: 1 }],
   ['polished_wedding', 'Polished wedding', POLISHED_WEDDING_SETTINGS, 1.25],
   ['bright_polished', 'Bright and polished', BRIGHT_POLISHED_SETTINGS, 1.25],
   ['acne_only', 'Acne only · preserve detail', ACNE_ONLY],
@@ -155,8 +157,14 @@ export function presetOf(options: AutoRetouchOptions): string {
 const percent = (v: number) => `${Math.round(v * 100)}%`;
 
 /** Choose what the automatic retouch works on and how strongly, then run it. */
-export function AutoRetouchSettings({ disabled, busy = false, onRun, onRunCollection, recipe }: { disabled: boolean; busy?: boolean; onRun: (options: AutoRetouchOptions) => void; onRunCollection?: (options: AutoRetouchOptions) => void; recipe?: RecipeDto | null }) {
-  const [options, setOptions] = useState<AutoRetouchOptions>(() => readRetouchPreferences(recipe));
+export function AutoRetouchSettings({ disabled, busy = false, onRun, onRunCollection, recipe, initialSkinPreset = false }: { disabled: boolean; busy?: boolean; onRun: (options: AutoRetouchOptions) => void; onRunCollection?: (options: AutoRetouchOptions) => void; recipe?: RecipeDto | null; initialSkinPreset?: boolean }) {
+  const [options, setOptions] = useState<AutoRetouchOptions>(() => {
+    const saved = readRetouchPreferences(recipe);
+    if (!initialSkinPreset || recipe?.body?.includes('studio_portrait_auto_v1')) return saved;
+    const values = PRESETS.find(p => p[0] === 'skin_natural')?.[2];
+    return { ...saved, intensity: 1, scope: 'face_and_body', eyes: false, teeth: false, refine: false, blemishes: true,
+      settings: { ...DEFAULT_RETOUCH_SETTINGS, ...values } };
+  });
   const [preset, setPreset] = useState(() => presetOf(options));
   const settings = options.settings ?? DEFAULT_RETOUCH_SETTINGS;
   const label = options.intensity < 0.8 ? 'Subtle' : options.intensity > 1.2 ? 'Polished' : 'Natural';
@@ -171,7 +179,7 @@ export function AutoRetouchSettings({ disabled, busy = false, onRun, onRunCollec
   const choose = ([id, , values, intensity]: Preset) => {
     setPreset(id);
     setOptions({ ...options, intensity: intensity ?? 1, settings: { ...DEFAULT_RETOUCH_SETTINGS, ...values },
-      ...(['acne_only', 'skin_cleanup', 'detailed_skin'].includes(id) ? { eyes: false, teeth: false, refine: false, blemishes: true, scope: 'face_and_body' as const } : {}),
+      ...(['skin_natural', 'skin_freckles', 'acne_only', 'skin_cleanup', 'detailed_skin'].includes(id) ? { eyes: false, teeth: false, refine: false, blemishes: true, scope: 'face_and_body' as const } : {}),
       ...(['polished_wedding', 'bright_polished', 'portrait_finish', 'smooth_finish', 'body_finish'].includes(id) ? { eyes: true, teeth: false, refine: true, blemishes: true, scope: 'face_and_body' as const } : {}),
     });
   };

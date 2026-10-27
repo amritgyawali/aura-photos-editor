@@ -54,13 +54,18 @@ const METADATA_PREFIX: &str = "provenance";
 /// neutral" rather than "not mentioned" - otherwise applying a look with a colour grade and
 /// then one without it would leave the first grade behind forever, which is exactly the
 /// compounding every automated pass promises not to do.
-pub const OPTIONAL_BLOCKS: [&str; 6] = [
+pub const OPTIONAL_BLOCKS: [&str; 11] = [
     "global.parametric",
     "global.channel_curves",
     "global.colour_grade",
     "global.calibration",
     "global.effects",
     "calibrated_look_v1",
+    "calibrated_look_v1.residualLut",
+    "reference_grade_v1",
+    "reference_grade_v1.palette",
+    "reference_grade_v1.skinFidelity",
+    "studio_finish_v1.backgroundRepair",
 ];
 
 /// What a merge did.
@@ -161,13 +166,25 @@ pub fn merge(
 
     // An optional block the proposal omitted has gone back to neutral. Remove it unless a
     // person set something inside it, in which case it stays and the refusal is reported.
+    let mut removed: Vec<&str> = Vec::new();
     for block in OPTIONAL_BLOCKS {
+        if removed.iter().any(|parent| {
+            block
+                .strip_prefix(*parent)
+                .is_some_and(|tail| tail.starts_with('.'))
+        }) {
+            continue;
+        }
         let prefix = format!("{block}.");
         let in_base: Vec<&String> = base_leaves
             .keys()
-            .filter(|path| path.starts_with(&prefix))
+            .filter(|path| path.as_str() == block || path.starts_with(&prefix))
             .collect();
-        if in_base.is_empty() || proposal_leaves.keys().any(|p| p.starts_with(&prefix)) {
+        if in_base.is_empty()
+            || proposal_leaves
+                .keys()
+                .any(|p| p == block || p.starts_with(&prefix))
+        {
             continue;
         }
         if source.is_automated() && in_base.iter().any(|p| is_protected(&protected, p)) {
@@ -176,6 +193,7 @@ pub fn merge(
         }
         remove_path(&mut merged, block);
         changed.push(block.to_string());
+        removed.push(block);
     }
 
     let mut result: Recipe =
@@ -352,12 +370,14 @@ impl Validation {
     #[allow(clippy::too_many_lines)]
     pub fn check(recipe: &Recipe) -> AuraResult<()> {
         crate::retouch_tools::read(recipe)?;
+        crate::retouch_intensity::read(recipe)?;
         crate::studio_finish::read(recipe)?;
         crate::studio_color::read(recipe)?;
         crate::material_lab::read(recipe)?;
         crate::spatial_lab::read(recipe)?;
         crate::color_lab::read(recipe)?;
         crate::calibrated_look::read(recipe)?;
+        crate::reference_grade::read(recipe)?;
         if recipe.schema == 0 {
             return Err(recipe_invalid("schema", "must be at least 1"));
         }
@@ -826,6 +846,90 @@ mod tests {
                 assert!(crate::hash::non_finite_field(&broken).is_some(), "{leaf}");
             }
         }
+    }
+
+    #[test]
+    fn returning_a_reference_grade_to_neutral_removes_it_unless_a_person_protected_it() {
+        let mut base = fixtures::reference();
+        let mut grade = crate::reference_grade::ReferenceGrade::identity();
+        grade.cast_out.fill([0.01, -0.02]);
+        crate::reference_grade::write(&mut base, &grade).unwrap();
+        let mut neutral = base.clone();
+        neutral.extra.remove(crate::reference_grade::KEY);
+        let (cleared, report) = merge(&base, &neutral, EditSource::Ai).unwrap();
+        assert!(crate::reference_grade::read(&cleared).unwrap().is_none());
+        assert!(report
+            .changed
+            .iter()
+            .any(|path| path == crate::reference_grade::KEY));
+        for path in ["reference_grade_v1", "reference_grade_v1.tone"] {
+            let mut protected = base.clone();
+            protected.provenance.user_edited_fields.push(path.into());
+            let (kept, report) = merge(&protected, &neutral, EditSource::Ai).unwrap();
+            assert_eq!(
+                crate::reference_grade::read(&kept).unwrap(),
+                Some(grade.clone())
+            );
+            assert!(report
+                .refused
+                .iter()
+                .any(|path| path == crate::reference_grade::KEY));
+        }
+        let mut corrupt = base;
+        corrupt.extra.insert(
+            crate::reference_grade::KEY.into(),
+            serde_json::json!({"tone": [1.0]}),
+        );
+        assert!(Validation::check(&corrupt).is_err());
+    }
+
+    #[test]
+    fn replacing_a_palette_grade_does_not_retain_its_optional_colour_transform() {
+        let mut base = fixtures::reference();
+        let mut palette = crate::reference_grade::ReferenceGrade::identity();
+        palette.cast_out.fill([0.01, -0.02]);
+        palette.palette = Some(crate::reference_grade::PaletteMap {
+            offset: [0.0; 2],
+            deltas: vec![
+                [0.0; 2];
+                crate::reference_grade::palette::EDGE
+                    * crate::reference_grade::palette::EDGE
+            ],
+        });
+        palette.skin_fidelity = 1.0;
+        crate::reference_grade::write(&mut base, &palette).unwrap();
+        let mut next = palette.clone();
+        next.palette = None;
+        next.skin_fidelity = 0.0;
+        let mut proposal = base.clone();
+        crate::reference_grade::write(&mut proposal, &next).unwrap();
+        let (merged, _) = merge(&base, &proposal, EditSource::Ai).unwrap();
+        assert_eq!(crate::reference_grade::read(&merged).unwrap(), Some(next));
+    }
+
+    #[test]
+    fn replacing_a_calibrated_lattice_with_a_cubic_model_removes_the_old_lattice() {
+        use crate::calibrated_look::{self, CalibratedLook, ResidualLut, RESIDUAL_NODES, TERMS};
+        let mut base = fixtures::reference();
+        let mut next = CalibratedLook {
+            version: 1,
+            coefficients: vec![[0.01, 0.0, 0.0]; TERMS],
+            amount: 1.0,
+            residual_lut: None,
+        };
+        let mut old = next.clone();
+        old.version = 2;
+        old.residual_lut = Some(ResidualLut {
+            values: vec![[0.01; 3]; RESIDUAL_NODES],
+        });
+        calibrated_look::write(&mut base, &old).unwrap();
+        next.coefficients.fill([0.0; 3]);
+        next.coefficients[0] = [0.02, 0.0, 0.0];
+        let mut proposal = base.clone();
+        calibrated_look::write(&mut proposal, &next).unwrap();
+        let (merged, _) = merge(&base, &proposal, EditSource::Ai).unwrap();
+        Validation::check(&merged).unwrap();
+        assert_eq!(calibrated_look::read(&merged).unwrap(), Some(next));
     }
 
     #[test]

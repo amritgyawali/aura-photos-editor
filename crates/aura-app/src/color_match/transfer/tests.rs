@@ -2,6 +2,68 @@ use super::*;
 use aura_raw::colour::curve::srgb_decode;
 use aura_render::reference_grade::linear_srgb_from_oklab;
 
+#[test]
+fn palette_transport_moves_missing_blue_hues_into_a_warm_reference_palette() {
+    let cool = image(128, 128, |x, y| {
+        let light = 0.25 + 0.6 * y as f32 / 127.0;
+        let a = -0.035 + 0.025 * x as f32 / 127.0;
+        linear_srgb_from_oklab([light, a, -0.08]).map(aura_raw::colour::curve::srgb_encode)
+    });
+    let warm = image(128, 128, |x, y| {
+        let light = 0.25 + 0.6 * y as f32 / 127.0;
+        let a = 0.01 + 0.025 * x as f32 / 127.0;
+        linear_srgb_from_oklab([light, a, 0.07]).map(aura_raw::colour::curve::srgb_encode)
+    });
+    let samples = samples(&cool, TARGET_SAMPLES);
+    let mut reference = reference_stats(&warm);
+    reference.palette_matching = true;
+    let fitted = fit_with_intent_checkpoint(
+        &reference,
+        &samples,
+        None,
+        super::super::MatchQuality::Precise,
+        super::super::MatchIntent::Palette,
+        || Ok(()),
+    )
+    .unwrap();
+    assert!(
+        fitted.grade.palette.is_some(),
+        "missing-hue transfer must use joint colour evidence"
+    );
+    let after = transformed(&fitted.grade, &samples);
+    let mean_b = after.iter().map(|p| p[2]).sum::<f32>() / after.len() as f32;
+    assert!(
+        mean_b > 0.035,
+        "blue must become warm, not merely less saturated: {mean_b}"
+    );
+    let measured = measure(&after);
+    let before = measure(&samples.iter().map(|p| p.lab).collect::<Vec<_>>());
+    assert!(distance(&reference, &measured).palette < 0.35 * distance(&reference, &before).palette);
+    assert!(after.iter().all(|p| p.iter().all(|v| v.is_finite())));
+}
+
+#[test]
+fn palette_strength_endpoints_restore_the_entire_previous_map_exactly() {
+    use aura_recipe::reference_grade::{palette::EDGE, PaletteMap};
+    let mut prior = ReferenceGrade::identity();
+    prior.palette = Some(PaletteMap {
+        offset: [0.01, -0.02],
+        deltas: vec![[0.005, 0.0]; EDGE * EDGE],
+    });
+    let mut next = ReferenceGrade::identity();
+    next.palette = Some(PaletteMap {
+        offset: [-0.01, 0.06],
+        deltas: vec![[0.0, 0.015]; EDGE * EDGE],
+    });
+    assert_eq!(mix(&prior, &next, &Scales::uniform(0.0)), prior);
+    assert_eq!(mix(&prior, &next, &Scales::uniform(1.0)), next);
+    let mut no_warmth = Scales::uniform(1.0);
+    no_warmth.temperature = 0.0;
+    no_warmth.tint = 0.0;
+    let mixed = mix(&prior, &next, &no_warmth);
+    assert_eq!(mixed.palette.unwrap().offset, prior.palette.unwrap().offset);
+}
+
 /// Deterministic texture, so no two neighbouring pixels are identical.
 fn noise(x: u32, y: u32, seed: u32) -> f32 {
     let mut h = x.wrapping_mul(374_761_393)
@@ -232,6 +294,38 @@ fn the_same_photograph_graded_eight_ways_is_matched_closely() {
 }
 
 #[test]
+fn quality_modes_fit_real_samples_with_distinct_iteration_budgets() {
+    let source = outdoor();
+    let reference = grade_image(&source, punchy);
+    let stats = reference_stats(&reference);
+    for quality in [
+        super::super::MatchQuality::Quick,
+        super::super::MatchQuality::Precise,
+    ] {
+        let target = samples(&source, quality.target_samples());
+        let result =
+            fit_with_quality_checkpoint(&stats, &target, Some(1.0), quality, || Ok(())).unwrap();
+        assert_eq!(result.iterations, quality.iterations());
+        assert!(target.len() <= quality.target_samples());
+        assert!(result.after.total < result.before.total);
+        result.grade.validate().unwrap();
+        // Lower computational budgets must not alter the exact zero-strength endpoint.
+        let identity = ReferenceGrade::identity();
+        assert_eq!(toward(&identity, &result.grade, 0.0), identity);
+        let mut checkpoints = 0;
+        let cancelled = fit_with_quality_checkpoint(&stats, &target, Some(1.0), quality, || {
+            checkpoints += 1;
+            if checkpoints >= 2 {
+                Err(super::super::invalid("Stopped for quality test"))
+            } else {
+                Ok(())
+            }
+        });
+        assert!(cancelled.is_err());
+    }
+}
+
+#[test]
 fn a_different_photograph_takes_the_look_of_an_edited_reference() {
     // The reference is one scene edited; the photograph is another scene. The answer is the same
     // edit applied to the photograph, which the fit never sees. This is the case the slider fit
@@ -263,23 +357,95 @@ fn a_different_photograph_takes_the_look_of_an_edited_reference() {
 }
 
 #[test]
+fn explicit_palette_matching_fits_unrelated_tone_without_claiming_scene_correspondence() {
+    let reference = reference_stats(&grade_image(&indoor(), warm));
+    let target = samples(&outdoor(), TARGET_SAMPLES);
+    let natural = fit_with_intent_checkpoint(
+        &reference,
+        &target,
+        None,
+        super::super::MatchQuality::Precise,
+        super::super::MatchIntent::Natural,
+        || Ok(()),
+    )
+    .unwrap();
+    let palette = fit_with_intent_checkpoint(
+        &reference,
+        &target,
+        None,
+        super::super::MatchQuality::Precise,
+        super::super::MatchIntent::Palette,
+        || Ok(()),
+    )
+    .unwrap();
+    println!(
+        "unrelated natural {:.3}, palette {:.3}, baseline {:.3}",
+        natural.after.total, palette.after.total, palette.before.total
+    );
+    assert!(palette.after.total < 0.8 * palette.before.total);
+    assert!(palette.after.total < natural.after.total);
+    assert!(palette.content.abs() < f32::EPSILON);
+    assert_eq!(
+        palette.iterations,
+        super::super::MatchQuality::Precise.iterations()
+    );
+    palette.grade.validate().unwrap();
+    let identity = ReferenceGrade::identity();
+    assert_eq!(toward(&identity, &palette.grade, 0.0), identity);
+}
+
+/// Mean |dL| and mean |d(a,b)| between two sets of `OKLab` samples, times a hundred: the tone and
+/// the colour halves of an error.
+fn split_error(result: &[[f32; 3]], truth: &[[f32; 3]]) -> (f32, f32) {
+    let n = result.len().max(1) as f32;
+    let (tone, colour) = result.iter().zip(truth).fold((0.0, 0.0), |(t, c), (a, b)| {
+        (
+            t + (a[0] - b[0]).abs(),
+            c + (a[1] - b[1]).hypot(a[2] - b[2]),
+        )
+    });
+    (100.0 * tone / n, 100.0 * colour / n)
+}
+
+#[test]
 fn a_batch_matched_to_one_reference_converges_on_one_look() {
+    // Two photographs of one scene, one already graded warm, matched to one split-toned
+    // reference of another scene. Both must arrive at the same look: the photograph's own cast
+    // is removed before the reference's is applied (ADR-0181), so the truth for both is the look
+    // on the neutral photograph, not the look stacked on the earlier warm grade.
+    //
+    // What one reference of another scene identifies is its colour - the neutral axis it puts
+    // shadows and highlights on - not its tone, which it shares with its scene (ADR-0180); the
+    // tone of this look is a few hundredths of lightness. So the colour half must lose at least
+    // 40 % of its error, the tone half must not get worse, and the whole must improve.
     let reference = grade_image(&indoor(), split_tone);
     let stats = reference_stats(&reference);
-    let first = outdoor();
-    let second = grade_image(&outdoor(), warm);
+    let neutral = outdoor();
+    let truth: Vec<[f32; 3]> = unchanged(&grade_image(&neutral, split_tone));
+    let mut results = Vec::new();
     let mut failures = Vec::new();
-    for (index, target) in [first, second].into_iter().enumerate() {
+    for (index, target) in [neutral.clone(), grade_image(&neutral, warm)]
+        .into_iter()
+        .enumerate()
+    {
         let pixels = samples(&target, TARGET_SAMPLES);
         let fit = fit(&stats, &pixels, None);
-        // A large histogram decrease can be achieved by repainting different objects.
-        // Require fidelity to the known grade instead, retaining descriptor non-regression.
-        let truth = grade_image(&target, split_tone);
-        let before = error(&unchanged(&target), &truth);
-        let after = error(&transformed(&fit.grade, &pixels), &truth);
-        println!("batch split tone: {before:.3} -> {after:.3}");
-        if !before.is_finite() || !after.is_finite() || after >= 0.6 * before {
-            failures.push(format!("target {index}: {before:.3} -> {after:.3}"));
+        let plain = unchanged(&target);
+        let result = transformed(&fit.grade, &samples(&target, usize::MAX));
+        let (tone_before, colour_before) = split_error(&plain, &truth);
+        let (tone_after, colour_after) = split_error(&result, &truth);
+        let before = error(&plain, &grade_image(&neutral, split_tone));
+        let after = error(&result, &grade_image(&neutral, split_tone));
+        println!(
+            "batch target {index}: {before:.3} -> {after:.3}; tone {tone_before:.3} -> {tone_after:.3}; colour {colour_before:.3} -> {colour_after:.3}"
+        );
+        if !(after < before
+            && colour_after < 0.6 * colour_before
+            && tone_after <= tone_before + 0.02)
+        {
+            failures.push(format!(
+                "target {index}: {before:.3} -> {after:.3}, colour {colour_before:.3} -> {colour_after:.3}, tone {tone_before:.3} -> {tone_after:.3}"
+            ));
         }
         assert!(
             fit.after.total < fit.before.total,
@@ -288,6 +454,14 @@ fn a_batch_matched_to_one_reference_converges_on_one_look() {
             fit.after
         );
         fit.grade.validate().unwrap();
+        results.push((plain, result));
+    }
+    // The two photographs began a whole warm grade apart; they must end at least 40 % closer.
+    let apart = split_error(&results[0].0, &results[1].0).1;
+    let together = split_error(&results[0].1, &results[1].1).1;
+    println!("batch colour apart {apart:.3} -> together {together:.3}");
+    if together >= 0.6 * apart {
+        failures.push(format!("colour apart {apart:.3} -> {together:.3}"));
     }
     assert!(
         failures.is_empty(),
@@ -306,7 +480,29 @@ fn a_monochrome_reference_produces_neutral_greys() {
         .map(|l| l[1].hypot(l[2]))
         .fold(0.0_f32, f32::max);
     assert!(worst < 0.005, "chroma {worst}");
-    assert!(fit.after.tone < fit.before.tone);
+    // An ordinary reference of another scene keeps this photograph's tone (ADR-0180); it never
+    // moves it farther from the reference's.
+    assert!(fit.after.tone <= fit.before.tone + 1e-4);
+}
+
+#[test]
+fn palette_monochrome_matching_does_not_leave_skin_coloured() {
+    let reference = reference_stats(&grade_image(&indoor(), mono));
+    let pixels = samples(&outdoor(), TARGET_SAMPLES);
+    let fit = fit_with_intent_checkpoint(
+        &reference,
+        &pixels,
+        None,
+        super::super::MatchQuality::Precise,
+        super::super::MatchIntent::Palette,
+        || Ok(()),
+    )
+    .unwrap();
+    let worst = transformed(&fit.grade, &pixels)
+        .iter()
+        .map(|v| v[1].hypot(v[2]))
+        .fold(0.0_f32, f32::max);
+    assert!(worst < 0.005, "monochrome must include skin: {worst}");
 }
 
 #[test]
@@ -439,3 +635,98 @@ fn stored_measurements_round_trip_and_reject_another_version() {
     old.version = 2;
     assert!(!old.usable());
 }
+
+#[test]
+fn a_look_that_would_clip_a_bright_backdrop_is_held_back_in_the_highlights_only() {
+    // A studio frame: most of it a near-white backdrop, a mid-grey figure in front.
+    let frame = image(96, 64, |x, y| {
+        let n = ((x * 7 + y * 13) % 5) as f32 * 0.004;
+        if (30..66).contains(&x) && y > 12 {
+            [0.45 + n, 0.42 + n, 0.40 + n]
+        } else {
+            [0.95 + n, 0.95 + n, 0.94 + n]
+        }
+    });
+    let pixels = samples(&frame, usize::MAX);
+    // A strong cool cast at every lightness: on the backdrop it drives blue to full scale.
+    let mut grade = ReferenceGrade::identity();
+    grade.cast_out.fill([-0.03, -0.05]);
+    let before = new_clipping(&grade, &pixels);
+    assert!(before > 0.3, "the fixture must clip: {before}");
+    let (held, from) = limit_highlights_to(grade.clone(), &pixels, MAX_NEW_CLIPPING);
+    assert_eq!(from, Some(before));
+    assert!(new_clipping(&held, &pixels) <= MAX_NEW_CLIPPING);
+    // The figure in the midtones keeps the look: its cast is the fitted one.
+    let middle = (AXIS_NODES - 1) / 2;
+    assert_eq!(held.cast_out[middle - 1], grade.cast_out[middle - 1]);
+    held.validate().unwrap();
+    // A look that clips nothing is returned exactly.
+    let mild = ReferenceGrade::identity();
+    assert_eq!(
+        limit_highlights_to(mild.clone(), &pixels, MAX_NEW_CLIPPING),
+        (mild, None)
+    );
+}
+
+/// Mean per-channel distance between two `OKLab` distributions, times a hundred.
+fn distribution_gap(result: &[[f32; 3]], wanted: &[[f32; 3]]) -> f32 {
+    let mut total = 0.0;
+    for channel in 0..3 {
+        let sorted = |set: &[[f32; 3]]| {
+            let mut values: Vec<f32> = set.iter().map(|p| p[channel]).collect();
+            values.sort_by(f32::total_cmp);
+            values
+        };
+        let (mine, theirs) = (sorted(result), sorted(wanted));
+        for k in 0..256 {
+            let q = (k as f32 + 0.5) / 256.0;
+            let at = |values: &[f32]| values[(q * (values.len() - 1) as f32) as usize];
+            total += (at(&mine) - at(&theirs)).abs();
+        }
+    }
+    100.0 * total / (3.0 * 256.0)
+}
+
+#[test]
+fn the_exact_goal_gives_a_photograph_the_reference_colours() {
+    // Two different scenes with the continuous colour variation photographs have (painted flat
+    // regions cannot be spread into a palette without inventing texture, and the maps refuse to):
+    // a cool, soft photograph and a warm, contrasty reference.
+    let photograph = image(160, 120, |x, y| {
+        let (fx, fy) = (x as f32 / 160.0, y as f32 / 120.0);
+        [
+            0.25 + 0.4 * fx,
+            0.35 + 0.35 * fy,
+            0.45 + 0.25 * (fx * fy).sqrt(),
+        ]
+    });
+    let reference = image(150, 110, |x, y| {
+        let (fx, fy) = (x as f32 / 150.0, y as f32 / 110.0);
+        let t = (fx * 0.7 + fy * 0.3).powf(1.4);
+        [0.08 + 0.9 * t, 0.06 + 0.7 * t * t, 0.05 + 0.35 * fy * t]
+    });
+    let colours: Vec<[f32; 3]> = samples(&reference, usize::MAX)
+        .iter()
+        .map(|s| s.lab)
+        .collect();
+    let target = samples(&photograph, TARGET_SAMPLES);
+    let plain: Vec<[f32; 3]> = target.iter().map(|s| s.lab).collect();
+    let fit = fit_exact(
+        &reference_stats(&reference),
+        &target,
+        &colours,
+        None,
+        &aura_core::progress::CancelToken::new(),
+    )
+    .unwrap();
+    fit.grade.validate().unwrap();
+    let before = distribution_gap(&plain, &colours);
+    let after = distribution_gap(&transformed(&fit.grade, &target), &colours);
+    println!("exact colours: distribution gap {before:.2} -> {after:.2}");
+    assert!(after < 0.15 * before, "{before:.2} -> {after:.2}");
+    assert!(stretch(&fit.grade, &target) <= exact_grade::MAX_EXACT_STRETCH + 0.05);
+    assert!(fit.after.total < fit.before.total);
+}
+
+#[cfg(test)]
+mod looks;

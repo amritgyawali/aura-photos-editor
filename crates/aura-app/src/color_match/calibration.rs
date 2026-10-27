@@ -1,8 +1,9 @@
 //! Supervised global colour calibration, independent of target-scene colour proportions.
 //!
 //! An edited reference alone confounds object colours and edits. An aligned before/after
-//! pair supplies corresponding RGBs. Fit a regularised cubic residual with robust reweighting,
-//! and qualify it on spatially held-out pixels through the renderer's actual lookup evaluator.
+//! pair supplies corresponding RGBs. Fit a regularised cubic with optional local RGB residuals.
+//! Disjoint spatial tiles support regression, model selection and final verification through
+//! the renderer's actual lookup evaluator, including a bound on colour-noise amplification.
 use aura_core::{progress::CancelToken, AuraResult};
 use aura_raw::{codec::Rgb8, colour::curve::srgb_decode};
 use aura_recipe::calibrated_look::{basis, CalibratedLook, TERMS};
@@ -15,6 +16,8 @@ const MAX_SAMPLES: usize = 65_536;
 const MIN_SAMPLES: usize = 512;
 const ROUNDS: usize = 4;
 
+mod lattice;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CalibrationReport {
@@ -24,6 +27,17 @@ pub struct CalibrationReport {
     pub mean_error: f32,
     pub p95_error: f32,
     pub occupied_color_cells: usize,
+    #[serde(default)]
+    pub selection_samples: usize,
+    #[serde(default)]
+    pub residual_refined: bool,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Partition {
+    Train,
+    Select,
+    Validate,
 }
 
 #[derive(Clone)]
@@ -31,7 +45,7 @@ struct Pair {
     input: [f32; 3],
     output: [f32; 3],
     cell: usize,
-    validation: bool,
+    partition: Partition,
 }
 
 fn lab(rgb: [f32; 3]) -> [f32; 3] {
@@ -92,8 +106,13 @@ fn pairs(original: &Rgb8, edited: &Rgb8) -> AuraResult<Vec<Pair>> {
             input,
             output: read(edited),
             cell: (bins[0] * 4 + bins[1]) * 4 + bins[2],
-            // Hold out entire spatial tiles, rather than neighbours from every patch.
-            validation: (tile_x + 3 * tile_y).is_multiple_of(5),
+            // Separate tiles for fitting, model selection and final verification. Neither
+            // model selection nor the final validation pixels enter either regression.
+            partition: match (tile_x + 3 * tile_y) % 5 {
+                0 => Partition::Validate,
+                1 => Partition::Select,
+                _ => Partition::Train,
+            },
         });
     }
     Ok(out)
@@ -154,51 +173,64 @@ pub(super) fn fit(
     edited: &Rgb8,
     cancel: &CancelToken,
 ) -> AuraResult<(CalibratedLook, CalibrationReport)> {
+    fit_pairs(&[(original, edited)], cancel)
+}
+
+/// One look learned from several original/edited pairs at once (ADR-0161). Each pair shows the
+/// edit on the colours of its own scene; pooled, they show it on more of the colours a batch will
+/// contain, so less of the batch depends on how the model extrapolates. Every pair must
+/// correspond, and each keeps its own spatial training, selection and validation tiles.
+pub(super) fn fit_pairs(
+    pairs_in: &[(&Rgb8, &Rgb8)],
+    cancel: &CancelToken,
+) -> AuraResult<(CalibratedLook, CalibrationReport)> {
     check_cancel(cancel)?;
-    let rows = pairs(original, edited)?;
-    if !content::similarity(&content::thumbnail(edited), original).is_some_and(|s| s >= 0.9) {
-        return Err(invalid("Choose the original of this exact edited photo, with the same framing and orientation."));
+    let mut rows = Vec::new();
+    for (original, edited) in pairs_in {
+        let these = pairs(original, edited)?;
+        if !content::similarity(&content::thumbnail(edited), original).is_some_and(|s| s >= 0.9) {
+            return Err(invalid("Choose the original of this exact edited photo, with the same framing and orientation."));
+        }
+        rows.extend(these);
     }
     let mut cells = [0_usize; 64];
-    for row in rows.iter().filter(|row| !row.validation) {
+    for row in rows.iter().filter(|row| row.partition == Partition::Train) {
         if let Some(cell) = cells.get_mut(row.cell) {
             *cell += 1;
         }
     }
     let training_samples = cells.iter().sum::<usize>();
-    let validation_samples = rows.len() - training_samples;
-    if training_samples < MIN_SAMPLES / 2 || validation_samples < 64 {
+    let validation_samples = rows
+        .iter()
+        .filter(|row| row.partition == Partition::Validate)
+        .count();
+    let selection_samples = rows
+        .iter()
+        .filter(|row| row.partition == Partition::Select)
+        .count();
+    if training_samples < MIN_SAMPLES / 2 || validation_samples < 64 || selection_samples < 64 {
         return Err(invalid(
             "The reference pair has too few independent validation pixels.",
         ));
     }
-    let model = train(&rows, &cells, cancel)?;
+    let base = train(&rows, &cells, cancel)?;
+    let model = select_model(&rows, &cells, base, cancel)?;
     check_cancel(cancel)?;
     let evaluator = Evaluator::new(&model);
-    let mut errors: Vec<_> = rows
-        .iter()
-        .filter(|row| row.validation)
-        .map(|row| pixel_error(evaluator.encoded_srgb(row.input), row.output))
-        .collect();
-    errors.sort_by(f32::total_cmp);
-    let mean_error = errors.iter().sum::<f32>() / errors.len().max(1) as f32;
-    let p95_error = errors
-        .get((errors.len().saturating_sub(1) as f32 * 0.95).round() as usize)
-        .copied()
-        .unwrap_or(f32::INFINITY);
+    let Quality {
+        mean: mean_error,
+        p95: p95_error,
+    } = quality(&rows, Partition::Validate, &evaluator);
     if !mean_error.is_finite() || mean_error > 3.0 || p95_error > 8.0 {
         return Err(invalid(format!("This pair cannot be explained reliably by a global colour grade (validation error {mean_error:.2}, p95 {p95_error:.2}). Use the same framing without local edits, or match the edited reference alone.")));
     }
-    // A photographic grade may soften or flatten tone; it must not reverse the neutral ramp.
-    let mut last = -1.0_f32;
-    for i in 0..=256 {
-        let mapped = evaluator.encoded_srgb([i as f32 / 256.0; 3]);
-        let light = lab(mapped)[0];
-        if light + 0.002 < last {
-            return Err(invalid("The reference pair implies an unstable tone reversal. Choose a better-exposed original/edited pair."));
-        }
-        last = light;
+    if !tone_ordered(&evaluator) {
+        return Err(invalid("The reference pair implies an unstable tone reversal. Choose a better-exposed original/edited pair."));
     }
+    if !colour_stable(&evaluator) {
+        return Err(invalid("The reference pair amplifies small colour differences too strongly in unobserved colours. Choose an original/edited pair with broader colour coverage."));
+    }
+    let residual_refined = model.residual_lut.is_some();
     Ok((
         model,
         CalibrationReport {
@@ -207,8 +239,78 @@ pub(super) fn fit(
             mean_error,
             p95_error,
             occupied_color_cells: cells.iter().filter(|&&n| n >= 8).count(),
+            selection_samples,
+            residual_refined,
         },
     ))
+}
+
+struct Quality {
+    mean: f32,
+    p95: f32,
+}
+
+fn quality(rows: &[Pair], partition: Partition, evaluator: &Evaluator) -> Quality {
+    let mut errors: Vec<_> = rows
+        .iter()
+        .filter(|row| row.partition == partition)
+        .map(|row| pixel_error(evaluator.encoded_srgb(row.input), row.output))
+        .collect();
+    errors.sort_by(f32::total_cmp);
+    Quality {
+        mean: errors.iter().sum::<f32>() / errors.len().max(1) as f32,
+        p95: errors
+            .get((errors.len().saturating_sub(1) as f32 * 0.95).round() as usize)
+            .copied()
+            .unwrap_or(f32::INFINITY),
+    }
+}
+
+fn tone_ordered(evaluator: &Evaluator) -> bool {
+    let mut last = -1.0_f32;
+    for i in 0..=256 {
+        let light = lab(evaluator.encoded_srgb([i as f32 / 256.0; 3]))[0];
+        if !light.is_finite() || light + 0.002 < last {
+            return false;
+        }
+        last = light;
+    }
+    true
+}
+
+/// Bound the actual baked RGB lookup, including colours absent from the pair.
+/// This authored gain limit is an additional guard, not proof of photographic fidelity.
+fn colour_stable(evaluator: &Evaluator) -> bool {
+    let gain = evaluator.max_noise_gain();
+    gain.is_finite() && gain <= 8.0
+}
+
+fn select_model(
+    rows: &[Pair],
+    cells: &[usize; 64],
+    base: CalibratedLook,
+    cancel: &CancelToken,
+) -> AuraResult<CalibratedLook> {
+    let Some(refined) = lattice::refine(rows, cells, &base, cancel)? else {
+        return Ok(base);
+    };
+    check_cancel(cancel)?;
+    let evaluator = Evaluator::new(&refined);
+    if !tone_ordered(&evaluator) || !colour_stable(&evaluator) {
+        return Ok(base);
+    }
+    let before = quality(rows, Partition::Select, &Evaluator::new(&base));
+    let after = quality(rows, Partition::Select, &evaluator);
+    // Prefer the compact cubic unless a separate selection set supports a material gain.
+    // The final validation set is never examined here or used to fit either model.
+    if after.mean.is_finite()
+        && after.mean + 0.02 < 0.97 * before.mean
+        && after.p95 <= before.p95 + 0.01
+    {
+        Ok(refined)
+    } else {
+        Ok(base)
+    }
 }
 
 fn train(rows: &[Pair], cells: &[usize; 64], cancel: &CancelToken) -> AuraResult<CalibratedLook> {
@@ -216,13 +318,18 @@ fn train(rows: &[Pair], cells: &[usize; 64], cancel: &CancelToken) -> AuraResult
         version: 1,
         coefficients: vec![[0.0; 3]; TERMS],
         amount: 1.0,
+        residual_lut: None,
     };
     for round in 0..ROUNDS {
         check_cancel(cancel)?;
         let mut matrix = [[0.0_f64; TERMS]; TERMS];
         let mut rhs = [[0.0_f64; 3]; TERMS];
         let mut total = 0.0;
-        for (index, row) in rows.iter().filter(|row| !row.validation).enumerate() {
+        for (index, row) in rows
+            .iter()
+            .filter(|row| row.partition == Partition::Train)
+            .enumerate()
+        {
             if index.is_multiple_of(4096) {
                 check_cancel(cancel)?;
             }

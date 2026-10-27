@@ -92,6 +92,7 @@ pub mod contract {
 pub mod activity;
 pub mod adaptive_look;
 pub mod emotion_commands;
+pub mod evoto_workflow;
 pub mod explain_commands;
 pub mod finish_commands;
 pub mod framing_workflows;
@@ -124,6 +125,7 @@ pub mod qc_commands;
 pub mod reference_style;
 pub mod restore_commands;
 pub mod retouch_commands;
+pub mod retouch_intensity;
 pub mod retouch_settings;
 pub mod smart_edit;
 pub mod state;

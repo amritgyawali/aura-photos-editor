@@ -8,6 +8,14 @@ use aura_ingest::contract::ingest::{ImportMode, ImportPlan};
 use std::sync::Arc;
 
 fn setup(path: &std::path::Path, directory: &std::path::Path) -> (AppState, ProjectId, PhotoId) {
+    setup_with_baseline(path, directory, true)
+}
+
+fn setup_with_baseline(
+    path: &std::path::Path,
+    directory: &std::path::Path,
+    save_baseline: bool,
+) -> (AppState, ProjectId, PhotoId) {
     let state = AppState::open(&directory.join("catalog.aura"))
         .expect("isolated catalogue")
         .with_cache_root(&directory.join("cache"))
@@ -48,15 +56,762 @@ fn setup(path: &std::path::Path, directory: &std::path::Path) -> (AppState, Proj
     )
     .expect("list target");
     let photo = PhotoId::from_db(&photos.first().expect("target").id).expect("photo id");
-    let baseline = aura_app::develop_commands::neutral_recipe(&state, photo);
-    state
-        .recipe_store()
-        .save(&project_id, &photo, &baseline, &[], "Camera baseline")
-        .expect("initial edit");
+    if save_baseline {
+        let baseline = aura_app::develop_commands::neutral_recipe(&state, photo);
+        state
+            .recipe_store()
+            .save(&project_id, &photo, &baseline, &[], "Camera baseline")
+            .expect("initial edit");
+    }
     (state, project_id, photo)
 }
 fn job() -> String {
     uuid::Uuid::new_v4().to_string()
+}
+
+#[test]
+fn palette_matching_checks_the_native_endpoint_without_writing_until_apply() {
+    let directory = tempfile::tempdir().expect("native palette catalogue");
+    let target_path = directory.path().join("target.png");
+    let reference_path = directory.path().join("different-reference.png");
+    image::RgbImage::from_fn(144, 96, |x, y| {
+        let value = (35 + x * 150 / 144 + y * 35 / 96) as u8;
+        image::Rgb([value, value.saturating_add(9), value.saturating_add(15)])
+    })
+    .save(&target_path)
+    .expect("target");
+    image::RgbImage::from_fn(96, 144, |x, y| {
+        let value = (45 + y * 150 / 144 + x * 25 / 96) as u8;
+        image::Rgb([value.saturating_add(15), value.saturating_add(5), value])
+    })
+    .save(&reference_path)
+    .expect("reference");
+    let source_bytes = std::fs::read(&target_path).expect("source bytes");
+    let (state, project, photo) = setup_with_baseline(&target_path, directory.path(), false);
+    let reference = color_match::import_reference(
+        &state,
+        &color_match::ImportInput {
+            path: reference_path.to_string_lossy().into_owned(),
+            cancel_id: job(),
+        },
+    )
+    .expect("reference import");
+    let analysis = color_match::prepare(
+        &state,
+        &color_match::PrepareInput {
+            replace_previous: false,
+            photo_id: photo.to_db(),
+            reference_id: reference.id.clone(),
+            cancel_id: job(),
+            quality: color_match::MatchQuality::Quick,
+            intent: color_match::MatchIntent::Palette,
+        },
+    )
+    .expect("native palette analysis");
+    let fitting = analysis.fitting.as_ref().expect("diagnostics");
+    assert_eq!(fitting.intent, color_match::MatchIntent::Palette);
+    assert!(fitting.native_candidate_checked);
+    assert!(fitting.native_backtrack_factor > 0.0 && fitting.native_backtrack_factor <= 1.0);
+    assert!(!analysis.full_resolution_checked);
+    assert!(state
+        .recipe_store()
+        .load(&photo)
+        .expect("no edit")
+        .is_none());
+    let apply = |controls| {
+        color_match::apply(
+            &state,
+            &color_match::ApplyInput {
+                photo_id: photo.to_db(),
+                session_id: analysis.session_id.clone(),
+                controls,
+                cancel_id: job(),
+            },
+        )
+    };
+    let result = apply(color_match::Controls::default()).expect("full-strength apply");
+    assert!(
+        result
+            .fitting
+            .as_ref()
+            .expect("native proof")
+            .cached_proposals
+            > 0,
+        "identical full-resolution pixels should reuse the in-process native proof"
+    );
+    assert!(result.current && result.full_resolution_checked);
+    assert!(result.after_distance <= result.before_distance + 0.0001);
+    let matched = state.recipe_store().load(&photo).expect("saved");
+    assert_eq!(
+        apply(color_match::Controls::default())
+            .expect("repeat")
+            .changed,
+        0
+    );
+    let zero = apply(color_match::Controls {
+        amount: 0.0,
+        ..Default::default()
+    })
+    .expect("zero");
+    let verified = zero
+        .fitting
+        .as_ref()
+        .expect("zero diagnostics")
+        .transfer
+        .as_ref()
+        .expect("zero component measurements");
+    assert!((verified.rendered_before.total - zero.before_distance).abs() < 1e-6);
+    assert!((verified.rendered_after.total - zero.after_distance).abs() < 1e-6);
+    assert!((verified.rendered_after.tone - verified.rendered_before.tone).abs() < 1e-6);
+    assert!((verified.rendered_after.palette - verified.rendered_before.palette).abs() < 1e-6);
+    let identity_preset = color_match::generate_lightroom_preset(
+        &state,
+        &color_match::PresetInput {
+            photo_id: photo.to_db(),
+            session_id: analysis.session_id.clone(),
+            name: "Zero strength".into(),
+            cancel_id: job(),
+        },
+    )
+    .expect("checked zero strength exports a valid identity preset");
+    assert!(identity_preset.p95_table_error < 0.1);
+    apply(color_match::Controls::default()).expect("restore fitted endpoint");
+    assert_eq!(
+        state.recipe_store().load(&photo).expect("restored"),
+        matched
+    );
+    assert_eq!(
+        std::fs::read(&target_path).expect("source unchanged"),
+        source_bytes
+    );
+    let mono_path = directory.path().join("different-monochrome.png");
+    image::RgbImage::from_fn(96, 144, |_, y| image::Rgb([(115 + y * 120 / 144) as u8; 3]))
+        .save(&mono_path)
+        .expect("monochrome reference");
+    let mono = color_match::import_reference(
+        &state,
+        &color_match::ImportInput {
+            path: mono_path.to_string_lossy().into_owned(),
+            cancel_id: job(),
+        },
+    )
+    .expect("monochrome import");
+    let analysis = color_match::prepare(
+        &state,
+        &color_match::PrepareInput {
+            replace_previous: false,
+            photo_id: photo.to_db(),
+            reference_id: mono.id,
+            cancel_id: job(),
+            quality: color_match::MatchQuality::Quick,
+            intent: color_match::MatchIntent::Palette,
+        },
+    )
+    .expect("native monochrome palette fit");
+    let monochrome = color_match::apply(
+        &state,
+        &color_match::ApplyInput {
+            photo_id: photo.to_db(),
+            session_id: analysis.session_id,
+            controls: Default::default(),
+            cancel_id: job(),
+        },
+    )
+    .expect("native monochrome apply");
+    assert!(monochrome.full_resolution_checked);
+    let saved = state
+        .recipe_store()
+        .load(&photo)
+        .expect("saved monochrome")
+        .expect("recipe");
+    let model = aura_recipe::reference_grade::read(&saved)
+        .expect("grade")
+        .expect("monochrome model");
+    assert!(model.chroma.iter().all(|v| v.abs() < 1e-6));
+    assert!(
+        model.skin_fidelity.abs() < 1e-6,
+        "skin must desaturate with a monochrome reference"
+    );
+    let replacement = color_match::prepare(
+        &state,
+        &color_match::PrepareInput {
+            photo_id: photo.to_db(),
+            reference_id: reference.id,
+            cancel_id: job(),
+            quality: color_match::MatchQuality::Quick,
+            intent: color_match::MatchIntent::Palette,
+            replace_previous: true,
+        },
+    )
+    .expect("replace monochrome with the earlier colour reference");
+    let preset_input = || color_match::PresetInput {
+        photo_id: photo.to_db(),
+        session_id: replacement.session_id.clone(),
+        name: "Warm & <soft> look".into(),
+        cancel_id: job(),
+    };
+    assert!(
+        color_match::generate_lightroom_preset(&state, &preset_input()).is_err(),
+        "analysis alone is not an applied preset"
+    );
+    let result = color_match::apply(
+        &state,
+        &color_match::ApplyInput {
+            photo_id: photo.to_db(),
+            session_id: replacement.session_id.clone(),
+            controls: Default::default(),
+            cancel_id: job(),
+        },
+    )
+    .expect("replacement colour apply");
+    assert!(result.current && result.full_resolution_checked);
+    let replaced = state
+        .recipe_store()
+        .load(&photo)
+        .expect("replacement saved")
+        .expect("recipe");
+    assert_eq!(aura_recipe::reference_grade::read(&replaced).expect("replacement grade"),
+        aura_recipe::reference_grade::read(matched.as_ref().expect("first matched recipe")).expect("first grade"),
+        "switching back must recover the original colour fit, without a monochrome crossfade baseline");
+    let preset = color_match::generate_lightroom_preset(&state, &preset_input())
+        .expect("self-contained Lightroom preset");
+    assert!(preset.xml.contains("Warm &amp; &lt;soft&gt; look"));
+    assert!(preset
+        .xml
+        .contains(&format!("crs:Table_{}=", preset.table_fingerprint)));
+    assert!(
+        preset.xml.contains("crs:PresetType=\"Normal\"") && preset.xml.contains("crs:RGBTable=")
+    );
+    assert_eq!(preset.table_edge, 32);
+    assert!(preset.mean_table_error.is_finite() && preset.p95_table_error.is_finite());
+    assert_eq!(
+        state
+            .recipe_store()
+            .load(&photo)
+            .expect("unchanged by export"),
+        Some(replaced.clone())
+    );
+    let mut manual = replaced;
+    manual.global.exposure += 0.25;
+    state
+        .recipe_store()
+        .save(
+            &project,
+            &photo,
+            &manual,
+            &["global.exposure".into()],
+            "Later manual exposure",
+        )
+        .expect("manual change");
+    assert!(
+        color_match::generate_lightroom_preset(&state, &preset_input()).is_err(),
+        "never export a stale matched treatment as the current edit"
+    );
+    assert_eq!(
+        state.recipe_store().load(&photo).expect("manual kept"),
+        Some(manual)
+    );
+    assert_eq!(
+        std::fs::read(&target_path).expect("source unchanged after export"),
+        source_bytes
+    );
+}
+
+#[test]
+fn identical_source_and_renamed_references_are_refused_without_editing_the_target() {
+    let directory = tempfile::tempdir().expect("distinct reference catalogue");
+    let target_path = directory.path().join("target.png");
+    let copy_path = directory.path().join("renamed-copy.png");
+    let different_path = directory.path().join("different-photo.png");
+    image::RgbImage::from_pixel(80, 64, image::Rgb([80u8, 90, 100]))
+        .save(&target_path)
+        .expect("target");
+    std::fs::copy(&target_path, &copy_path).expect("renamed copy");
+    image::RgbImage::from_pixel(80, 64, image::Rgb([100u8, 90, 80]))
+        .save(&different_path)
+        .expect("different photo");
+    let original = std::fs::read(&target_path).expect("source bytes");
+    let (state, _, photo) = setup_with_baseline(&target_path, directory.path(), false);
+    for path in [&target_path, &copy_path] {
+        let reference = color_match::import_reference(
+            &state,
+            &color_match::ImportInput {
+                path: path.to_string_lossy().into_owned(),
+                cancel_id: job(),
+            },
+        )
+        .expect("import duplicate reference");
+        let error = color_match::prepare(
+            &state,
+            &color_match::PrepareInput {
+                replace_previous: false,
+                intent: Default::default(),
+                photo_id: photo.to_db(),
+                reference_id: reference.id,
+                cancel_id: job(),
+                quality: Default::default(),
+            },
+        )
+        .expect_err("same source must be refused");
+        assert!(error.message.contains("same source photo"));
+        assert!(state
+            .recipe_store()
+            .load(&photo)
+            .expect("no edit")
+            .is_none());
+        let writes: i64 = state.catalog().read(|conn| {
+            conn.query_row("SELECT (SELECT COUNT(*) FROM edit_history)+(SELECT COUNT(*) FROM setting WHERE key LIKE 'colour_match_v1:%')", [], |row| row.get(0))
+                .map_err(|e| aura_core::errors::db::statement_failed("duplicate refusal writes", &e))
+        }).expect("no matching writes");
+        assert_eq!(
+            writes, 0,
+            "duplicate refusal creates no recipe, history or session"
+        );
+    }
+    let reference = color_match::import_reference(
+        &state,
+        &color_match::ImportInput {
+            path: different_path.to_string_lossy().into_owned(),
+            cancel_id: job(),
+        },
+    )
+    .expect("different reference");
+    let accepted = color_match::prepare(
+        &state,
+        &color_match::PrepareInput {
+            replace_previous: false,
+            intent: Default::default(),
+            photo_id: photo.to_db(),
+            reference_id: reference.id,
+            cancel_id: job(),
+            quality: Default::default(),
+        },
+    )
+    .expect("different photo must remain usable");
+    assert!(accepted.current);
+    assert!(state
+        .recipe_store()
+        .load(&photo)
+        .expect("analysis remains read-only")
+        .is_none());
+    assert_eq!(
+        std::fs::read(&target_path).expect("source unchanged"),
+        original
+    );
+}
+
+#[test]
+fn fractional_reanalysis_and_quality_changes_start_from_the_original_match_baseline() {
+    for legacy in [false, true] {
+        let directory = tempfile::tempdir().expect("fractional reference matching");
+        let target_path = directory.path().join("original.png");
+        let reference_path = directory.path().join("reference.png");
+        image::RgbImage::from_fn(96, 80, |x, y| {
+            let l = (45 + x * 100 / 96 + y * 35 / 80) as u8;
+            image::Rgb([l, l.saturating_add(6), l.saturating_add(12)])
+        })
+        .save(&target_path)
+        .expect("target");
+        image::RgbImage::from_fn(80, 96, |x, y| {
+            let l = (55 + x * 100 / 80 + y * 35 / 96) as u8;
+            image::Rgb([l.saturating_add(7), l.saturating_add(4), l])
+        })
+        .save(&reference_path)
+        .expect("reference");
+        let actual_directory = directory.path().join("actual");
+        let fresh_directory = directory.path().join("fresh");
+        std::fs::create_dir_all(&actual_directory).expect("actual directory");
+        std::fs::create_dir_all(&fresh_directory).expect("fresh directory");
+        let (actual, actual_project, actual_photo) = setup(&target_path, &actual_directory);
+        let (fresh, fresh_project, fresh_photo) = setup(&target_path, &fresh_directory);
+        let import_reference = |state: &AppState| {
+            let reference = color_match::import_reference(
+                state,
+                &color_match::ImportInput {
+                    path: reference_path.to_string_lossy().into_owned(),
+                    cancel_id: job(),
+                },
+            )
+            .expect("reference");
+            if legacy {
+                let key = format!("colour_reference_grade_v1:{}", reference.id);
+                state
+                    .catalog()
+                    .writer()
+                    .with(move |conn| {
+                        conn.execute("DELETE FROM setting WHERE key=?1", [key])
+                            .map_err(|e| {
+                                aura_core::errors::db::statement_failed(
+                                    "legacy fractional reference",
+                                    &e,
+                                )
+                            })?;
+                        Ok(())
+                    })
+                    .expect("legacy descriptors");
+            }
+            reference.id
+        };
+        let actual_reference = import_reference(&actual);
+        let fresh_reference = import_reference(&fresh);
+        let apply_fraction = |state: &AppState,
+                              project: ProjectId,
+                              photo: PhotoId,
+                              reference: &str,
+                              quality| {
+            let analysis = color_match::prepare(
+                state,
+                &color_match::PrepareInput {
+                    replace_previous: false,
+                    intent: Default::default(),
+                    photo_id: photo.to_db(),
+                    reference_id: reference.into(),
+                    cancel_id: job(),
+                    quality,
+                },
+            )
+            .expect("analyse fractional look");
+            let applied = color_match::apply(
+                state,
+                &color_match::ApplyInput {
+                    photo_id: photo.to_db(),
+                    session_id: analysis.session_id,
+                    cancel_id: job(),
+                    controls: color_match::Controls {
+                        amount: 0.75,
+                        ..Default::default()
+                    },
+                },
+            )
+            .expect("apply fractional look");
+            assert!(applied.full_resolution_checked && applied.current);
+            let recipe = state
+                .recipe_store()
+                .load(&photo)
+                .expect("fractional recipe")
+                .expect("saved");
+            let pixels =
+                aura_app::native_retouch::preview(state, &project.to_db(), &photo.to_db(), false)
+                    .expect("native fractional pixels")
+                    .rgb_base64;
+            (recipe, pixels)
+        };
+        let precise = apply_fraction(
+            &actual,
+            actual_project,
+            actual_photo,
+            &actual_reference,
+            color_match::MatchQuality::Precise,
+        );
+        let repeated = apply_fraction(
+            &actual,
+            actual_project,
+            actual_photo,
+            &actual_reference,
+            color_match::MatchQuality::Precise,
+        );
+        assert!(
+            repeated.0 == precise.0,
+            "reanalysis must not compound 75% into 93.75% (legacy={legacy})"
+        );
+        assert!(
+            repeated.1 == precise.1,
+            "reanalysis must preserve native pixels (legacy={legacy})"
+        );
+        let quick = apply_fraction(
+            &actual,
+            actual_project,
+            actual_photo,
+            &actual_reference,
+            color_match::MatchQuality::Quick,
+        );
+        let fresh_quick = apply_fraction(
+            &fresh,
+            fresh_project,
+            fresh_photo,
+            &fresh_reference,
+            color_match::MatchQuality::Quick,
+        );
+        assert!(
+            quick.0 == fresh_quick.0,
+            "Quick after matching must equal a fresh Quick recipe (legacy={legacy})"
+        );
+        assert!(
+            quick.1 == fresh_quick.1,
+            "Quick after matching must equal fresh Quick native pixels (legacy={legacy})"
+        );
+        let restored = apply_fraction(
+            &actual,
+            actual_project,
+            actual_photo,
+            &actual_reference,
+            color_match::MatchQuality::Precise,
+        );
+        assert!(
+            restored.0 == precise.0,
+            "switching back to Precise must retain absolute strength (legacy={legacy})"
+        );
+        assert!(
+            restored.1 == precise.1,
+            "Precise mode must return to identical native pixels (legacy={legacy})"
+        );
+    }
+}
+
+#[test]
+fn pristine_analysis_never_overwrites_a_later_first_manual_edit() {
+    let directory = tempfile::tempdir().expect("pristine manual race");
+    let target_path = directory.path().join("original.png");
+    let reference_path = directory.path().join("reference.png");
+    image::RgbImage::from_pixel(80, 64, image::Rgb([80u8, 90, 100]))
+        .save(&target_path)
+        .expect("target");
+    image::RgbImage::from_pixel(80, 64, image::Rgb([100u8, 90, 80]))
+        .save(&reference_path)
+        .expect("reference");
+    let (state, project, photo) = setup_with_baseline(&target_path, directory.path(), false);
+    let reference = color_match::import_reference(
+        &state,
+        &color_match::ImportInput {
+            path: reference_path.to_string_lossy().into_owned(),
+            cancel_id: job(),
+        },
+    )
+    .expect("reference import");
+    let analysis = color_match::prepare(
+        &state,
+        &color_match::PrepareInput {
+            replace_previous: false,
+            intent: Default::default(),
+            photo_id: photo.to_db(),
+            reference_id: reference.id,
+            cancel_id: job(),
+            quality: Default::default(),
+        },
+    )
+    .expect("analyse before the first edit");
+    assert!(state
+        .recipe_store()
+        .load(&photo)
+        .expect("pristine")
+        .is_none());
+    let mut manual = aura_app::develop_commands::neutral_recipe(&state, photo);
+    manual.global.exposure = 0.25;
+    state
+        .recipe_store()
+        .save_first(
+            &project,
+            &photo,
+            &manual,
+            &["global.exposure".into()],
+            "First manual correction",
+        )
+        .expect("manual edit wins");
+    assert!(color_match::apply(
+        &state,
+        &color_match::ApplyInput {
+            photo_id: photo.to_db(),
+            session_id: analysis.session_id,
+            cancel_id: job(),
+            controls: Default::default(),
+        }
+    )
+    .is_err());
+    assert_eq!(
+        state
+            .recipe_store()
+            .load(&photo)
+            .expect("manual recipe")
+            .expect("saved"),
+        manual
+    );
+    let history: i64 = state
+        .catalog()
+        .read(|conn| {
+            conn.query_row("SELECT COUNT(*) FROM edit_history", [], |row| row.get(0))
+                .map_err(|e| aura_core::errors::db::statement_failed("manual first history", &e))
+        })
+        .expect("history");
+    assert_eq!(history, 1, "refusal must not add a matching history entry");
+}
+
+#[test]
+fn pristine_imports_match_without_analysis_edits_and_first_apply_supports_undo() {
+    for legacy in [false, true] {
+        let directory = tempfile::tempdir().expect("pristine catalogue");
+        let target_path = directory.path().join("original.png");
+        let reference_path = directory.path().join("reference.png");
+        image::RgbImage::from_fn(160, 120, |x, y| {
+            let l = (45 + x * 100 / 160 + y * 35 / 120) as u8;
+            image::Rgb([l, l.saturating_add(6), l.saturating_add(12)])
+        })
+        .save(&target_path)
+        .expect("target");
+        image::RgbImage::from_fn(120, 160, |x, y| {
+            let l = (55 + x * 100 / 120 + y * 35 / 160) as u8;
+            image::Rgb([l.saturating_add(7), l.saturating_add(4), l])
+        })
+        .save(&reference_path)
+        .expect("reference");
+        let original_bytes = std::fs::read(&target_path).expect("source bytes");
+        let (state, project, photo) = setup_with_baseline(&target_path, directory.path(), false);
+        let baseline = aura_app::develop_commands::neutral_recipe(&state, photo);
+        let reference = color_match::import_reference(
+            &state,
+            &color_match::ImportInput {
+                path: reference_path.to_string_lossy().into_owned(),
+                cancel_id: job(),
+            },
+        )
+        .expect("import reference");
+        if legacy {
+            // Descriptor-only libraries and references predating distribution transfer
+            // retain the legacy fitting path without a separately stored grade measurement.
+            let measurement_key = format!("colour_reference_grade_v1:{}", reference.id);
+            state
+                .catalog()
+                .writer()
+                .with(move |conn| {
+                    conn.execute("DELETE FROM setting WHERE key=?1", [measurement_key])
+                        .map_err(|e| {
+                            aura_core::errors::db::statement_failed("simulate legacy reference", &e)
+                        })?;
+                    Ok(())
+                })
+                .expect("legacy reference");
+        }
+        let history_count = || -> i64 {
+            state
+                .catalog()
+                .read(|conn| {
+                    conn.query_row("SELECT COUNT(*) FROM edit_history", [], |row| row.get(0))
+                        .map_err(|e| {
+                            aura_core::errors::db::statement_failed("pristine history", &e)
+                        })
+                })
+                .expect("history count")
+        };
+        assert!(state
+            .recipe_store()
+            .load(&photo)
+            .expect("unmodified import")
+            .is_none());
+        let analysis = color_match::prepare(
+            &state,
+            &color_match::PrepareInput {
+                replace_previous: false,
+                intent: Default::default(),
+                photo_id: photo.to_db(),
+                reference_id: reference.id,
+                cancel_id: job(),
+                quality: Default::default(),
+            },
+        )
+        .expect("analyse pristine import");
+        assert!(state
+            .recipe_store()
+            .load(&photo)
+            .expect("analysis does not initialize edits")
+            .is_none());
+        assert_eq!(history_count(), 0, "analysis must not create an Undo step");
+        assert_eq!(
+            analysis.fitting.as_ref().expect("fitting").engine,
+            if legacy {
+                "bounded-pattern-search-v1"
+            } else {
+                "reference-grade-transfer-v4-scene-tone"
+            }
+        );
+        let input = |amount| color_match::ApplyInput {
+            photo_id: photo.to_db(),
+            session_id: analysis.session_id.clone(),
+            cancel_id: job(),
+            controls: color_match::Controls {
+                amount,
+                ..Default::default()
+            },
+        };
+        let zero = color_match::apply(&state, &input(0.0)).expect("zero before first edit");
+        assert_eq!(zero.changed, 0);
+        assert!(state
+            .recipe_store()
+            .load(&photo)
+            .expect("zero keeps pristine import")
+            .is_none());
+        assert_eq!(history_count(), 0);
+        let matched = color_match::apply(&state, &input(1.0)).expect("first colour edit");
+        assert!(matched.changed > 0 && matched.full_resolution_checked && matched.current);
+        assert!(matched.after_distance < matched.before_distance);
+        assert_eq!(
+            history_count(),
+            1,
+            "first actual edit creates exactly one Undo step"
+        );
+        let first = state
+            .recipe_store()
+            .load(&photo)
+            .expect("first edit")
+            .expect("saved");
+        aura_app::history_step(
+            &state,
+            &aura_app::contract::ipc::HistoryStepInput {
+                project_id: project.to_db(),
+                photo_id: photo.to_db(),
+                action: "undo".into(),
+            },
+        )
+        .expect("undo first edit");
+        assert_eq!(
+            state
+                .recipe_store()
+                .load(&photo)
+                .expect("undone")
+                .expect("neutral"),
+            baseline
+        );
+        aura_app::history_step(
+            &state,
+            &aura_app::contract::ipc::HistoryStepInput {
+                project_id: project.to_db(),
+                photo_id: photo.to_db(),
+                action: "redo".into(),
+            },
+        )
+        .expect("redo first edit");
+        assert_eq!(
+            state
+                .recipe_store()
+                .load(&photo)
+                .expect("redone")
+                .expect("saved"),
+            first
+        );
+        let mut manual = first;
+        manual.global.exposure += 0.2;
+        state
+            .recipe_store()
+            .save(
+                &project,
+                &photo,
+                &manual,
+                &["global.exposure".into()],
+                "Later manual edit",
+            )
+            .expect("manual correction");
+        assert!(color_match::apply(&state, &input(0.5)).is_err());
+        assert_eq!(
+            state
+                .recipe_store()
+                .load(&photo)
+                .expect("manual preserved")
+                .expect("saved"),
+            manual
+        );
+        assert_eq!(
+            std::fs::read(&target_path).expect("source preserved"),
+            original_bytes
+        );
+    }
 }
 
 #[test]
@@ -414,6 +1169,11 @@ fn edited_preview_references_keep_library_metadata_and_saved_strengths_after_reo
     )
     .expect("create from actual edited preview");
     assert!(reference
+        .preview
+        .as_ref()
+        .expect("comparison preview")
+        .starts_with("data:image/jpeg;base64,"));
+    assert!(reference
         .thumbnail
         .as_ref()
         .expect("preview")
@@ -453,6 +1213,10 @@ fn edited_preview_references_keep_library_metadata_and_saved_strengths_after_reo
         .with_cache_root(&directory.path().join("cache"));
     let references = color_match::list_references(&reopened).expect("durable library");
     let saved = references.first().expect("saved reference");
+    assert_eq!(
+        saved.preview, reference.preview,
+        "comparison pixels survive reopening"
+    );
     assert_eq!(saved.name, "Warm reception");
     assert_eq!(saved.group, "Weddings");
     assert!(saved.favorite);
@@ -666,6 +1430,9 @@ fn different_dimensions_match_strengths_restore_and_new_manual_edits_are_kept() 
     let prepared = color_match::prepare(
         &state,
         &color_match::PrepareInput {
+            replace_previous: false,
+            intent: Default::default(),
+            quality: Default::default(),
             photo_id: photo.to_db(),
             reference_id: reference.id.clone(),
             cancel_id: job(),
@@ -677,12 +1444,28 @@ fn different_dimensions_match_strengths_restore_and_new_manual_edits_are_kept() 
         .fitting
         .as_ref()
         .expect("measured fitting diagnostics");
-    assert_eq!(fitting.engine, "bounded-pattern-search-v1");
-    assert!((1..=160).contains(&fitting.refinement_candidates));
-    assert!(fitting.unique_renders <= 238 && fitting.cached_proposals > 0);
-    assert!(fitting.grade_candidates <= 36);
+    assert_eq!(fitting.engine, "reference-grade-transfer-v4-scene-tone");
+    assert_eq!(fitting.quality, color_match::MatchQuality::Precise);
+    assert_eq!(fitting.max_iterations, 4);
+    assert!((1..=fitting.max_iterations).contains(&fitting.refinement_candidates));
+    assert!((1..=40_000).contains(&fitting.target_samples));
+    // Natural analysis finds a native-safe endpoint before offering it (ADR-0180): the baseline
+    // plus one to six bracketing renders.
+    assert!(
+        (2..=8).contains(&fitting.unique_renders),
+        "{}",
+        fitting.unique_renders
+    );
+    assert_eq!(fitting.cached_proposals, 0);
+    assert_eq!(fitting.grade_candidates, 0);
     assert!(fitting.native_candidate_checked);
     assert!((0.0..=1.0).contains(&fitting.native_backtrack_factor));
+    let transfer = fitting
+        .transfer
+        .as_ref()
+        .expect("rendered transfer diagnostics");
+    assert_eq!(transfer.rendered_before.total, prepared.before_distance);
+    assert_eq!(transfer.rendered_after.total, prepared.after_distance);
     assert!(prepared.after_distance <= prepared.before_distance);
     assert!(
         prepared.after_distance < prepared.before_distance - 0.01,
@@ -697,12 +1480,50 @@ fn different_dimensions_match_strengths_restore_and_new_manual_edits_are_kept() 
     let applied =
         color_match::apply(&state, &input(color_match::Controls::default())).expect("native apply");
     assert!(applied.full_resolution_checked && applied.changed > 0);
+    assert!(
+        applied
+            .fitting
+            .as_ref()
+            .expect("verified fitting diagnostics")
+            .native_candidate_checked
+    );
     assert!(applied.after_distance <= applied.before_distance + 0.0001);
     let full = state
         .recipe_store()
         .load(&photo)
         .expect("read full strength")
         .expect("recipe");
+    let history_count = || -> i64 {
+        state
+            .catalog()
+            .read(|conn| {
+                conn.query_row("SELECT COUNT(*) FROM edit_history", [], |row| row.get(0))
+                    .map_err(|e| {
+                        aura_core::errors::db::statement_failed("count repeated colour history", &e)
+                    })
+            })
+            .expect("history count")
+    };
+    let full_history = history_count();
+    let repeated = color_match::apply(&state, &input(color_match::Controls::default()))
+        .expect("repeat identical strengths through native renderer");
+    assert_eq!(
+        repeated.changed, 0,
+        "same strengths must not create a duplicate edit"
+    );
+    assert_eq!(
+        history_count(),
+        full_history,
+        "identical native controls add no Undo step"
+    );
+    assert_eq!(
+        state
+            .recipe_store()
+            .load(&photo)
+            .expect("same recipe")
+            .expect("saved"),
+        full
+    );
     let half_controls = color_match::Controls {
         amount: 0.5,
         ..color_match::Controls::default()
@@ -730,6 +1551,10 @@ fn different_dimensions_match_strengths_restore_and_new_manual_edits_are_kept() 
         .expect("saved");
     assert_eq!(restored.global, original.global);
     assert_eq!(restored.retouch, original.retouch);
+    assert_eq!(
+        restored.extra, original.extra,
+        "zero also removes the matched colour extension exactly"
+    );
     let status = color_match::status(&state, &photo.to_db())
         .expect("status")
         .expect("saved strengths");
@@ -788,6 +1613,9 @@ fn native_raw_reference_match_does_not_touch_originals() {
     let prepared = color_match::prepare(
         &state,
         &color_match::PrepareInput {
+            replace_previous: false,
+            intent: Default::default(),
+            quality: Default::default(),
             photo_id: photo.to_db(),
             reference_id: reference.id,
             cancel_id: job(),

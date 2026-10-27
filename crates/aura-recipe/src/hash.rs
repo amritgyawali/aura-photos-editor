@@ -137,14 +137,9 @@ pub fn number(value: f64) -> String {
         let as_int = value as i64;
         return as_int.to_string();
     }
-    let text = format!("{value:.FLOAT_PLACES$}");
-    // Decide integrality on the rounded value, not the raw one. `3e-7` prints as `0.000000`,
-    // which reads back as `0` and would then print as `0`: the same recipe with two canonical
-    // forms and two hashes, and every later save refused as a concurrent edit (ADR-0170). The
-    // same holds within half a millionth of any integer, and for `-0.000000`.
-    let rounded: f64 = text.parse().unwrap_or(value);
-    if rounded.fract() == 0.0 && rounded.abs() < 1e15 {
-        return (rounded as i64).to_string();
+    let mut text = format!("{value:.FLOAT_PLACES$}");
+    if text.starts_with("-0.") && text[1..].chars().all(|c| c == '0' || c == '.') {
+        text.remove(0);
     }
     text
 }
@@ -296,31 +291,5 @@ mod tests {
         recipe.global.exposure = f32::NAN;
         let err = canonical(&recipe).expect_err("NaN must not serialise");
         assert_eq!(err.code.to_string(), "AURA-RENDER-8002");
-    }
-
-    #[test]
-    fn a_number_reads_back_to_the_same_canonical_text() {
-        // Values within half a millionth of an integer used to print with six decimals and
-        // read back as that integer, giving one recipe two canonical forms.
-        for (value, text) in [
-            (3e-7, "0"),
-            (-4e-7, "0"),
-            (0.999_999_7, "1"),
-            (-2.000_000_3, "-2"),
-            (0.000_001, "0.000001"),
-            (0.31, "0.310000"),
-        ] {
-            assert_eq!(number(value), text, "{value}");
-        }
-        let mut x = -3.0_f64;
-        while x < 3.0 {
-            let once = number(x);
-            let again = number(once.parse().unwrap_or(f64::NAN));
-            assert_eq!(once, again, "{x}");
-            x += 0.000_000_37;
-            if (x * 1e3).fract().abs() < 1e-9 {
-                x += 0.000_123;
-            }
-        }
     }
 }

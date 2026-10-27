@@ -15,6 +15,9 @@ use crate::{errors::recipe_invalid, Recipe};
 use aura_core::AuraResult;
 use serde::{Deserialize, Serialize};
 
+pub mod palette;
+pub use palette::PaletteMap;
+
 pub const KEY: &str = "reference_grade_v1";
 /// Tone curve nodes, evenly spaced over input OKLab lightness `0..=1`.
 pub const TONE_NODES: usize = 33;
@@ -64,6 +67,19 @@ pub struct ReferenceGrade {
     pub zone_gain: Vec<f32>,
     /// How strongly skin-coloured pixels keep their own hue and colourfulness, `0..=1`.
     pub skin: f32,
+    /// Additional per-pixel skin tone/colour displacement protection for palette transfer.
+    /// Absent in older grades; zero preserves their rendering exactly.
+    #[serde(default, skip_serializing_if = "no_fidelity")]
+    pub skin_fidelity: f32,
+    /// Optional full-palette chromatic transport; older grades render exactly as before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub palette: Option<PaletteMap>,
+}
+
+// Serde's skip_serializing_if callback receives a borrowed field.
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn no_fidelity(value: &f32) -> bool {
+    *value <= 0.0
 }
 
 impl ReferenceGrade {
@@ -84,6 +100,8 @@ impl ReferenceGrade {
             hue_light: vec![0.0; SECTORS],
             zone_gain: vec![1.0; ZONES],
             skin: 0.0,
+            skin_fidelity: 0.0,
+            palette: None,
         }
     }
 
@@ -102,6 +120,7 @@ impl ReferenceGrade {
                 .zip(&self.cast_out)
                 .all(|(a, b)| (a[0] - b[0]).abs() <= 1e-5 && (a[1] - b[1]).abs() <= 1e-5);
         near(&self.tone, &identity.tone)
+            && self.palette.as_ref().is_none_or(PaletteMap::is_identity)
             && casts_equal
             && near(&self.chroma, &identity.chroma)
             && near(&self.hue_gain, &identity.hue_gain)
@@ -113,6 +132,9 @@ impl ReferenceGrade {
     /// # Errors
     /// Wrong node counts, non-finite values, a decreasing curve or a value outside its bound.
     pub fn validate(&self) -> AuraResult<()> {
+        if let Some(palette) = &self.palette {
+            palette.validate()?;
+        }
         let refuse = |why: &str| Err(recipe_invalid(KEY, why));
         let lengths = self.tone.len() == TONE_NODES
             && self.cast_in.len() == AXIS_NODES
@@ -135,7 +157,7 @@ impl ReferenceGrade {
             .chain(&self.hue_shift)
             .chain(&self.hue_light)
             .chain(&self.zone_gain)
-            .chain(std::iter::once(&self.skin));
+            .chain([&self.skin, &self.skin_fidelity]);
         if !all.into_iter().all(|v| v.is_finite()) {
             return refuse("reference grade holds a non-finite value");
         }
@@ -180,6 +202,7 @@ impl ReferenceGrade {
                 .iter()
                 .any(|v| v.abs() > MAX_HUE_LIGHT + 1e-6)
             || !(0.0..=1.0).contains(&self.skin)
+            || !(0.0..=1.0).contains(&self.skin_fidelity)
         {
             return refuse("reference grade hue or zone adjustment is out of range");
         }
@@ -219,6 +242,10 @@ impl ReferenceGrade {
             *v = finite(*v, 0.0).clamp(-MAX_HUE_LIGHT, MAX_HUE_LIGHT);
         }
         self.skin = finite(self.skin, 0.0).clamp(0.0, 1.0);
+        self.skin_fidelity = finite(self.skin_fidelity, 0.0).clamp(0.0, 1.0);
+        if let Some(palette) = self.palette.as_mut() {
+            palette.bound();
+        }
         self
     }
 }
@@ -266,6 +293,19 @@ mod tests {
         write(&mut recipe, &identity).unwrap();
         assert_eq!(recipe, before);
         assert_eq!(read(&recipe).unwrap(), None);
+    }
+
+    #[test]
+    fn old_grades_keep_zero_skin_fidelity_and_new_fidelity_is_bounded() {
+        let identity = ReferenceGrade::identity();
+        let old = serde_json::to_value(&identity).unwrap();
+        assert!(old.get("skinFidelity").is_none());
+        let restored: ReferenceGrade = serde_json::from_value(old).unwrap();
+        assert_eq!(restored, identity);
+        let mut invalid = identity;
+        invalid.skin_fidelity = 1.5;
+        assert!(invalid.validate().is_err());
+        assert!((invalid.bounded().skin_fidelity - 1.0).abs() < f32::EPSILON);
     }
 
     #[test]

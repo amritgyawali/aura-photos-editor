@@ -216,11 +216,16 @@ pub fn image_descriptors(
 ) -> IpcResult<DescriptorsDto> {
     let photo = parse_photo(photo_id)?;
     let Some(row) = state.stored_embedding(project_id, photo)? else {
-        return Err(aura_index::errors::embed_degenerate(
+        let mut error = aura_index::errors::embed_degenerate(
             photo_id,
             "this photograph has not been analysed yet",
-        )
-        .into());
+        );
+        // The code's own sentence says the photograph could not be read, which is wrong
+        // here: nothing has tried to read it yet.
+        "This photograph has not been analysed yet. Analyse the collection first; nothing is \
+         wrong with the photo."
+            .clone_into(&mut error.user_message);
+        return Err(error.into());
     };
 
     Ok(DescriptorsDto {

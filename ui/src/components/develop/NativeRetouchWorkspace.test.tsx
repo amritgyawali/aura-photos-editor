@@ -5,8 +5,9 @@ import { nativeRetouch, freshRetouch } from '../../ipc/nativeRetouch';
 import { api, develop } from '../../ipc/client';
 import { forgetPreviews } from '../../state/previewCache';
 vi.mock('./AutomaticFinishControls', () => ({ AutomaticFinishControls: () => null }));
+import { useEffectRequest } from '../../state/effectRequest';
 
-vi.mock('../../ipc/nativeRetouch',async()=>({...await vi.importActual('../../ipc/nativeRetouch'),nativeRetouch:{autoPortrait:vi.fn(),autoRetouch:vi.fn(),edit:vi.fn(),preview:vi.fn(),draftPreview:vi.fn(),selectionPreview:vi.fn(),savedSelection:vi.fn()}}));
+vi.mock('../../ipc/nativeRetouch',async()=>({...await vi.importActual('../../ipc/nativeRetouch'),nativeRetouch:{findGlare:vi.fn(),autoPortrait:vi.fn(),autoRetouch:vi.fn(),edit:vi.fn(),preview:vi.fn(),draftPreview:vi.fn(),selectionPreview:vi.fn(),savedSelection:vi.fn()}}));
 vi.mock('../../ipc/client',()=>({api:{listImages:vi.fn()},asIpcError:(e:Error)=>({message:e.message}),develop:{imageRecipe:vi.fn(),imageHistory:vi.fn(),historyStep:vi.fn()}}));
 beforeEach(()=>{
   vi.resetAllMocks();forgetPreviews();vi.mocked(nativeRetouch.edit).mockResolvedValue([]);
@@ -17,6 +18,34 @@ beforeEach(()=>{
   localStorage.clear();
 });
 function open(){return render(<NativeRetouchWorkspace projectId="project" photoId="photo" onClose={vi.fn()} onBusyChange={vi.fn()}/>);}
+it('opens the glare feature with local glare softening selected and saves the actual operation', async () => {
+  render(<NativeRetouchWorkspace projectId="project" photoId="photo" feature="glare" onClose={vi.fn()} onBusyChange={vi.fn()} />);
+  await screen.findByAltText('Retouched photograph');
+  expect((screen.getByLabelText('Tool') as HTMLSelectElement).value).toBe('glare');
+  expect(screen.getByText(/fully opaque glare/)).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Apply retouch' }));
+  await waitFor(() => expect(nativeRetouch.edit).toHaveBeenCalledWith('project', 'photo', 'append', [expect.objectContaining({ tool: 'glare', amount: .85, feather: .3 })]));
+});
+it('finds lens reflections and saves one glare operation per lens in a single step', async () => {
+  vi.mocked(nativeRetouch.findGlare).mockResolvedValue({faces:1,message:'Found 2 lens reflections on 1 face. Compare before and after, then adjust or undo.',
+    regions:[{region:[.4,.3,.05,.03],confidence:.9,face:0},{region:[.6,.3,.05,.03],confidence:.7,face:0}]});
+  render(<NativeRetouchWorkspace projectId="project" photoId="photo" feature="glare" onClose={vi.fn()} onBusyChange={vi.fn()} />);
+  await screen.findByAltText('Retouched photograph');
+  fireEvent.click(screen.getByRole('button', { name: 'Find and remove reflections' }));
+  await waitFor(() => expect(nativeRetouch.edit).toHaveBeenCalledWith('project', 'photo', 'append', [
+    expect.objectContaining({ tool: 'glare', region: [.4,.3,.05,.03], amount: .85, feather: .3 }),
+    expect.objectContaining({ tool: 'glare', region: [.6,.3,.05,.03] }),
+  ]));
+  expect(await screen.findByText(/Found 2 lens reflections/)).toBeTruthy();
+});
+it('reports when no lens reflection is found and saves nothing', async () => {
+  vi.mocked(nativeRetouch.findGlare).mockResolvedValue({faces:1,regions:[],message:'No lens reflection stood out on 1 face. If you see one, place an ellipse over it by hand.'});
+  render(<NativeRetouchWorkspace projectId="project" photoId="photo" feature="glare" onClose={vi.fn()} onBusyChange={vi.fn()} />);
+  await screen.findByAltText('Retouched photograph');
+  fireEvent.click(screen.getByRole('button', { name: 'Find and remove reflections' }));
+  expect(await screen.findByText(/No lens reflection stood out/)).toBeTruthy();
+  expect(nativeRetouch.edit).not.toHaveBeenCalledWith('project', 'photo', 'append', expect.anything());
+});
 it('saves local saturation and vibrance with a sampled color range and brightness intersection', async () => {
   open(); await screen.findByAltText('Retouched photograph');
   fireEvent.change(screen.getByLabelText('Tool'),{target:{value:'color_saturation'}});
@@ -211,7 +240,8 @@ it('keeps manual repair available after more than 256 saved acne repairs',async(
   expect((screen.getByRole('button',{name:'Polished skin in selection'}) as HTMLButtonElement).disabled).toBe(false);
   fireEvent.click(duplicate);
   await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','duplicate',[],'saved-299'));
-});
+// Three hundred saved operations take seconds to render; the suite's 5 s default is for ordinary tests.
+},15_000);
 it('uses grayscale contrast review for both sides without changing the recipe or filtering coverage',async()=>{
   vi.mocked(nativeRetouch.edit).mockResolvedValue([{...freshRetouch(),id:'saved'}]);
   open();
@@ -651,4 +681,15 @@ it('runs Auto advanced retouch through the workspace and reloads the stack after
   fireEvent.click(button);
   await waitFor(() => expect(run).toHaveBeenCalledWith('project', 'photo', undefined, 'professional'));
   await waitFor(() => expect(vi.mocked(nativeRetouch.edit).mock.calls.length).toBeGreaterThan(loads));
+});
+it('opens with the tool chosen in the Effects library, set up as the quick job asked, and takes it once',async()=>{
+  useEffectRequest.setState({request:null,sequence:0,recent:[],favourites:[]});
+  useEffectRequest.getState().ask('sparkle',{amount:.7,radius:.006});
+  open();await screen.findByAltText('Retouched photograph');
+  await waitFor(()=>expect((screen.getByLabelText('Tool') as HTMLSelectElement).value).toBe('sparkle'));
+  expect(useEffectRequest.getState().request).toBeNull();
+  fireEvent.click(screen.getByRole('button',{name:'Apply retouch'}));
+  await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','append',[
+    expect.objectContaining({tool:'sparkle',amount:.7,radius:.006})
+  ]));
 });

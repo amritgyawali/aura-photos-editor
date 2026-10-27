@@ -1,5 +1,9 @@
 # AI Color Match
 
+> **Not in the product.** This guide describes the one-click screen of ADR-0170, which was
+> superseded before it was merged. Reference matching is the **Color Match** panel; see
+> [Match a look](match-a-look.md).
+
 Make a photo take the colour and tone of an edited photo you like, in one click.
 
 ## Where it is

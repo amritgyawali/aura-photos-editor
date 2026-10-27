@@ -289,6 +289,30 @@ fn inverse(m: &skin::Matte) -> skin::Matte {
     }
 }
 
+/// The people in a photograph as a stored selection, for the Studio's finishing tools that tell
+/// them from their background (ADR-0150): the learned subject network when it is installed,
+/// otherwise the bundled person segmenter. `None` when neither finds anyone. The second value
+/// says which one made it.
+/// # Errors
+/// The photograph's preview cannot be read.
+pub(crate) fn subject_matte(
+    state: &AppState,
+    project: &str,
+    photo: PhotoId,
+) -> IpcResult<Option<(Matte, &'static str)>> {
+    let (rgb, width, height) = pixels(state, project, photo)?;
+    if let Ok(found) = aura_vision::ai::subject(&rgb, width, height) {
+        return Ok(encode(&found).map(|m| (m, "the learned subject selection")));
+    }
+    let analysis = segmentation(photo, &rgb, width, height)?;
+    Ok(analysis
+        .background
+        .as_ref()
+        .map(inverse)
+        .and_then(|m| encode(&m))
+        .map(|m| (m, "the person segmenter")))
+}
+
 /// Measure an AI selection. `Err(reason)` when it finds nothing.
 ///
 /// The learned models (ADR-0103) are used when they are installed: the subject network for

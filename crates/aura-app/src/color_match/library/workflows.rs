@@ -368,6 +368,7 @@ impl PortableReference {
                 favorite: self.favorite,
                 default_controls: self.default_controls,
                 thumbnail: None,
+                preview: None,
                 regions: regions.iter().map(|region| region.name.clone()).collect(),
             },
             regions,
@@ -485,6 +486,10 @@ fn import(
                     .summary
                     .thumbnail
                     .clone_from(&existing.summary.thumbnail);
+                reference
+                    .summary
+                    .preview
+                    .clone_from(&existing.summary.preview);
                 *existing = reference;
             }
         } else {
@@ -679,7 +684,6 @@ pub fn run(
                 }
                 for id in previous_ids.into_iter().filter(|id| !references.iter().any(|reference| reference.summary.id == *id)) {
                     transaction.execute("DELETE FROM setting WHERE key=?1",[format!("{ASSET}{id}")]).map_err(|e| db(&e))?;
-                    super::super::one_click::forget_preview(&transaction, &id).map_err(|e| db(&e))?;
                 }
             }
         }

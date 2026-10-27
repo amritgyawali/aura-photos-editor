@@ -4,6 +4,8 @@ What was built, how it was tested on real photographs in the real application, w
 does well, and where it still falls short. Decision record: ADR-0170. User guide:
 [AI Color Match](../one-click-color-match.md).
 
+**Superseded (2026-10-27):** The one-click screen and look fit described here were not merged. Main built the same workflow in its own Color Match panel (`ui/src/components/look/ColorMatchPanel.tsx`: Recommended and My References, strengths up to Extreme, Save Preset, Sync to a collection), and ADR-0183's Full look is how main moves a photo of another scene further toward a reference. `color_match/one_click.rs`, `transfer/look.rs`, the four one-click IPC commands, `ColorMatchStudio` and `scripts/test-color-match-gui.py` exist only on the `feat/evoto-color-match` branch.
+
 ## Summary
 
 - Choosing a reference in the **AI Color Match** panel matches the open photo in one click,

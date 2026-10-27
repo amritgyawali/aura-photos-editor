@@ -432,20 +432,29 @@ fn the_interactive_path_runs_fewer_stages_than_the_export_path() {
         borrowed_from: None,
     });
 
+    recipe.restoration.deblur = 50;
+    let caps = graph::Capabilities {
+        restoration: true,
+        ..graph::Capabilities::default()
+    };
     let interactive = graph::plan(
         &recipe,
         RenderPurpose::Interactive,
         graph::InputKind::Working,
-        graph::Capabilities::default(),
+        caps,
     );
     let export = graph::plan(
         &recipe,
         RenderPurpose::Export,
         graph::InputKind::Working,
-        graph::Capabilities::default(),
+        caps,
     );
     assert!(interactive.stages.len() < export.stages.len());
-    assert!(!interactive.stages.contains(&graph::Stage::Dehaze));
+    // Restoration is heavy and waits for the full render. Dehaze reads the same small
+    // frame-wide base as Clarity and Shadows/Highlights (ADR-0126), so it runs on both paths.
+    assert!(!interactive.stages.contains(&graph::Stage::Restoration));
+    assert!(export.stages.contains(&graph::Stage::Restoration));
+    assert!(interactive.stages.contains(&graph::Stage::Dehaze));
     assert!(export.stages.contains(&graph::Stage::Dehaze));
 }
 
