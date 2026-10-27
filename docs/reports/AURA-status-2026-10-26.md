@@ -29,6 +29,10 @@ height and the relight's direction while the light itself was off, and reported 
 now switches them on first; all six checks pass, and the face and body section reads **228 checks,
 163 pass, 51 skips (one-sided controls refusing negatives), 14 warnings, 0 failures**.
 
+**Effects screen: 73 of 73.** The test had counted the screen against a hard-coded 119 tools; the
+window now offers 137 (42 retouch tools and 95 effects), so it reads the expected number from the
+same lists the screen is built from. Every effect renders inside its own region and nowhere else.
+
 **Found, not yet fixed: two face finders disagree on small faces.** Auto advanced retouch, auto
 edit, masks and culling use the learned detector, which also scans tiles of the 2048 px preview;
 the portrait parse that the renderer uses (face and body sliders, group balance, group skin, the
@@ -139,7 +143,8 @@ byte-identical after the run.
 2. Reconcile Codex's main-tree colour-match changes with this branch (rebase whichever lands second
    and rerun `scripts/test-everything-gui.py` plus the 20-photo match test).
 3. ~~Run `scripts/test-evoto100-gui.py`~~ done 2026-10-27 (108 checks, 0 failures after the memory
-   fix). `scripts/test-effects-gui.py` is still to run.
+   fix), and `scripts/test-effects-gui.py` done 2026-10-27 (73 of 73: every one of the 137 tools
+   is listed on the Effects screen, and every effect renders inside its region and nowhere else).
 4. Add a group photograph, a full-length portrait and a photo with a beard and an open smile to the
    in-app test inputs, so the warnings in section 4 become real checks.
 5. Test a person seen from behind with a drawn face box, to confirm the body tools follow it.
