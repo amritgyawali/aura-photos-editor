@@ -121,6 +121,9 @@ pub struct Rendered {
     pub colour: DeliveryColour,
     /// Phase 14's four-input hash. Recorded beside every written file.
     pub render_hash: String,
+    /// Canonical edit recipe captured with these pixels, not reloaded after rendering.
+    /// Shared so resizing, sharpening and prefetched copies do not duplicate large recipes.
+    pub recipe_json: Option<std::sync::Arc<str>>,
 }
 
 /// Interleaved RGB samples at one of the two depths a delivery uses.

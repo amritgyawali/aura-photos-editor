@@ -64,6 +64,45 @@ fn write_ppm(path: &std::path::Path, (rgb, w, h): &(Vec<u8>, u32, u32)) {
     std::fs::write(path, out).expect("write render");
 }
 
+fn assert_report_binding(dto: &aura_app::advanced_retouch::AdvancedRetouchDto) {
+    let mut body: serde_json::Value = serde_json::from_str(&dto.recipe.body).expect("recipe JSON");
+    let object = body.as_object_mut().expect("recipe object");
+    let saved = object.remove(advanced_retouch::KEY).expect("saved report");
+    object.remove("provenance");
+    if let Some(path) = std::env::var_os("AURA_BINDING_REVIEW_OUT") {
+        std::fs::write(
+            path,
+            serde_json::to_vec_pretty(&(saved.get("checkedRecipe"), &body))
+                .expect("comparison JSON"),
+        )
+        .expect("write comparison evidence");
+    }
+    let snapshot: serde_json::Value = serde_json::from_str(
+        saved
+            .get("checkedRecipe")
+            .and_then(serde_json::Value::as_str)
+            .expect("opaque recipe snapshot"),
+    )
+    .expect("snapshot JSON");
+    assert_eq!(
+        snapshot, body,
+        "report must bind to the returned saved settings"
+    );
+    assert_eq!(
+        saved
+            .get("checkedPhotoId")
+            .and_then(serde_json::Value::as_str),
+        Some(dto.recipe.photo_id.as_str())
+    );
+    assert!(
+        !body
+            .as_object()
+            .expect("object")
+            .contains_key(advanced_retouch::KEY),
+        "no recursive report snapshot"
+    );
+}
+
 #[test]
 #[ignore = "requires AURA_ADVANCED_PHOTOS pointing at real portraits"]
 fn every_stage_runs_in_order_on_real_photographs() {
@@ -135,6 +174,7 @@ fn every_stage_runs_in_order_on_real_photographs() {
             project_id: project.id.clone(),
             photo_id: photo.clone(),
             options: None,
+            preset: None,
         };
         let events = Mutex::new(Vec::new());
         let started = std::time::Instant::now();
@@ -142,6 +182,7 @@ fn every_stage_runs_in_order_on_real_photographs() {
             events.lock().expect("events").push(p);
         })
         .expect("advanced retouch");
+        assert_report_binding(&dto);
         let seconds = started.elapsed().as_secs_f32();
         let events = events.into_inner().expect("events");
         let report = &dto.report;
@@ -205,6 +246,7 @@ fn every_stage_runs_in_order_on_real_photographs() {
         )
         .expect("stack");
         let again = advanced_retouch::run(&state, &input, &|_| {}).expect("second run");
+        assert_report_binding(&again);
         let second = aura_recipe::retouch_tools::read(
             &aura_app::develop_commands::load_or_neutral(&state, photo_id).expect("recipe"),
         )

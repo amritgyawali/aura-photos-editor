@@ -88,12 +88,30 @@ impl Position {
 /// reduction of the frame rather than on the frame itself, for two reasons: it costs the
 /// same on a 24 MP file and a 100 MP one, and it makes the numbers independent of the render
 /// level, so a proxy and an export sharpen identically.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Stats {
     /// The largest Sobel gradient magnitude in the frame. Sharpening's normaliser.
     pub gradient_peak: f32,
-    /// The fifth percentile of the blurred dark channel. Dehaze's floor.
+    /// The fifth percentile of the blurred dark channel. A haze reading for callers that
+    /// want one number; the Dehaze stage itself reads [`Stats::base`] since ADR-0126.
     pub dark_floor: f32,
+    /// The edge-aware base layers - local tone, clarity and haze - measured once over the
+    /// whole frame. `None` when no stage needs them. The tiler fills this in before the
+    /// first tile, for the reason the two numbers above exist. ADR-0126.
+    pub base: Option<std::sync::Arc<crate::edge_aware::FrameBase>>,
+}
+
+impl Stats {
+    /// The same statistics without the base layers, for a checkpoint taken after the stages
+    /// that read them: nothing downstream of the retouch stack needs a base, and a cached
+    /// checkpoint should not hold one.
+    #[must_use]
+    pub fn without_base(&self) -> Self {
+        Self {
+            base: None,
+            ..self.clone()
+        }
+    }
 }
 
 impl Default for Stats {
@@ -102,6 +120,7 @@ impl Default for Stats {
         Self {
             gradient_peak: 1.0,
             dark_floor: 0.0,
+            base: None,
         }
     }
 }
@@ -152,6 +171,7 @@ pub fn measure(rgb: &[f32], width: usize, height: usize) -> Stats {
     Stats {
         gradient_peak,
         dark_floor,
+        base: None,
     }
 }
 
@@ -173,39 +193,80 @@ pub fn blur_plane(plane: &[f32], width: usize, height: usize, radius: usize) -> 
     current
 }
 
+/// The divisor every window uses: its sample count, counted as the window is summed.
+fn window_count(radius: usize) -> f32 {
+    let mut count = 0.0f32;
+    for _ in 0..=(radius * 2) {
+        count += 1.0;
+    }
+    count.max(1.0)
+}
+
+/// One box pass along every row, clamped to the edge sample.
+///
+/// Every output sample is the sum of its window read left to right from zero, divided by the
+/// window's count - so the value at a pixel depends on that pixel's window and nothing else,
+/// which is what lets a tile and the whole frame agree bit for bit. The loops are interchanged
+/// rather than the arithmetic changed: one window offset at a time is added to the whole row,
+/// so each sample still receives its terms in offset order, and the inner loop is a
+/// contiguous vector add.
 fn blur_rows(src: &[f32], dst: &mut [f32], width: usize, height: usize, radius: usize) {
+    let count = window_count(radius);
     dst.par_chunks_mut(width)
         .enumerate()
         .take(height)
         .for_each(|(y, row)| {
-            let base = y * width;
-            for (x, slot) in row.iter_mut().enumerate() {
-                let mut sum = 0.0f32;
-                let mut count = 0.0f32;
-                for offset in 0..=(radius * 2) {
-                    let sx = (x + offset).saturating_sub(radius).min(width - 1);
-                    sum += src.get(base + sx).copied().unwrap_or(0.0);
-                    count += 1.0;
+            let Some(line) = src.get(y * width..(y + 1) * width) else {
+                return;
+            };
+            let first = line.first().copied().unwrap_or(0.0);
+            let last = line.last().copied().unwrap_or(0.0);
+            row.fill(0.0);
+            for offset in 0..=(radius * 2) {
+                // Sample x reads x + offset - radius, clamped to 0..width.
+                let low = radius.saturating_sub(offset).min(width);
+                let high = (width + radius).saturating_sub(offset).clamp(low, width);
+                let (left, rest) = row.split_at_mut(low);
+                let (middle, right) = rest.split_at_mut(high - low);
+                for slot in left.iter_mut() {
+                    *slot += first;
                 }
-                *slot = sum / count.max(1.0);
+                let from = (low + offset).saturating_sub(radius);
+                if let Some(values) = line.get(from..from + middle.len()) {
+                    for (slot, value) in middle.iter_mut().zip(values) {
+                        *slot += *value;
+                    }
+                }
+                for slot in right.iter_mut() {
+                    *slot += last;
+                }
+            }
+            for slot in row.iter_mut() {
+                *slot /= count;
             }
         });
 }
 
+/// One box pass down every column, clamped to the edge row. The same rule as
+/// [`blur_rows`]: each output sample sums its own window from zero in offset order, one
+/// window row at a time added across the whole output row.
 fn blur_columns(src: &[f32], dst: &mut [f32], width: usize, height: usize, radius: usize) {
+    let count = window_count(radius);
     dst.par_chunks_mut(width)
         .enumerate()
         .take(height)
         .for_each(|(y, row)| {
-            for (x, slot) in row.iter_mut().enumerate() {
-                let mut sum = 0.0f32;
-                let mut count = 0.0f32;
-                for offset in 0..=(radius * 2) {
-                    let sy = (y + offset).saturating_sub(radius).min(height - 1);
-                    sum += src.get(sy * width + x).copied().unwrap_or(0.0);
-                    count += 1.0;
+            row.fill(0.0);
+            for offset in 0..=(radius * 2) {
+                let sy = (y + offset).saturating_sub(radius).min(height - 1);
+                if let Some(line) = src.get(sy * width..(sy + 1) * width) {
+                    for (slot, value) in row.iter_mut().zip(line) {
+                        *slot += *value;
+                    }
                 }
-                *slot = sum / count.max(1.0);
+            }
+            for slot in row.iter_mut() {
+                *slot /= count;
             }
         });
 }
@@ -612,6 +673,57 @@ pub fn crop_rotate(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The per-sample definition the two passes replaced.
+    fn blur_reference(plane: &[f32], width: usize, height: usize, radius: usize) -> Vec<f32> {
+        let mut current = plane.to_vec();
+        let mut scratch = vec![0.0f32; width * height];
+        for _ in 0..BOX_PASSES {
+            for y in 0..height {
+                for x in 0..width {
+                    let (mut sum, mut count) = (0.0f32, 0.0f32);
+                    for offset in 0..=(radius * 2) {
+                        let sx = (x + offset).saturating_sub(radius).min(width - 1);
+                        sum += current[y * width + sx];
+                        count += 1.0;
+                    }
+                    scratch[y * width + x] = sum / count.max(1.0);
+                }
+            }
+            for y in 0..height {
+                for x in 0..width {
+                    let (mut sum, mut count) = (0.0f32, 0.0f32);
+                    for offset in 0..=(radius * 2) {
+                        let sy = (y + offset).saturating_sub(radius).min(height - 1);
+                        sum += scratch[sy * width + x];
+                        count += 1.0;
+                    }
+                    current[y * width + x] = sum / count.max(1.0);
+                }
+            }
+        }
+        current
+    }
+
+    /// Interchanging the loops changed the order nothing is added in: bit for bit the same.
+    #[test]
+    fn the_vector_passes_are_the_per_sample_definition() {
+        for (w, h) in [(1, 1), (1, 9), (7, 5), (40, 23), (97, 61)] {
+            let plane: Vec<f32> = (0..w * h)
+                .map(|i| ((i * 7919 + 3) % 1013) as f32 / 1013.0 * 1.7 - 0.2)
+                .collect();
+            for radius in [1, 2, 5, 13, 60] {
+                let fast = blur_plane(&plane, w, h, radius);
+                let slow = blur_reference(&plane, w, h, radius);
+                assert!(
+                    fast.iter()
+                        .zip(&slow)
+                        .all(|(a, b)| a.to_bits() == b.to_bits()),
+                    "{w}x{h} radius {radius}"
+                );
+            }
+        }
+    }
 
     fn ramp(width: usize, height: usize) -> Vec<f32> {
         let mut out = vec![0.0f32; width * height * 3];

@@ -25,6 +25,7 @@ struct JobSlot {
     state: AppState,
     project: String,
     child: Option<String>,
+    started_ms: u64,
 }
 /// One entry of the run's `photo-edits.json`.
 #[derive(serde::Serialize)]
@@ -35,6 +36,17 @@ struct EditedPhoto {
     model: String,
     reasons: Vec<String>,
     recipe: RecipeDto,
+    boundary_preflight: Option<crate::portrait_preflight::Report>,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WithheldPhoto {
+    photo_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    code: Option<String>,
+    message: String,
+    disposition: &'static str,
 }
 
 /// `photo-edits.json`, written as the run goes. A wedding is two thousand recipes with a
@@ -129,23 +141,32 @@ fn measured_cull(
     let times = crate::measured_cull::camera_times(state, project).unwrap_or_default();
     let wanted: BTreeSet<&String> = readable.iter().collect();
     let mut frames = Vec::with_capacity(readable.len());
-    for photo in photos.iter().filter(|photo| wanted.contains(&photo.id)) {
+    let chosen: Vec<&ImageRowLite> = photos
+        .iter()
+        .filter(|photo| wanted.contains(&photo.id))
+        .collect();
+    let lanes = workers(state);
+    // Each frame is measured on its own; the decision over all of them is made afterwards.
+    for chunk in chosen.chunks(lanes.saturating_mul(16).max(1)) {
         if stopped(job) {
             return Ok(None);
         }
-        frames.push(
-            crate::measured_cull::measure_photo(state, project, photo, &times).unwrap_or_else(
-                |_| crate::measured_cull::Frame {
+        let measured = in_order(chunk, lanes, |photo| {
+            let frame = crate::measured_cull::measure_photo(state, project, photo, &times)
+                .unwrap_or_else(|_| crate::measured_cull::Frame {
                     photo_id: photo.id.clone(),
                     file_name: photo.file_name.clone(),
                     measure: None,
                     time_ms: None,
                     edited_by_hand: false,
-                },
-            ),
-        );
-        let done = frames.len() as u64;
-        update(job, |s| s.items_done = done);
+                });
+            update(job, |s| s.items_done = s.items_done.saturating_add(1));
+            frame
+        });
+        frames.extend(measured);
+    }
+    if stopped(job) {
+        return Ok(None);
     }
     let report = crate::measured_cull::decide(&frames);
     let path = destination.join("photo-cull.json");
@@ -200,7 +221,11 @@ fn edit_one(
             crate::photo_enhance::enhance_photo(state, &develop)?
         };
         if let Some(reference) = look.reference_id.clone().filter(|id| !id.is_empty()) {
-            let fitted = crate::reference_style::apply_reference(
+            let cancel = JOBS
+                .lock()
+                .get(job)
+                .map_or_else(CancelToken::new, |slot| slot.cancel.clone());
+            let fitted = crate::reference_style::apply_with_cancel(
                 state,
                 &crate::reference_style::ApplyReferenceInput {
                     photo_id: photo.to_owned(),
@@ -208,7 +233,9 @@ fn edit_one(
                     strength: f32::from(look.reference_strength.min(100)) / 100.0,
                     profile_id: profile.clone(),
                     profile_strength: profile.as_ref().map(|_| strength),
+                    cancel_id: None,
                 },
+                &cancel,
             )?;
             reasons.push(format!(
                 "Reference look fitted at {}%: distance to the reference {:.3} before, {:.3} after.",
@@ -223,6 +250,7 @@ fn edit_one(
             photo_id: photo.to_owned(),
             source: "local".into(),
             model: "AURA measured edit with your look".into(),
+            boundary_preflight: None,
             reasons,
             recipe,
         });
@@ -252,6 +280,7 @@ fn edit_one(
             photo_id: photo.to_owned(),
             source: answer.source,
             model: answer.model,
+            boundary_preflight: None,
             reasons: answer.reasons,
             recipe: answer.recipe,
         });
@@ -263,10 +292,40 @@ fn edit_one(
         photo_id: photo.to_owned(),
         source: "local".into(),
         model: "AURA measured edit".into(),
+        boundary_preflight: None,
         reasons: vec!["Light, colour, white balance and scene measured from this photograph; portrait retouch evaluated with its saved preferences. Every decision is recorded as a step in its history.".into()],
         recipe,
     })
 }
+/// True when this build cannot render the photograph at full size: a camera file whose
+/// mosaic it does not decode. A developed file, or a file that cannot be read here, is left
+/// to the export, which reports its own failures.
+fn full_size_unsupported(state: &AppState, photo: &str) -> bool {
+    let Ok(Some((path, _))) = state
+        .catalog()
+        .read(|conn| aura_catalog::repo::primary_file_for_photo(conn, photo))
+    else {
+        return false;
+    };
+    let path = Path::new(&path);
+    let developed = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| matches!(e.to_ascii_lowercase().as_str(), "jpg" | "jpeg" | "png"));
+    if developed {
+        return false;
+    }
+    let Ok(bytes) = std::fs::read(path) else {
+        return false;
+    };
+    aura_raw::meta::read(&bytes, path).is_ok_and(|meta| {
+        !matches!(
+            meta.format,
+            aura_raw::RawFormat::Jpeg | aura_raw::RawFormat::Png
+        ) && meta.mosaic_support() != aura_raw::format::MosaicSupport::Decodable
+    })
+}
+
 fn error(message: &str) -> IpcError {
     let mut error: IpcError =
         aura_core::errors::render::recipe_invalid("automatic workflow", message).into();
@@ -313,6 +372,11 @@ fn in_order<T: Sync, R: Send>(
     });
     answers.sort_by_key(|(index, _)| *index);
     answers.into_iter().map(|(_, answer)| answer).collect()
+}
+
+/// A decode that ran past its deadline: worth one more try once the machine is quieter.
+fn timed_out(err: &IpcError) -> bool {
+    err.code == "AURA-RAW-2004"
 }
 
 /// How many photographs a folder run works on at once: as many as the image gate lets run
@@ -517,6 +581,7 @@ fn start(state: &AppState, mut input: OneClickFinishInput) -> Result<OneClickFin
             state: state.clone(),
             project: input.project_id.clone(),
             child: input.ingest_job_id.clone(),
+            started_ms: state.clock().monotonic_ms(),
         },
     );
     let worker = state.clone();
@@ -601,6 +666,26 @@ pub fn one_click_status(job_id: &str) -> Result<OneClickStatusDto, IpcError> {
 }
 /// Cancel the pipeline and its active import/model/analysis child.
 #[must_use]
+/// Folder runs in progress, for the status bar.
+pub(crate) fn active_runs(now_ms: u64) -> Vec<crate::activity::ActivityItemDto> {
+    JOBS.lock()
+        .values()
+        .filter(|slot| matches!(slot.status.status.as_str(), "running" | "cancelling"))
+        .map(|slot| crate::activity::ActivityItemDto {
+            id: 0,
+            kind: "folder".into(),
+            label: format!(
+                "Finishing a folder of {} photographs ({})",
+                slot.status.frames, slot.status.phase
+            ),
+            detail: slot.status.phase_label.clone(),
+            done: slot.status.items_done,
+            total: slot.status.items_total,
+            seconds: now_ms.saturating_sub(slot.started_ms) / 1000,
+        })
+        .collect()
+}
+
 pub fn one_click_cancel(job_id: &str) -> bool {
     let active = JOBS
         .lock()
@@ -705,7 +790,7 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
     let mut readable = Vec::new();
     let mut analysis = Vec::new();
     let lanes = workers(state);
-    for chunk in photos.chunks(lanes.saturating_mul(4).max(1)) {
+    for chunk in photos.chunks(lanes.saturating_mul(16).max(1)) {
         if stopped(job) {
             return Ok(());
         }
@@ -713,18 +798,34 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
             if stopped(job) {
                 return None;
             }
-            let row = crate::photo_analysis(
-                state,
-                &PhotoAutoEditInput {
-                    project_id: project.clone(),
-                    photo_id: photo.id.clone(),
-                    job_id: job.into(),
-                },
-            );
+            let row = {
+                let _t = crate::perf::step(state, "analyze.photo");
+                crate::photo_analysis(
+                    state,
+                    &PhotoAutoEditInput {
+                        project_id: project.clone(),
+                        photo_id: photo.id.clone(),
+                        job_id: job.into(),
+                    },
+                )
+            };
             update(job, |s| s.items_done = s.items_done.saturating_add(1));
             Some(row)
         });
         for (photo, row) in chunk.iter().zip(rows) {
+            // Several frames decoding at once on a busy machine can push one past its decode
+            // deadline. Try it once more on its own before setting it aside.
+            let row = match row {
+                Some(Err(err)) if timed_out(&err) && !stopped(job) => Some(crate::photo_analysis(
+                    state,
+                    &PhotoAutoEditInput {
+                        project_id: project.clone(),
+                        photo_id: photo.id.clone(),
+                        job_id: job.into(),
+                    },
+                )),
+                other => other,
+            };
             match row {
                 None => return Ok(()),
                 Some(Ok(row)) => {
@@ -965,7 +1066,12 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
     // edit is local work the image gate already bounds.
     let lanes = if cloud { 1 } else { workers(state) };
     let done = std::sync::atomic::AtomicUsize::new(0);
-    for chunk in targets.chunks(lanes.saturating_mul(4).max(1)) {
+    let mut retouched = 0_usize;
+    let mut retouched_faces = 0_u64;
+    let mut without_retouch = Vec::new();
+    let mut successful_edits = BTreeMap::new();
+    let mut failed_edits = Vec::new();
+    for chunk in targets.chunks(lanes.saturating_mul(16).max(1)) {
         if stopped(job) {
             return Ok(());
         }
@@ -992,9 +1098,82 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
             return Ok(());
         }
         for (photo, result) in chunk.iter().zip(results) {
+            let result = match result {
+                Some(Err(err)) if timed_out(&err) && !stopped(job) => {
+                    Some(edit_one(state, job, project, photo, look, cloud))
+                }
+                other => other,
+            };
             match result {
                 None => return Ok(()),
-                Some(Ok(entry)) => {
+                Some(Ok(mut entry)) => {
+                    let recipe: aura_recipe::Recipe = serde_json::from_str(&entry.recipe.body)
+                        .map_err(|e| error(&e.to_string()))?;
+                    let pid = aura_core::PhotoId::from_db(photo)
+                        .map_err(|_| error("Invalid photo identifier."))?;
+                    update(job, |s| {
+                        s.phase_label = format!(
+                            "Checking portrait boundaries: {}",
+                            names.get(photo.as_str()).copied().unwrap_or(photo)
+                        );
+                    });
+                    let checked = crate::portrait_preflight::check(state, pid, &recipe);
+                    if stopped(job) {
+                        return Ok(());
+                    }
+                    let refusal = match checked {
+                        Ok(report) => {
+                            let refusal = (!report.eligible()).then(|| {
+                                format!(
+                                    "Portrait boundary check is {}: {}",
+                                    report.status,
+                                    report.reasons.join(" ")
+                                )
+                            });
+                            entry.boundary_preflight = Some(report);
+                            refusal
+                        }
+                        Err(err) => Some(format!(
+                            "Portrait boundary check could not render: {}",
+                            err.user_message
+                        )),
+                    };
+                    edits.push(&entry)?;
+                    if let Some(reason) = refusal {
+                        update(job, |s| s.failed_edits += 1);
+                        failed_edits.push(WithheldPhoto {
+                            photo_id: photo.clone(),
+                            code: None,
+                            message: reason.clone(),
+                            disposition: "withheld_from_delivery",
+                        });
+                        note(
+                            job,
+                            format!(
+                                "{} withheld from delivery: {reason}",
+                                names.get(photo.as_str()).copied().unwrap_or(photo)
+                            ),
+                        );
+                        continue;
+                    }
+                    let body: serde_json::Value = serde_json::from_str(&entry.recipe.body)
+                        .map_err(|e| error(&e.to_string()))?;
+                    let portrait = body.get(crate::portrait_auto::KEY);
+                    if portrait
+                        .and_then(|value| value.get("operations"))
+                        .and_then(serde_json::Value::as_u64)
+                        .unwrap_or(0)
+                        > 0
+                    {
+                        retouched += 1;
+                        retouched_faces += portrait
+                            .and_then(|value| value.get("retouchedFaces"))
+                            .and_then(serde_json::Value::as_u64)
+                            .unwrap_or(0);
+                    } else {
+                        without_retouch
+                            .push(names.get(photo.as_str()).copied().unwrap_or(photo.as_str()));
+                    }
                     update(job, |s| {
                         if entry.source == "cloud" || entry.source == "cache" {
                             s.ai_edited += 1;
@@ -1002,14 +1181,20 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
                             s.local_edited += 1;
                         }
                     });
-                    edits.push(&entry)?;
+                    successful_edits.insert(photo.clone(), aura_recipe::recipe_hash(&recipe)?);
                 }
                 Some(Err(err)) => {
                     update(job, |s| s.failed_edits += 1);
+                    failed_edits.push(WithheldPhoto {
+                        photo_id: photo.clone(),
+                        code: Some(err.code.clone()),
+                        message: err.message.clone(),
+                        disposition: "withheld_from_delivery",
+                    });
                     note(
                         job,
                         format!(
-                            "{} edit or retouch failed; exporting its last saved reversible recipe: {}",
+                            "{} edit or retouch failed and was withheld from delivery: {}",
                             names.get(photo.as_str()).copied().unwrap_or(photo),
                             err.message
                         ),
@@ -1019,8 +1204,53 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
         }
     }
     edits.close()?;
+    let failures_path = Path::new(&input.destination).join("photo-edit-failures.json");
+    let failures = serde_json::to_vec_pretty(&failed_edits).map_err(|e| error(&e.to_string()))?;
+    std::fs::write(&failures_path, failures)
+        .map_err(|e| aura_core::errors::io::from_io(&e, &failures_path))?;
+    note(job, format!(
+        "Portrait retouch applied to {retouched} of {} edited photos ({retouched_faces} detected faces). {} photos have no automatic retouch operations{}.",
+        retouched + without_retouch.len(),
+        without_retouch.len(),
+        if without_retouch.is_empty() { String::new() } else {
+            format!(": {}{}; inspect these photos and their portrait reports", without_retouch.iter().take(5).copied().collect::<Vec<_>>().join(", "),
+                if without_retouch.len() > 5 { ", ..." } else { "" })
+        }
+    ));
+    targets.retain(|photo| successful_edits.contains_key(photo));
+    if targets.is_empty() && !failed_edits.is_empty() {
+        return Err(error("No selected photo completed its edit. Export was withheld; inspect photo-edit-failures.json."));
+    }
     if stopped(job) {
         return Ok(());
+    }
+    // A camera file whose sensor data this build cannot decode can be previewed and edited
+    // from the picture the camera embedded, but it cannot be rendered at full size. It is
+    // named and left out before the export starts, so the photographs that can be delivered
+    // are delivered as a complete, sealed set rather than a job marked failed. ADR-0061.
+    let (targets, unrenderable): (Vec<String>, Vec<String>) = targets
+        .into_iter()
+        .partition(|photo| !full_size_unsupported(state, photo));
+    if !unrenderable.is_empty() {
+        let shown: Vec<&str> = unrenderable
+            .iter()
+            .take(5)
+            .map(|photo| names.get(photo.as_str()).copied().unwrap_or(photo.as_str()))
+            .collect();
+        note(
+            job,
+            format!(
+                "{} camera file(s) were left out of the delivery because this build cannot decode their sensor data at full size ({}{}). They keep their edits; export the camera's own JPEGs or DNG copies to deliver them.",
+                unrenderable.len(),
+                shown.join(", "),
+                if unrenderable.len() > shown.len() { ", ..." } else { "" }
+            ),
+        );
+    }
+    if targets.is_empty() {
+        return Err(error(
+            "None of the selected photographs can be rendered at full size by this build.",
+        ));
     }
     phase(
         job,
@@ -1034,7 +1264,33 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
         .find(|p| p.name == "gallery")
         .or_else(|| presets.first())
         .ok_or_else(|| error("No export preset is installed."))?;
-    let report = crate::export_run(
+    let total = targets.len();
+    let exported = |p: aura_export::api::Progress<'_>| {
+        let name = p
+            .path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        update(job, |s| {
+            s.items_done = p.done as u64;
+            s.written = p.written as u64;
+            s.verified = u64::from(p.verified);
+            s.phase_label = if let Some((first, last)) = p.rendering {
+                format!("Rendering and encoding photos {first} to {last} of {total}.")
+            } else if name.is_empty() {
+                format!(
+                    "Exporting photo {} of {total}: one could not be rendered and is left out.",
+                    p.done
+                )
+            } else {
+                format!(
+                    "Exporting photo {} of {total}: {name} written and read back.",
+                    p.done
+                )
+            };
+        });
+    };
+    let report = crate::delivery_commands::export_run_checked(
         state,
         ExportJobInput {
             project_id: project.clone(),
@@ -1060,6 +1316,9 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
             strip_camera_serial: true,
             verify: true,
         },
+        None,
+        Some(&exported),
+        Some(&successful_edits),
     )?;
     update(job, |s| {
         s.written = u64::from(report.written);

@@ -63,6 +63,7 @@ pub fn probe(bytes: &[u8]) -> AuraResult<JpegInfo> {
     }
     let mut at = 2usize;
     let mut info: Option<JpegInfo> = None;
+    let mut scanned = false;
 
     while at + 1 < bytes.len() {
         if bytes.get(at).copied() != Some(0xFF) {
@@ -91,6 +92,12 @@ pub fn probe(bytes: &[u8]) -> AuraResult<JpegInfo> {
             _ => break,
         };
         if length < 2 || at + length > bytes.len() {
+            // After the frame header and a first scan the picture is readable; what follows
+            // is a second scan, a trailer or padding a camera wrote, and a decoder reads past
+            // a damaged one. Only a stream that breaks before it is readable is corrupt.
+            if scanned && info.is_some() {
+                break;
+            }
             return Err(corrupt(format!(
                 "jpeg segment {marker:#04X} declares {length} bytes past the end"
             )));
@@ -118,6 +125,7 @@ pub fn probe(bytes: &[u8]) -> AuraResult<JpegInfo> {
             // Entropy-coded data follows. Scan for the end marker rather than
             // trying to interpret it, skipping the stuffed FF00 pairs and the
             // restart markers that may appear inside the scan.
+            scanned = true;
             let mut scan = at + length;
             while scan + 1 < bytes.len() {
                 if bytes.get(scan).copied() == Some(0xFF) {
@@ -131,7 +139,11 @@ pub fn probe(bytes: &[u8]) -> AuraResult<JpegInfo> {
                             scan += 2;
                             break;
                         }
-                        _ => break,
+                        Some(value) if is_marker(value) => break,
+                        // An FF the encoder did not stuff, followed by a byte that is no
+                        // marker: entropy data some phone encoders write, and every decoder
+                        // reads through. It is not the start of a segment.
+                        _ => scan += 1,
                     }
                 } else {
                     scan += 1;
@@ -145,6 +157,11 @@ pub fn probe(bytes: &[u8]) -> AuraResult<JpegInfo> {
     }
 
     info.ok_or_else(|| corrupt("jpeg stream has no start-of-frame header"))
+}
+
+/// True for a byte that, after `FF`, begins a real JPEG marker rather than being data.
+const fn is_marker(value: u8) -> bool {
+    matches!(value, 0xC0..=0xCF | 0xD8..=0xDF | 0xE0..=0xEF | 0xFE)
 }
 
 /// Extract the TIFF block from an `Exif\0\0` APP1 segment, if there is one.
@@ -204,5 +221,48 @@ fn read_u16(bytes: &[u8], at: usize) -> u16 {
     match (bytes.get(at).copied(), bytes.get(at + 1).copied()) {
         (Some(high), Some(low)) => u16::from_be_bytes([high, low]),
         _ => 0,
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used)]
+mod tests {
+    use super::*;
+
+    /// SOI, a frame header and a scan with `entropy`, then `tail`.
+    fn stream(entropy: &[u8], tail: &[u8]) -> Vec<u8> {
+        let mut v = vec![0xFF, 0xD8];
+        v.extend_from_slice(&[0xFF, 0xC0, 0x00, 0x11, 0x08, 0x00, 0x10, 0x00, 0x20, 0x03]);
+        v.extend_from_slice(&[0x01, 0x22, 0x00, 0x02, 0x11, 0x01, 0x03, 0x11, 0x01]);
+        v.extend_from_slice(&[
+            0xFF, 0xDA, 0x00, 0x0C, 0x03, 0x01, 0x00, 0x02, 0x11, 0x03, 0x11, 0x00, 0x3F, 0x00,
+        ]);
+        v.extend_from_slice(entropy);
+        v.extend_from_slice(tail);
+        v
+    }
+
+    #[test]
+    fn an_unstuffed_ff_inside_the_scan_is_data_not_a_segment() {
+        // FF A6 inside the entropy data, as two phone cameras on Wikimedia Commons write it.
+        let bytes = stream(
+            &[0x12, 0xFF, 0xA6, 0xBE, 0xEF, 0xFF, 0x00, 0x34],
+            &[0xFF, 0xD9],
+        );
+        let info = probe(&bytes).expect("readable");
+        assert_eq!((info.width, info.height), (32, 16));
+        assert_eq!(info.byte_len, Some(bytes.len()));
+    }
+
+    #[test]
+    fn a_damaged_segment_after_a_readable_scan_does_not_reject_the_picture() {
+        let bytes = stream(&[0x12, 0x34], &[0xFF, 0xE1, 0xFF, 0xF0]);
+        assert!(probe(&bytes).is_ok());
+    }
+
+    #[test]
+    fn a_stream_that_breaks_before_its_scan_is_still_corrupt() {
+        let bytes = vec![0xFF, 0xD8, 0xFF, 0xE1, 0xFF, 0xF0, 0x00];
+        assert!(probe(&bytes).is_err());
     }
 }

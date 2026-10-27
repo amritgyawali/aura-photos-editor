@@ -41,6 +41,11 @@ either way, turned to one side and the other, and on a locally equalised copy th
 in a dark corner. A candidate becomes a face only with evidence: a skin-coloured centre (unless
 the photograph has no colour) and either many agreeing windows or an eye where an eye should be.
 
+Gold silk, gilded carving and sequins can look like a tilted face to the cascade - skin-coloured,
+with two dark points where eyes would be. A tilted face found by only a few windows therefore has
+to have both of its eyes confirmed by the eye cascade, or it is not treated as a face. If that
+leaves out a real face with its head tilted, draw it with **Draw a face AURA missed**.
+
 It then measures - rather than predicts - everything else, relative to the face it found: the eyes
 from the eye cascade and the darkest compact blob where an iris should be, the mouth from a
 colour map that makes lips stand out, the brows as what is darker than *that person's* forehead,
@@ -97,8 +102,12 @@ it says so.
 
 ## What AURA will never change
 
-- **Nobody is reshaped.** There is no slimming, no liquify, no enlarging, no feature moving - not
-  as a setting and not in the code.
+- **Nobody is reshaped automatically.** Portrait retouch never slims, liquifies, enlarges or moves a
+  feature. Those tools exist only in the Studio's *Portrait studio* section, where you move them
+  yourself (ADR-0108), and no automatic pass can apply them.
+- **The light on a face is moved only when you ask.** The Portrait studio's *Light* tab adds a key
+  light, a fill, catchlights and a glow (ADR-0127). *Auto light* proposes one when you press it, says
+  why, and saves it as one step you can undo; nothing else ever relights a face.
 - **Nobody's skin tone is changed.** Smoothing, evening and fill light work on blotches, shadows
   and shine, never on the tone of a person's skin.
 - **Nothing is invented.** Every adjustment changes the tone or colour of a pixel that was already

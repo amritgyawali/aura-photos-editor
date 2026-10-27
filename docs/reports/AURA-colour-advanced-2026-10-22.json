@@ -1,0 +1,759 @@
+{
+  "date": "2026-10-22",
+  "family": "colour",
+  "status": "source frozen09:52:03; initial scoped native and final UI checks passed; canonical final native and strict Clippy qualification coordinated by parent",
+  "algorithm_origin": "Original analytical methods; no Evoto code, models or parity claim",
+  "methods": [
+    {
+      "id": "spatial_chroma_plane",
+      "label": "Measured spatial cast removal",
+      "name": "Measured spatial cast removal",
+      "mechanism": "Fit two selected-only affine chroma surfaces and remove their spatial slopes while retaining the selected mean colour.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ]
+    },
+    {
+      "id": "radial_log_illumination",
+      "label": "Measured radial illumination correction",
+      "name": "Measured radial illumination correction",
+      "mechanism": "Fit log-luminance against squared distance from an authored optical centre and remove the fitted radial variation.",
+      "controls": [
+        "amount",
+        "strength",
+        "source",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ]
+    },
+    {
+      "id": "gaussian_palette_transport",
+      "label": "Gaussian patch palette transport",
+      "name": "Gaussian patch palette transport",
+      "mechanism": "Compute the symmetric Gaussian optimal-transport map between two selected patch chroma covariances and means.",
+      "controls": [
+        "amount",
+        "strength",
+        "source",
+        "second",
+        "radius",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "prerequisites": "Required reference patches must contain selected pixels; otherwise exact identity."
+    },
+    {
+      "id": "palette_simplex",
+      "label": "Three-anchor palette constraint",
+      "name": "Three-anchor palette constraint",
+      "mechanism": "Project chroma onto the closest point of the triangle defined by two selected patches and an explicit target colour.",
+      "controls": [
+        "amount",
+        "strength",
+        "source",
+        "second",
+        "radius",
+        "target"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "prerequisites": "Required reference patches must contain selected pixels; otherwise exact identity."
+    },
+    {
+      "id": "hue_density_equalize",
+      "label": "Measured circular hue redistribution",
+      "name": "Measured circular hue redistribution",
+      "mechanism": "Compute a selected hue CDF with a seam in the least populated angular bin and redistribute hue into an authored angular span.",
+      "controls": [
+        "amount",
+        "strength",
+        "target",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "prerequisites": "Target must have nonzero chroma to define hue; otherwise exact identity."
+    },
+    {
+      "id": "chroma_copula_map",
+      "label": "Chroma marginal copula remapping",
+      "name": "Chroma marginal copula remapping",
+      "mechanism": "Map the two selected opponent-chroma marginal ranks through logistic quantiles while retaining luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ]
+    },
+    {
+      "id": "hue_radius_balance",
+      "label": "Hue-dependent colourfulness balance",
+      "name": "Hue-dependent colourfulness balance",
+      "mechanism": "Fit log colour radius to first circular harmonics and remove its measured dependence on hue.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ]
+    },
+    {
+      "id": "kmeans_palette_recolor",
+      "label": "Cluster-residual palette recolouring",
+      "name": "Cluster-residual palette recolouring",
+      "mechanism": "Fit three deterministic Lloyd clusters and translate each cluster toward authored anchors while retaining within-cluster residuals.",
+      "controls": [
+        "amount",
+        "strength",
+        "source",
+        "second",
+        "radius",
+        "target"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "prerequisites": "Required reference patches must contain selected pixels; otherwise exact identity."
+    },
+    {
+      "id": "channel_regression_recover",
+      "label": "Measured channel-response reconstruction",
+      "name": "Measured channel-response reconstruction",
+      "mechanism": "Fit channel regressions from selected below-threshold pixels and estimate above-threshold channel values from the other channels.",
+      "controls": [
+        "amount",
+        "strength",
+        "pivot",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "qualificationOverrides": {
+        "pivot": 0.8,
+        "width": 0.2
+      },
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "prerequisites": "At least6 selected below-threshold training pixels, and an above-threshold channel to reconstruct; otherwise identity is expected."
+    },
+    {
+      "id": "kubelka_munk_mix",
+      "label": "Kubelka-Munk pigment mixing",
+      "name": "Kubelka-Munk pigment mixing",
+      "mechanism": "Interpolate reflectance-derived absorption-to-scattering ratios and invert the Kubelka-Munk relation; this is a creative reflectance approximation.",
+      "controls": [
+        "amount",
+        "strength",
+        "target",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ]
+    },
+    {
+      "id": "pca_monochrome",
+      "label": "Variance-preserving principal monochrome",
+      "name": "Variance-preserving principal monochrome",
+      "mechanism": "Project selected RGB covariance onto its dominant eigenvector and normalize projected variance to measured luminance variance.",
+      "controls": [
+        "amount",
+        "strength"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ]
+    },
+    {
+      "id": "fisher_monochrome",
+      "label": "Two-patch discriminant monochrome",
+      "name": "Two-patch discriminant monochrome",
+      "mechanism": "Solve a regularized Fisher discriminant from two selected patch distributions to separate their colours in monochrome.",
+      "controls": [
+        "amount",
+        "strength",
+        "source",
+        "second",
+        "radius",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "prerequisites": "Required reference patches must contain selected pixels; otherwise exact identity."
+    },
+    {
+      "id": "isoluminant_edge_light",
+      "label": "Isoluminant colour-edge lighting",
+      "name": "Isoluminant colour-edge lighting",
+      "mechanism": "Convert selected chroma differences unsupported by luminance contrast into a bounded luminance lift.",
+      "controls": [
+        "amount",
+        "strength",
+        "radius",
+        "pivot",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ]
+    },
+    {
+      "id": "luminance_error_diffusion",
+      "label": "Selected error-diffusion tones",
+      "name": "Selected error-diffusion tones",
+      "mechanism": "Quantize linear luminance and redistribute quantization error to selected forward neighbours with Floyd-Steinberg weights.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ]
+    },
+    {
+      "id": "amplitude_dotscreen",
+      "label": "Area-modulated photographic dots",
+      "name": "Area-modulated photographic dots",
+      "mechanism": "Render a spatial dot screen whose covered area follows photographed luminance, with antialiased dot boundaries.",
+      "controls": [
+        "amount",
+        "strength",
+        "radius",
+        "pivot"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ]
+    },
+    {
+      "id": "iso_luma_contours",
+      "label": "Stop-domain luminance contours",
+      "name": "Stop-domain luminance contours",
+      "mechanism": "Render periodic contour bands on log-luminance isosurfaces, retaining the photographed colour direction.",
+      "controls": [
+        "amount",
+        "strength",
+        "pivot",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ]
+    },
+    {
+      "id": "exposure_fusion",
+      "label": "Analytical exposure fusion",
+      "name": "Analytical exposure fusion",
+      "mechanism": "Fuse three bounded synthetic exposure renderings using their measured well-exposedness weights.",
+      "controls": [
+        "amount",
+        "strength",
+        "pivot",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ]
+    },
+    {
+      "id": "perceptual_lightness_lift",
+      "label": "Constant-Lab-chroma lightness lift",
+      "name": "Constant-Lab-chroma lightness lift",
+      "mechanism": "Lift CIE Lab lightness with a bounded bell while keeping Lab a and b fixed, then return to linear Rec.2020.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ]
+    },
+    {
+      "id": "uv_cast_translate",
+      "label": "Uniform-chromaticity cast translation",
+      "name": "Uniform-chromaticity cast translation",
+      "mechanism": "Translate CIE u-prime/v-prime chromaticity from the selected mean toward a target while retaining luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "target"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "prerequisites": "Target must have positive luminance to define chromaticity; otherwise exact identity."
+    },
+    {
+      "id": "chroma_group_lasso",
+      "label": "Robust group-lasso chroma cleanup",
+      "name": "Robust group-lasso chroma cleanup",
+      "mechanism": "Estimate a selected robust chroma noise scale and apply the vector group-lasso proximal operator.",
+      "controls": [
+        "amount",
+        "strength",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ]
+    },
+    {
+      "id": "geometric_median_neutral",
+      "label": "Geometric-median cast balance",
+      "name": "Geometric-median cast balance",
+      "mechanism": "Estimate the continuous weighted chroma geometric median with fixed-count Weiszfeld updates and remove that robust cast.",
+      "controls": [
+        "amount",
+        "strength"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ]
+    },
+    {
+      "id": "aitchison_tint",
+      "label": "Compositional-geodesic colour tint",
+      "name": "Compositional-geodesic colour tint",
+      "mechanism": "Interpolate channel compositions along an Aitchison log-ratio geodesic toward a chosen target, retaining luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "target",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ]
+    },
+    {
+      "id": "energy_conserving_lightness",
+      "label": "Fixed-energy lightness redistribution",
+      "name": "Fixed-energy lightness redistribution",
+      "mechanism": "Solve an exponential-tilting KL projection toward a luminance anchor while preserving the total RGB channel energy.",
+      "controls": [
+        "amount",
+        "strength",
+        "pivot"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ]
+    },
+    {
+      "id": "dichromatic_specular",
+      "label": "Dichromatic reflection subtraction",
+      "name": "Dichromatic reflection subtraction",
+      "mechanism": "Fit a two-basis diffuse-plus-illuminant reflection model and subtract a bounded specular component.",
+      "controls": [
+        "amount",
+        "strength",
+        "source",
+        "radius",
+        "target",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "qualificationOverrides": {
+        "target": [
+          0.8,
+          0.9,
+          1.0
+        ],
+        "source": [
+          0.25,
+          0.5
+        ]
+      },
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "prerequisites": "Required reference patches must contain selected pixels; otherwise exact identity. Diffuse and target illuminant bases must be non-collinear."
+    },
+    {
+      "id": "mirror_hue_fold",
+      "label": "Mirrored palette hue folding",
+      "name": "Mirrored palette hue folding",
+      "mechanism": "Fold hue through a repeated angular reflection into a bounded palette sector while retaining chroma radius and luminance.",
+      "controls": [
+        "amount",
+        "strength",
+        "target",
+        "width"
+      ],
+      "lane": "colour",
+      "category": "color_lab",
+      "nativeCommand": "save_color_lab",
+      "recipeKey": "color_lab_v1",
+      "source": "crates/aura-render/src/color_lab/scientific.rs",
+      "group": "colour",
+      "validation": "Initial active/distinct-output, exact-zero, determinism, selected-only statistics/reference isolation, feather blending, finite HDR and UI control authoring tests passed.",
+      "tests": [
+        "color_lab::scientific::tests::all_twenty_five_new_mechanisms_are_active_distinct_deterministic_finite_and_zero_exact",
+        "color_lab::scientific::tests::reference_patches_statistics_and_error_diffusion_ignore_all_excluded_pixels",
+        "color_lab::scientific::tests::black_hdr_single_pixel_and_empty_selection_are_safe"
+      ],
+      "prerequisites": "Target must have nonzero chroma to define hue; otherwise exact identity."
+    }
+  ],
+  "fixes": [
+    {
+      "id": "bounded-local-target-memory",
+      "issue": "Four creative local methods retained a full-frame RGB target plane and allocated per-pixel vectors/sets.",
+      "change": "Evaluate the same selected-only 7x7 stencil directly during final parallel blending using fixed-capacity stack scratch.",
+      "saved_retained_bytes_per_pixel": 12
+    },
+    {
+      "id": "wiener-unused-chroma-planes",
+      "issue": "Luminance-only Wiener cleanup retained four unused chroma/covariance planes.",
+      "change": "Build chroma and cross-moment planes only for guided chroma.",
+      "saved_retained_bytes_per_pixel": 16
+    },
+    {
+      "id": "empty-selection-short-circuit",
+      "issue": "An empty selection still built method statistics and local planes.",
+      "change": "Return exact identity before constructing any method context."
+    },
+    {
+      "id": "error-diffusion-finite-fallback",
+      "issue": "The new sequential diffusion path bypassed the generic finite-output fallback.",
+      "change": "Reject nonfinite candidate values and residuals before they can propagate; ordinary finite outputs retain the same formula."
+    },
+    {
+      "id": "selected-reference-patch-validity",
+      "issue": "New patch-based operations could use zero statistics from an empty selected reference patch.",
+      "change": "Explicit patch-validity checks return exact identity when a required selected reference patch is absent; the UI explains the prerequisite."
+    },
+    {
+      "id": "undefined-target-chromaticity",
+      "issue": "A black target has no u-prime/v-prime chromaticity, and a neutral target has no hue for angular palette operators.",
+      "change": "Return exact identity for those undefined target cases; ordinary valid targets retain the same mathematical operators."
+    },
+    {
+      "id": "dotscreen-white-endpoint",
+      "issue": "Finite dot-cell sampling could leave dark gaps at nominal white.",
+      "change": "Explicit full-coverage white endpoint independent of the dot-cell phase; black remains exact black."
+    },
+    {
+      "id": "signed-diffusion-output",
+      "issue": "Sequential diffusion bypassed the generic nonnegative final-output safeguard for signed working-space samples.",
+      "change": "Apply the generic finite/nonnegative blend safeguard while preserving excluded samples exactly."
+    },
+    {
+      "id": "signed-unavailable-reference-identity",
+      "issue": "Returning an unchanged pixel from inside a transform still passed through the generic nonnegative clamp.",
+      "change": "Unavailable scientific-reference operations exit before per-pixel blending, preserving even signed source values bit-exactly."
+    }
+  ],
+  "limitations": [
+    "These are explicit creative or statistical tools; not every operation is appropriate for every photograph.",
+    "New global statistics use at most8192 deterministic selected samples; local reference distributions use a bounded7x7 stencil.",
+    "Channel-response reconstruction is an empirical estimate and requires enough selected unclipped samples; missing data is not recovered.",
+    "Three-cluster palette recolouring and monochrome/contour/halftone methods intentionally alter appearance.",
+    "Existing full-window mean/regression methods still require full-frame scalar planes; the full native rendering memory issue is reduced, not eliminated."
+  ],
+  "validation": [
+    {
+      "command": "CARGO_INCREMENTAL=0 cargo test -p aura-render -p aura-recipe color_lab --lib",
+      "result": "passed before final hardening and resource regression additions",
+      "recipeTests": 3,
+      "renderTests": 37,
+      "scientificTests": 11
+    },
+    {
+      "command": "npm.cmd test -- ColorLabPanel.test.tsx",
+      "cwd": "ui",
+      "result": "passed",
+      "tests": 81,
+      "note": "Includes all100 catalogue methods; every new exposed numeric control edited and saved."
+    },
+    {
+      "command": "npm.cmd run lint",
+      "cwd": "ui",
+      "result": "passed"
+    },
+    {
+      "command": "cargo clippy -p aura-render --all-targets -- -D warnings",
+      "result": "coordinated by spatial lane; initial production and test diagnostics fixed; final rerun pending"
+    }
+  ],
+  "newRegressionTests": [
+    "color_lab::creative::tests::local_stencil_methods_retain_no_full_frame_targets_or_unused_scalar_planes",
+    "color_lab::scientific::tests::error_diffusion_does_not_inject_nonfinite_values_for_extreme_finite_hdr",
+    "color_lab::scientific::tests::absent_selected_reference_patches_are_exact_identity",
+    "color_lab::scientific::tests::undefined_target_chromaticity_and_hue_are_exact_identity",
+    "color_lab::scientific::tests::diffusion_clamps_selected_signed_values_and_preserves_excluded_bits",
+    "color_lab::scientific::tests::dotscreen_black_and_white_endpoints_are_independent_of_cell_phase",
+    "color_lab::scientific::tests::unavailable_reference_noop_also_preserves_signed_working_values"
+  ],
+  "files": [
+    "crates/aura-recipe/src/color_lab.rs",
+    "crates/aura-render/src/color_lab.rs",
+    "crates/aura-render/src/color_lab/creative.rs",
+    "crates/aura-render/src/color_lab/creative/tests.rs",
+    "crates/aura-render/src/color_lab/stencil.rs",
+    "crates/aura-render/src/color_lab/scientific.rs",
+    "crates/aura-render/src/color_lab/scientific/measured.rs",
+    "crates/aura-render/src/color_lab/scientific/math.rs",
+    "crates/aura-render/src/color_lab/scientific/tests.rs",
+    "ui/src/ipc/colorLab.ts",
+    "ui/src/components/develop/ColorLabPanel.tsx",
+    "ui/src/components/develop/ColorLabPanel.test.tsx"
+  ],
+  "expectedFinalCounts": {
+    "colourRenderTests": 44,
+    "colourRecipeTests": 3,
+    "newScientificTests": 17,
+    "newMemoryRegressionTests": 1,
+    "uiTests": 81
+  },
+  "sourceFreeze": {
+    "hostTimestamp": "2026-10-22 09:52:03",
+    "changedAfter0949": [
+      {
+        "path": "crates/aura-render/src/color_lab.rs",
+        "sha256": "ebc80c074286da0a1b694b7fe5b491be74421d01c23e61da3de41419bfb0857e"
+      },
+      {
+        "path": "crates/aura-render/src/color_lab/scientific.rs",
+        "sha256": "dc9eb6dce39dd86252a1aa7c676d43cffee8a55b76b33a915c8f602fce978c00"
+      },
+      {
+        "path": "crates/aura-render/src/color_lab/scientific/tests.rs",
+        "sha256": "c3905fdac70d814095ec3a7f524c7eb86d7d286834c799f73bdf90318c8bf92b"
+      }
+    ]
+  }
+}

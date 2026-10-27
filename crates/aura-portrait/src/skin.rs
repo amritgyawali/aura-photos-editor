@@ -184,13 +184,12 @@ impl SkinModel {
 mod tests {
     use super::*;
     use crate::canvas::linear_srgb_to_lab;
-    use aura_raw::colour::curve::srgb_decode;
 
     fn lab8(rgb: [u8; 3]) -> [f32; 3] {
         linear_srgb_to_lab([
-            srgb_decode(f32::from(rgb[0]) / 255.0),
-            srgb_decode(f32::from(rgb[1]) / 255.0),
-            srgb_decode(f32::from(rgb[2]) / 255.0),
+            aura_raw::colour::curve::srgb_byte_to_linear(rgb[0]),
+            aura_raw::colour::curve::srgb_byte_to_linear(rgb[1]),
+            aura_raw::colour::curve::srgb_byte_to_linear(rgb[2]),
         ])
     }
 

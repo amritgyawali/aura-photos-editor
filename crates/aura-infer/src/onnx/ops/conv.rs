@@ -22,11 +22,106 @@ use crate::onnx::ops::{
     float_operand, nchw, optional_float, pair_attr, resolve_pads, sample, spatial_out,
 };
 
-/// Output samples below which the loop stays on one thread.
+/// Multiply-adds below which an operator stays on one thread.
 ///
 /// Scheduling a rayon job costs more than a small feature map's arithmetic, and
-/// the placeholder models in this phase are deliberately small.
+/// the placeholder models in this phase are deliberately small. The measure is the
+/// arithmetic rather than the output size: a 16x16 map with 384 input channels and a
+/// 3x3 kernel is a small output and a third of a billion multiply-adds.
 const PARALLEL_MIN: usize = 1 << 16;
+
+/// Output samples one pointwise task accumulates at a time: the block of four output
+/// planes stays in the first-level cache while every input channel streams past it.
+const POINTWISE_CHUNK: usize = 512;
+
+/// A 1x1, stride-1, unpadded, ungrouped convolution: a matrix product of the weights with
+/// the input planes. Every output sample is its bias plus each input channel's term in
+/// channel order - the same additions in the same order as the general loop - but four
+/// output channels share each read of an input channel and the samples run as long
+/// contiguous vectors instead of one short row at a time.
+#[allow(clippy::too_many_arguments)]
+fn pointwise(
+    output: &mut [f32],
+    input: &[f32],
+    weight: &Tensor,
+    bias: Option<&Tensor>,
+    in_channels: usize,
+    out_channels: usize,
+    plane: usize,
+    parallel: bool,
+) {
+    const BLOCK: usize = 4;
+    let per_image = out_channels.div_ceil(BLOCK);
+    let task = |index: usize, block: &mut [f32]| {
+        let image = index / per_image;
+        let first = (index % per_image) * BLOCK;
+        let count = block.len() / plane;
+        let mut planes: Vec<&mut [f32]> = block.chunks_mut(plane).collect();
+        for (offset, out) in planes.iter_mut().enumerate() {
+            out.fill(bias.map_or(0.0, |tensor| sample(tensor, first + offset)));
+        }
+        let mut start = 0;
+        while start < plane {
+            let end = (start + POINTWISE_CHUNK).min(plane);
+            for channel in 0..in_channels {
+                let at = (image * in_channels + channel) * plane;
+                let Some(src) = input.get(at + start..at + end) else {
+                    continue;
+                };
+                let terms: [f32; BLOCK] = std::array::from_fn(|offset| {
+                    if offset < count {
+                        sample(weight, (first + offset) * in_channels + channel)
+                    } else {
+                        0.0
+                    }
+                });
+                let [first_term, second_term, third_term, fourth_term] = terms;
+                if let [one, two, three, four] = planes.as_mut_slice() {
+                    let (Some(one), Some(two), Some(three), Some(four)) = (
+                        one.get_mut(start..end),
+                        two.get_mut(start..end),
+                        three.get_mut(start..end),
+                        four.get_mut(start..end),
+                    ) else {
+                        continue;
+                    };
+                    for ((((value, one), two), three), four) in
+                        src.iter().zip(one).zip(two).zip(three).zip(four)
+                    {
+                        *one += first_term * value;
+                        *two += second_term * value;
+                        *three += third_term * value;
+                        *four += fourth_term * value;
+                    }
+                } else {
+                    for (term, out) in terms.iter().zip(planes.iter_mut()) {
+                        if let Some(out) = out.get_mut(start..end) {
+                            for (slot, value) in out.iter_mut().zip(src) {
+                                *slot += term * value;
+                            }
+                        }
+                    }
+                }
+            }
+            start = end;
+        }
+    };
+    // Blocks never straddle two images: each image's channels are cut into blocks of four.
+    let blocks: Vec<(usize, &mut [f32])> = output
+        .chunks_mut(out_channels * plane)
+        .flat_map(|image| image.chunks_mut(BLOCK * plane))
+        .enumerate()
+        .collect();
+    if parallel {
+        blocks
+            .into_par_iter()
+            .for_each(|(index, block)| task(index, block));
+    } else {
+        for (index, block) in blocks {
+            task(index, block);
+        }
+    }
+}
 
 /// `Conv`: NCHW input, `[M, C/group, kh, kw]` weights, optional `[M]` bias.
 ///
@@ -71,6 +166,30 @@ pub(super) fn conv(node: &Node, inputs: &[Option<&Value>]) -> AuraResult<Vec<Val
     let row_len = out_w;
     if input.data.len() != batch * in_channels * in_h * in_w {
         return Err(invalid_graph("Conv: input buffer does not match its shape"));
+    }
+
+    let work = output
+        .data
+        .len()
+        .saturating_mul(group_channels * kernel_h * kernel_w);
+    if group == 1
+        && kernel_h == 1
+        && kernel_w == 1
+        && stride == (1, 1)
+        && (pad_top, pad_left, pad_bottom, pad_right) == (0, 0, 0, 0)
+        && (out_h, out_w) == (in_h, in_w)
+    {
+        pointwise(
+            &mut output.data,
+            &input.data,
+            weight,
+            bias,
+            in_channels,
+            out_channels,
+            out_h * out_w,
+            work >= PARALLEL_MIN,
+        );
+        return Ok(vec![Value::Float(output)]);
     }
 
     // One rayon task per output row: (batch, channel, row) is unique per slice.
@@ -145,7 +264,7 @@ pub(super) fn conv(node: &Node, inputs: &[Option<&Value>]) -> AuraResult<Vec<Val
         }
     };
 
-    if output.data.len() >= PARALLEL_MIN {
+    if work >= PARALLEL_MIN {
         output
             .data
             .par_chunks_mut(row_len)
@@ -215,42 +334,54 @@ pub(super) fn conv_transpose(node: &Node, inputs: &[Option<&Value>]) -> AuraResu
     }
 
     let mut output = Tensor::zeros(vec![batch, out_channels, out_h, out_w]);
+    // For each kernel column, the output columns it reaches and the input column each
+    // reads: the same test the per-sample definition makes, made once per operator.
+    let taps: Vec<Vec<(usize, usize)>> = (0..kernel_w)
+        .map(|kx| {
+            (0..out_w)
+                .filter_map(|out_x| {
+                    let x = (out_x + pad_left).checked_sub(kx * dilation.1)?;
+                    (x % stride.1 == 0 && x / stride.1 < in_w).then_some((out_x, x / stride.1))
+                })
+                .collect()
+        })
+        .collect();
+    // Every output sample starts at its bias and adds the taps that reach it in input
+    // channel, kernel row, kernel column order - exactly the definition's order - with the
+    // row's samples accumulated side by side.
     let fill = |row_index: usize, row: &mut [f32]| {
         let out_y = row_index % out_h;
         let channel = (row_index / out_h) % out_channels;
         let image = row_index / (out_h * out_channels);
-        let bias_value = bias.map_or(0.0, |tensor| sample(tensor, channel));
-        for (out_x, slot) in row.iter_mut().enumerate() {
-            let mut total = bias_value;
-            for in_channel in 0..in_channels {
-                let plane = (image * in_channels + in_channel) * in_h * in_w;
-                let weight_base = (in_channel * out_channels + channel) * kernel_h * kernel_w;
-                for ky in 0..kernel_h {
-                    // out_y + pad_top = in_y * stride + ky * dilation
-                    let Some(y) = (out_y + pad_top).checked_sub(ky * dilation.0) else {
-                        continue;
-                    };
-                    if y % stride.0 != 0 || y / stride.0 >= in_h {
-                        continue;
-                    }
-                    let in_y = y / stride.0;
-                    for kx in 0..kernel_w {
-                        let Some(x) = (out_x + pad_left).checked_sub(kx * dilation.1) else {
-                            continue;
-                        };
-                        if x % stride.1 != 0 || x / stride.1 >= in_w {
-                            continue;
+        row.fill(bias.map_or(0.0, |tensor| sample(tensor, channel)));
+        for in_channel in 0..in_channels {
+            let plane = (image * in_channels + in_channel) * in_h * in_w;
+            let weight_base = (in_channel * out_channels + channel) * kernel_h * kernel_w;
+            for ky in 0..kernel_h {
+                // out_y + pad_top = in_y * stride + ky * dilation
+                let Some(y) = (out_y + pad_top).checked_sub(ky * dilation.0) else {
+                    continue;
+                };
+                if y % stride.0 != 0 || y / stride.0 >= in_h {
+                    continue;
+                }
+                let start = plane + (y / stride.0) * in_w;
+                let Some(source) = input.data.get(start..start + in_w) else {
+                    continue;
+                };
+                for (kx, reach) in taps.iter().enumerate() {
+                    let w = sample(weight, weight_base + ky * kernel_w + kx);
+                    for &(out_x, in_x) in reach {
+                        if let (Some(slot), Some(value)) = (row.get_mut(out_x), source.get(in_x)) {
+                            *slot += w * value;
                         }
-                        let in_x = x / stride.1;
-                        total += sample(weight, weight_base + ky * kernel_w + kx)
-                            * sample(input, plane + in_y * in_w + in_x);
                     }
                 }
             }
-            *slot = total;
         }
     };
-    if output.data.len() >= PARALLEL_MIN {
+    let work = output.data.len().saturating_mul(in_channels);
+    if work >= PARALLEL_MIN {
         output
             .data
             .par_chunks_mut(out_w)
@@ -266,6 +397,7 @@ pub(super) fn conv_transpose(node: &Node, inputs: &[Option<&Value>]) -> AuraResu
 
 #[cfg(test)]
 #[allow(
+    clippy::similar_names,
     clippy::unwrap_used,
     clippy::disallowed_methods,
     clippy::many_single_char_names,
@@ -382,6 +514,125 @@ mod tests {
                 bits(got),
                 bits(&want),
                 "stride {stride} pad {pad} group {group}"
+            );
+        }
+    }
+
+    /// The pointwise path - four output channels at a time over long vectors - adds the
+    /// same terms in the same order as the definition, with a bias, a channel count that
+    /// is not a multiple of four, more than one image and planes longer than one chunk.
+    #[test]
+    fn pointwise_convolution_is_bit_identical_to_the_definition() {
+        let pattern =
+            |n: usize, k: f32| (0..n).map(|i| ((i * 37 % 23) as f32 - 11.0) * k).collect();
+        for (batch, c, m, h, w) in [(1, 3, 4, 7, 9), (2, 5, 7, 31, 29), (1, 16, 9, 1, 1)] {
+            let x = Tensor {
+                shape: vec![batch, c, h, w],
+                data: pattern(batch * c * h * w, 0.013),
+            };
+            let weights = Tensor {
+                shape: vec![m, c, 1, 1],
+                data: pattern(m * c, 0.07),
+            };
+            let bias = Tensor {
+                shape: vec![m],
+                data: pattern(m, 0.3),
+            };
+            let got = conv(
+                &node("Conv", &[]),
+                &[
+                    Some(&Value::Float(x.clone())),
+                    Some(&Value::Float(weights.clone())),
+                    Some(&Value::Float(bias.clone())),
+                ],
+            )
+            .unwrap();
+            let got = got[0].as_float().unwrap();
+            let mut want = vec![0.0f32; batch * m * h * w];
+            for b in 0..batch {
+                for o in 0..m {
+                    for p in 0..h * w {
+                        let mut total = bias.data[o];
+                        for k in 0..c {
+                            total += weights.data[o * c + k] * x.data[(b * c + k) * h * w + p];
+                        }
+                        want[(b * m + o) * h * w + p] = total;
+                    }
+                }
+            }
+            let bits = |v: &[f32]| v.iter().map(|v| v.to_bits()).collect::<Vec<_>>();
+            assert_eq!(bits(&got.data), bits(&want), "{batch}x{c}->{m} {h}x{w}");
+        }
+    }
+
+    /// The transposed convolution's precomputed taps give the per-sample definition exactly.
+    #[test]
+    fn transposed_convolution_is_bit_identical_to_the_definition() {
+        let pattern =
+            |n: usize, k: f32| (0..n).map(|i| ((i * 41 % 29) as f32 - 14.0) * k).collect();
+        for (stride, kernel, pad) in [(2, 2, 0), (2, 3, 1), (1, 3, 1), (3, 4, 2)] {
+            let (c, m, h, w) = (3, 2, 5, 6);
+            let x = Tensor {
+                shape: vec![1, c, h, w],
+                data: pattern(c * h * w, 0.05),
+            };
+            let weights = Tensor {
+                shape: vec![c, m, kernel, kernel],
+                data: pattern(c * m * kernel * kernel, 0.09),
+            };
+            let n = node(
+                "ConvTranspose",
+                &[
+                    ("strides", vec![stride as i64; 2]),
+                    ("pads", vec![pad as i64; 4]),
+                ],
+            );
+            let got = conv_transpose(
+                &n,
+                &[
+                    Some(&Value::Float(x.clone())),
+                    Some(&Value::Float(weights.clone())),
+                ],
+            )
+            .unwrap();
+            let got = got[0].as_float().unwrap();
+            let (oh, ow) = (got.shape[2], got.shape[3]);
+            let mut want = vec![0.0f32; m * oh * ow];
+            for o in 0..m {
+                for oy in 0..oh {
+                    for ox in 0..ow {
+                        let mut total = 0.0f32;
+                        for k in 0..c {
+                            for ky in 0..kernel {
+                                for kx in 0..kernel {
+                                    let y = (oy + pad) as isize - ky as isize;
+                                    let xx = (ox + pad) as isize - kx as isize;
+                                    if y < 0 || xx < 0 {
+                                        continue;
+                                    }
+                                    let (y, xx) = (y as usize, xx as usize);
+                                    if y % stride != 0 || xx % stride != 0 {
+                                        continue;
+                                    }
+                                    let (iy, ix) = (y / stride, xx / stride);
+                                    if iy >= h || ix >= w {
+                                        continue;
+                                    }
+                                    total += weights.data
+                                        [((k * m + o) * kernel + ky) * kernel + kx]
+                                        * x.data[(k * h + iy) * w + ix];
+                                }
+                            }
+                        }
+                        want[(o * oh + oy) * ow + ox] = total;
+                    }
+                }
+            }
+            let bits = |v: &[f32]| v.iter().map(|v| v.to_bits()).collect::<Vec<_>>();
+            assert_eq!(
+                bits(&got.data),
+                bits(&want),
+                "stride {stride} kernel {kernel}"
             );
         }
     }

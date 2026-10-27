@@ -2,6 +2,628 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Cloud TLS on `ring`; the photographer is told when body tools have no person - 2026-10-27
+
+- **AI provider connections use rustls's standard `ring` crypto** instead of the alpha-stage,
+  unmaintained `rustls-rustcrypto` (ADR-0066 addendum). Seven advisory exceptions and about 470
+  lockfile lines go with it; a verified handshake with Anthropic and OpenAI was checked live.
+  Key exchange offers X25519, P-256 and P-384, all constant-time.
+- **The finishing panel says when people tools have no person.** Face, body, skin, makeup and
+  people adjustments act only on a detected face (PR #73). Saving one on a photograph with no face
+  now returns a note the panel shows above its tools - "No face was found... draw their face in
+  Portrait retouch" - instead of a slider that silently does nothing. Background tools, which need
+  no person, report nothing.
+
+## Match a look: fixes for the deep assessment, learned originals, tone from the reference - 2026-10-25
+
+- **Your own edit, learned.** When the edited reference you upload was made from a photo in the
+  collection, the Match a look panel (as well as the start screen and collection preparation) finds
+  that photo by name or capture time, confirms it by pixels, and learns your edit pixel for pixel.
+  On the 20-photo desktop test the result came within a median 0.71 of the true look (from 7.6)
+  and the original was found in 19 of 20 cases (ADR-0161, ADR-0181).
+- **No more repainted scenes.** A reference of a different scene is matched as a look, not as a
+  colour distribution: a blue sky no longer turns the colour of the reference's fruit, nor a white
+  floor the green of its forest. Collection matching moved closer to the true look in 18 of 20
+  photos (was 12).
+- **No new bands or blotches.** Every fitted look is limited in how steeply it may stretch nearby
+  colours (twofold), and every result is checked for new bands and patches at every brightness, not
+  only in shadows. Palette results with new bands: 6 of 20 to 0; their median error to the true look
+  9.8 to 6.0.
+- **Tone from the reference.** Matte, airy, moody and contrasty looks now carry their tone across
+  scenes, estimated against ordinary finished photographs (ADR-0180).
+- **Honest results.** A refused save no longer leaves Matching... on screen, and a saved result
+  that looks the same as the original is reported as such, with its measured difference, never as a
+  match.
+- **Strength is a share of a safe match.** Collection matching checks the full-strength look first,
+  so 50 % is half of a look that was safe at 100 %; an edited photo used as a reference is measured
+  at full size.
+- **Exact colours of the reference.** A third matching goal gives your photo the reference's own
+  colours and tones - its tone curve, its palette in its proportions, its split tone, skin to skin -
+  and repaints a different scene to do it. On the 20-photo desktop test it moved photos closest to
+  the reference's colours (median distance 21.3 to 14.5; Palette 15.8, Natural 18.4). Where a full
+  copy would band, block up a dark backdrop or blow out highlights it stops short and says so
+  (ADR-0182).
+- **Apply saves the strongest strength that passes** instead of refusing when the amount asked for
+  fails one check, and says what was saved.
+- **No more hangs on small machines.** A colour match that captured its own edited preview waited
+  for itself forever with one image-work slot; the slot is now reentrant on its thread.
+- **Build green again.** The two Match a look accuracy gates now test what one reference of another
+  scene can identify - its colour, which loses 51-54 % of its error - instead of failing on tone it
+  cannot identify; TLS dependencies upgraded for three advisories, and the AI connection uses X25519
+  key exchange only, so the fourth cannot reach a secret (ADR-0066 addendum, ADR-0181).
+- **Colour bands leave greys alone.** The eight HSL bands now fade in with a pixel's saturation
+  (none below 3 %, all of it from 15 %), so moving the orange luminance slider to -100 no longer
+  darkens a grey card with a trace of warm cast by 34-55 levels. The shader does the same.
+- **No body without a person.** On a photo with no face, the learned subject selection (which
+  finds the most prominent *thing* - a pot, a cake) no longer becomes a body for the slim, height,
+  legs, torso and subject light controls to warp or relight. It still separates the background.
+- **Every retouched face is checked.** Auto advanced retouch's quality control now renders larger
+  - up to the full resolution - when a retouched face is too small to check at screen size, so the
+  guests seated across a stage are checked like the speaker, not left out of the report.
+- **The in-app test of every tool** (`scripts/test-everything-gui.py`) reconnects when the window
+  swaps its web process, measures dehaze on the export render, and no longer clobbers the project
+  name it uses to reopen the library.
+
+## A hundred measured portrait, attire, background and delivery tools - 2026-10-22
+
+- **Sliders that find what they act on** (ADR-0150), in the style of Evoto: twenty more face sliders
+  (eye height, tilt, corners and a measured eye symmetry; nose bridge, tip, lift and nostrils; each lip,
+  the brows, temples, chin and hair volume) and ten more body sliders (thighs, calves, a flat stomach on
+  the side the silhouette shows it, hips, shoulders, torso, height, neck, double chin, a level head).
+- **Skin and makeup on every face**: aegyo-sal, lip lines, glow, stubble shadow, rosy complexion, even
+  teeth, feature sharpening, beard definition, clothing colour on skin, pores; eyeliner and wing on the
+  measured lid line, lashes, lip liner, ombre lips, highlighter, bronzer, enhance worn makeup, fill brows.
+- **Hair, attire, background and people**: hair shine, parting, colour depth and edge; gold jewellery,
+  clipped red fabric, veil clarity, embroidery, garment edges, mehndi, white and dark garments, outfit
+  colour; background saturation, brightness, warmth, depth blur, noise, backdrop light, light wrap, a
+  colour that keeps shadows and a sky with clouds; people exposure, warmth, clarity, group face and skin
+  balance, relight, harsh shadows, backlight rescue, a face-aware vignette and face brightness.
+- **Seven tools you place yourself**: body hair, cellulite, tan lines, hands, knuckles and elbows, glasses
+  reflection colour, and a cast shadow.
+- **Framing, delivery and review**: ID photographs on white, measured crops, level eyes, a transparent PNG
+  cut-out, an Instagram grid in posting order, carousel slides, before and after, a 2x enlargement without
+  halos, a face picker and a list of faces showing no white of the eye (not a blink verdict: that needs
+  a trained eye-state model). See [the tool list](docs/evoto-hundred-tools.md).
+- **Fixed**: moving a Portrait studio slider back to zero, Reset all, Keep original background, Clear
+  liquify and turning the light off now take effect; the merge kept the old value of any field the
+  saved finish left out. The portrait parse (version 4) centres the mouth on the line between the lips,
+  keeps blush out of the lips and lid shimmer out of the whites of the eyes.
+
+## Calibrated original/edited reference transfer - 2026-10-23
+
+- Learn a shared global RGB transformation from an aligned original/edited pair
+  on the main Match a look screen, with robust fitting and held-out validation.
+- Use the same bounded lookup in native previews and exports; preserve repeat
+  application, explicit strength, zero restoration, skin/highlight checks and
+  protected recipe fields.
+- Refine single-reference tone and white balance again after fitting split toning.
+- Record 54 targeted test passes and remaining photographic limits in the
+  [calibrated reference report](docs/reports/AURA-calibrated-reference-2026-10-23.md).
+
+## Main Match a look workflow and native reference fitting - 2026-10-23
+
+- Add single edited JPEG/PNG/TIFF upload to the main reference-first screen.
+- Fit individual tone, white-balance, supported colour-band and three-way grading
+  controls for each target through native pixels, with conservative scene regularisation.
+- Verify merged canonical recipes at native resolution and save with stale-edit
+  protection. Preserve zero restoration, manual values and repeat application.
+- Connect Stop to the native reference worker for collection and unattended runs.
+  See the [main workflow guide](docs/reference-first-matching.md) and its validation report.
+
+## Robust reference-grade estimation - 2026-10-23
+
+- Bound spatial samples across image aspect ratios and avoid fixed-grid texture aliasing.
+- Improve neutral-axis estimation and preserve sampled selective-colour details.
+- Retain the best intermediate fit for strongly corresponding scenes, preserve identity for matching measurements,
+  and check cancellation between fitting updates.
+- Version cached measurements and surface stale references with refresh instructions.
+  See the [reference-grade workflow](docs/reference-grade-matching.md) for limits.
+- Retain the three unmet grade-fidelity checks in the
+  [reliability report](docs/reports/AURA-reference-grade-reliability-2026-10-23.md).
+  These changes do not qualify universal exact reference matching.
+
+## Adaptive reference colour fitting - 2026-10-22
+
+- Search signed corrections, individual curve anchors and supported colour bands;
+  fit separate shadow, midtone and highlight casts through native grading wheels.
+- Add reversible monochrome-reference handling with per-person tone and cast guards.
+- Use structure evidence and edit regularization to limit scene-driven overfitting.
+  Check proposals on native renders and backtrack before publishing analysis.
+- Preserve old sessions and descriptor-only portable libraries. Reject applied
+  strengths that worsen native appearance distance beyond numerical tolerance.
+- Record real-photo comparisons, including the rejected unregularized prototype,
+  in the [adaptive matcher report](docs/reports/AURA-adaptive-colour-matching-2026-10-22.md).
+  Universal exact colour/tone matching remains unverified.
+
+## Single-image reference workspace and colour transfer tests - 2026-10-22
+
+- Open single-image reference matching directly in **Match a look**, beside the
+  existing preview and filmstrip. Preserve the editor's saved work and panel state.
+- Download and import two original-resolution references, match each to two supplied
+  photo previews, verify exports and run a separate native CR3/reference test.
+- Record 18 controlled known-grade comparisons and remaining split-tone and
+  monochrome limitations in the [colour-match report](docs/reports/AURA-reference-colour-match-2026-10-22.md).
+  Exact grade cloning and Evoto parity remain unverified.
+- Verify delivered colour independently, adjust four matches and export a native
+  4480 × 6720 CR3 as JPEG/PNG. Lossless files preserve the applied treatment exactly;
+  [the export report](docs/reports/AURA-exported-colour-verification-2026-10-22.md)
+  retains the remaining reference-colour, tone and white-balance differences.
+
+## Colour history, recipe sidecar repairs and comprehensive desktop audit - 2026-10-22
+
+- Keep repeated Levels, selective-colour and local-colour saves out of Undo
+  history, including edits below canonical recipe precision. Retain validation
+  and stale-revision protection.
+- Write requested recipe sidecars from the exact rendered edit, retain the snapshot
+  through resizing and sharpening, and preserve accurate sidecar delivery counts.
+- Add a regression for identical and subprecision colour saves and an isolated
+  desktop audit of older tools, semantic selections, material tools, reference
+  management and export formats.
+- Reopen the 27 supplied RAW edits in the rebuilt application and record
+  per-tool coverage, original-file hashes and export verification in the
+  [comprehensive report](docs/reports/AURA-comprehensive-test-2026-10-22.md).
+
+## Advanced methods and existing-tool repairs - 2026-10-22
+
+- Add 25 further colour, 25 spatial and 25 selection mechanisms; each catalogue
+  now contains 100 methods. Add 25 descriptive diagnostics and three review screens.
+- Preserve native local detail for 44 supported spatial methods with bounded
+  stripes and halos. Remove retained full-frame colour stencil targets.
+- Fix hidden selection-parameter validation, resource preflight and valid-pair
+  centring of existing lagged autocorrelation. Version the renderer cache.
+- Record actual qualification separately in the
+  [advanced validation report](docs/reports/AURA-advanced-validation-2026-10-22.md).
+
+## Additional editing methods and delivery inspection - 2026-10-22
+
+- Add 25 colour methods, 25 spatial methods and 25 selection workflows, bringing
+  each catalogue to 75. Add 25 diagnostics across three additional review screens.
+- Qualify all 100 additions through the native desktop on synthetic and real-photo
+  previews. Edit and export all 27 supplied RAW photos without changing originals.
+- Retain REA evidence and report exact Evoto parity and proprietary model recovery
+  as unverified. See the [validation report](docs/reports/AURA-validation-2026-10-22.md).
+
+## Selected lab correctness and fresh qualification - 2026-10-21
+
+- Repair selected-only interpolation, tied rank filtering, incomplete Haar blocks and
+  reference coordinates; version the corrected renderer cache identity.
+- Correct checkpoint ancestors, rollback binding, correction dependencies, boundary
+  selections and first batch edits on unedited imported photos.
+- Keep extension history paths unique and identical saved stacks history-neutral;
+  enforce photo membership inside recipe transactions.
+- Add spatial stack reordering, reliable workflow selection state and stricter
+  photo/export qualification. Preserve the existing 100 distinct additions.
+- Record fresh verification separately in the [current report](docs/reports/AURA-revalidation-2026-10-21.md).
+
+## One hundred colour, spatial, selection and review additions - 2026-10-21
+
+- Add twenty-five selected colour transforms and twenty-five spatial repair methods,
+  each with a native recipe stack, explicit mask binding, stale-save protection and Undo.
+- Add twenty-five selection construction, image-guided refinement and topology workflows.
+- Add twenty-five durable cohort review/checkpoint workflows, including planned transfers,
+  revision-bound signoff, correction dependencies and portable review metadata.
+- Qualify the supplied RAW folder with unchanged-source hashes, edited previews and
+  full-resolution export checks. Record actual Evoto preview edits and its trial export gate.
+- These are independent implementations. Proprietary Evoto models and exact output parity
+  are not claimed. See the [100-item report](docs/reports/AURA-hundred-capabilities-2026-10-21.md).
+
+## Further material, selection and inspection tools - 2026-10-20
+
+- Add a native, selection-bound material stack with fifteen additional repair methods,
+  independent fabric bands, original-safe history and dedicated editing panel.
+- Add fifteen component authoring, placement and selection topology workflows.
+- Add twenty measured scopes/maps/reports in a dedicated read-only Photo inspection panel.
+- Retain fresh REA Evoto evidence with explicit coverage and private-model limits.
+  See the [additional fifty report](docs/reports/AURA-next-fifty-capabilities-2026-10-20.md).
+
+## Fifty studio capabilities - 2026-10-20
+
+- Update the workspace and desktop TLS locks to rustls 0.23.46 for four
+  RustSec fixes; record the existing GPU parser's scoped CC0 license exception.
+- Add native Levels, luminosity Levels, selective CMYK and sampled endpoints;
+  extend masks with curves, HSL, colour grading, sharpening and dehaze.
+- Add twelve composed-selection workflows, including whole inversion,
+  duplication, saved-mask combinations, morphology and connected-area cleanup.
+- Add durable empty reference groups, ordering, transactional batch management
+  and bounded descriptor-library import/export.
+- Add free/exact/custom framing, physical print sizing/export, measured placement
+  and alignment, reusable templates, linked regional strengths and RGB/Lab inspection.
+- Keep originals, manual work and history; distinguish documented counterparts
+  from AURA extensions in the [50-item report](docs/reports/AURA-fifty-capabilities-2026-10-20.md).
+
+## Adjustable automatic finishing and reference library - 2026-10-20
+
+- Add genuine regional reference-colour fitting with independent skin, hair,
+  clothing and background strengths, frozen masks, native checks and history.
+- Group the editor into seven panels with preserved drafts and a sticky preview;
+  expose automatic finishing directly in Develop.
+- Record current Evoto 8 REA evidence, 24 targeted native traces and a bounded
+  metadata audit. Exact parity and proprietary model recovery remain unestablished.
+- Adjust the overall automatic retouch or individual finishing categories from
+  0–200%, restore original strengths after zero, and retain manual edits and Undo/Redo.
+- Add twelve fine reference-colour strengths, including independent temperature
+  and tint, within the existing native highlight/skin safeguards.
+- Create a reference from a saved edited preview; browse thumbnails, search,
+  groups and favorites; rename/remove entries and remember matching strengths.
+- Import several references with individual outcomes. Keep saved matches
+  adjustable after their reusable reference is removed.
+- See the [workflow guide](docs/adjustable-finishing-and-reference-colour.md),
+  [ADR-0130](docs/adr/ADR-0130-adjustable-automatic-finishing-and-reference-workflows.md)
+  and [research/qualification report](docs/reports/AURA-Evoto-workflows-2026-10-20.md).
+
+## Sampled colour selection and local saturation - 2026-10-19
+
+- Sample a colour on the photo to refine any retouch selection, with tolerance,
+  smooth falloff and lightness sensitivity. Combine it with brushes, gradients,
+  brightness ranges and saved subject/material masks.
+- Add local saturation and adaptive vibrance, preserving working luminance and
+  neutral colours with a uniform chroma limit for negative-channel protection.
+- Keep colour sample coordinates separate from clone sources and zoom centres;
+  preserve the range when attaching a saved region mask.
+- See [ADR-0129](docs/adr/ADR-0129-sampled-colour-range-and-local-saturation.md) and
+  the [validation report](docs/reports/AURA-sampled-colour-tools-2026-10-19.md).
+
+## Selected optical and colour tools - 2026-10-19
+
+- Add native directional motion blur and radial zoom blur with a movable centre.
+  Selected-only sampling protects excluded subjects; prefiltered long trails
+  avoid sparse repeated copies.
+- Add hue-selective colour-spill suppression and a smooth highlight compression
+  shoulder, with dedicated controls and recipe validation.
+- Use existing masks, presets, editable history, preview and export. The zoom
+  centre can be positioned on the photo or entered numerically.
+- See [ADR-0128](docs/adr/ADR-0128-selected-optical-and-colour-tools.md) and the
+  [validation report](docs/reports/AURA-optical-and-colour-tools-2026-10-19.md).
+
+## Selected material and light tools - 2026-10-19
+
+- Add native fabric chroma moiré reduction, sampled fabric stain correction,
+  bounded shadow balancing, selected background blur and highlight glow.
+- Reuse manual and saved selections, strength controls, persisted history and
+  export. Require a clean fabric sample for stain correction.
+- Search executable retouch tools by name, purpose and material.
+- Record tested behavior and remaining feature gaps in the
+  [material and light report](docs/reports/AURA-material-and-light-tools-2026-10-19.md)
+  and [ADR-0127](docs/adr/ADR-0127-selected-material-and-light-effects.md).
+
+## Import recovery and responsive retouch review - 2026-10-19
+
+- Fix duplicate selected files stopping mixed imports. Individual file selections
+  retain sibling availability; progress covers the whole selection, including skips.
+- Seal failed/cancelled import journals and retain terminal errors for polling and
+  automatic-workflow callers. Commit imported rows and their counters together.
+- Validate whole-number edit fields locally and recover failed writes without
+  requiring a preview retry.
+- Search and filter saved retouch operations, with 24 rows per page and every
+  operation still editable by its stable ID. Remove duplicate command registration.
+- See [ADR-0126](docs/adr/ADR-0126-import-recovery-and-responsive-retouch-review.md)
+  and the [validation report](docs/reports/AURA-workflow-improvements-2026-10-19.md).
+
+## An Effects screen, and twenty more tools - 2026-10-20
+
+- **Effects in the sidebar** (ADR-0135): all 119 retouch tools and effects in one searchable place,
+  grouped, with quick jobs, favourites and recently used. Each card says what the tool needs (a
+  point, a skin sample, a colour). **Use on this photo** opens Retouch with the tool chosen and
+  never replaces an unsaved draft.
+- **Grooming**: darken lashes and liner, fill thin hair or brows, and match grain, which gives an
+  over-smoothed area the grain the photograph itself measures.
+- **Stylised looks**: channel swap, sunset glow, day to night with lamps kept lit, Lomo, instant
+  film, pop art.
+- **Optics and texture**: iris blur, double exposure echo, ripple, frosted glass, pixel sort, VHS
+  tape, emboss, crosshatch.
+- **Light**: sparkle on real glints, fairy lights, rainbow prism.
+
+## Twenty more effects: colour looks, light and lens, art, repair - 2026-10-20
+
+- **Colour looks** (ADR-0134): split tone, film fade, bleach bypass, teal and orange that holds
+  skin, colour splash, and a sky-blue restore that leaves skin and cloud alone.
+- **Light and lens**: spotlight, rim light along a selected subject's edge, chromatic aberration,
+  fisheye, anamorphic streaks, kaleidoscope.
+- **Art**: watercolour, stained glass, cartoon and neon edges that follow colour edges, thermal.
+- **Repair**: blown highlights given back the colour of their surroundings at their own
+  brightness, dehaze measured on the selection, and the iris's limbal ring.
+
+## Twenty more tools, a whole-app test, and two fixes it found - 2026-10-20
+
+- **Eight practical repairs** (ADR-0132): dust and scratches, JPEG artifact cleanup, banding
+  removal, auto levels and colour-cast removal measured on the selection, even out uneven
+  lighting, HDR detail, and bokeh highlights.
+- **Twelve creative looks**: tilt-shift, duotone, posterize, halftone print, pencil sketch, oil
+  paint, cross-process, infrared, mirror symmetry, lens flare, god rays, snow and rain.
+- **Matching a finished PNG of the same photo works up to the documented 16 megapixels.** Every
+  PNG reference over 8 megapixels was refused as too large to open, with a message telling the
+  photographer to contact support.
+- **A photo that has not been analysed yet says so**, rather than that it could not be read.
+- **Portrait retouch no longer mistakes gold silk or gilded carving for a tilted face**
+  (ADR-0133). On a photo of a bride's mehndi hands it had smoothed the dress as skin. A tilted face
+  found by only a few windows now needs both eyes confirmed; on 67 wedding photographs every real
+  face is still found.
+- `scripts/test-everything-gui.py` exercises every tool and feature in the real window on real
+  photographs, including RAW, and writes a report.
+
+## Twenty-nine effects you place yourself - 2026-10-20
+
+- **Liquify** (ADR-0131): push, enlarge, shrink and twirl, tapering to nothing at the ellipse
+  edge so a warp never tears; never used by automatic retouch.
+- **Blur and optics**: spin blur, pixelate and privacy blur, soft focus, Orton glow, local
+  sharpening and edge-preserving local noise reduction. (A defringe was also built and then
+  withdrawn on merging `main`, whose measured Defringe of ADR-0125 does the job better.)
+- **Colour**: hue shift and colour unify that keep brightness, green-screen colour replacement
+  with spill removal, local white balance from a picked neutral, vein reduction, invert.
+- **Light and portrait**: light leak, glitch, haze, sun rays, film halation, catchlights, a pet-eye
+  glow fix, lip gloss, freckles, floor reflection and drop shadow, plus seven named shortcuts.
+- Every effect is an ordinary saved retouch operation with its own selection, strength and Undo,
+  deterministic on every machine, and changes nothing outside its selection (the drop shadow
+  falls beside its subject by design).
+
+## Retouch strength sliders after Auto retouch - 2026-10-19
+
+- **Turn each kind of automatic retouch up or down after it has run** (ADR-0130): blemish and
+  acne removal, skin smoothing, even skin tone, dark circles, teeth, shine, body skin, clothing,
+  background and more, one slider each, 100% being exactly what Auto retouch did and 0% removing
+  it. The measured operations are never rewritten, so moving a slider back restores the automatic
+  result bit for bit, and running Auto retouch again keeps the sliders where they were.
+- **Sliders stop where they stop changing anything**: above 100% only operations below full
+  strength can rise, and a slider whose areas are all at full strength stops at 100%.
+- **Apply these strengths to the collection** gives every other auto-retouched photo the same
+  strengths over its own measured retouch. Operations made or changed by hand are never scaled.
+## Portrait light: relight a face, open its shadows, add catchlights and a glow, or press Auto light - 2026-10-17
+
+- **A key light shaped by the head** (ADR-0127), in a new **Light** tab of the Portrait studio. Each
+  face is given a 3-D shape from its own landmarks and a virtual soft light shades it by which way
+  each part of it faces, so the near cheek rises and the far cheek and jaw fall into shadow along the
+  curve of the face - not a gradient laid over somebody. Direction and height place the light; one
+  click puts it to the left, the front, the right or behind (a rim light). Brightness moves, colour
+  never does, so nobody's skin tone changes.
+- **Fill light** reads where the shadow on each face actually is and opens it, up to a stop, leaving
+  the lit side, the eyes, the brows and the lips their depth.
+- **Catchlights** go in the side of each iris facing the light, the same place in both eyes, sized to
+  the iris and coloured like the white of that eye. An eye that already has one is left alone.
+- **Glow**: a soft bloom from the brightest parts of the photograph; needs no face.
+- **Auto light** measures how the largest face is lit and proposes a light - a fill for harsh side
+  light, a soft key for flat light, catchlights for dull eyes - saves it as one undoable step, and
+  shows its reasons. Nothing runs automatically; a recipe without a light keeps its exact hash.
+- Presets *Studio portrait light* and *Dreamy glow*. New command `suggest_portrait_light`.
+
+## Shadows, Highlights, Clarity and Dehaze rebuilt to work on regions, and Auto enhance sized from them - 2026-10-17
+
+- **Shadows and Highlights act on regions** (ADR-0126). Each pixel takes the gain its *region*
+  asks for - read from an edge-aware guided-filter base - so a lifted shadow keeps its texture and
+  a recovered sky keeps its clouds white. The old per-pixel curve turned white clouds into grey
+  blobs darker than the sky at Highlights -80. +100 now lifts a shadow region 1.5 stops; -100
+  brings a bright region down 1.1. Clipped regions (a blown JPEG sky) are protected and stay white
+  instead of turning grey and blocky.
+- **Clarity has no halos.** It raises each region's detail against an edge-aware base and steps
+  aside at strong edges: at +100 on a hard four-stop edge it moves no pixel by more than 0.09
+  stops, where the blur it replaces drew a two-stop glow round branches and building edges.
+- **Dehaze is the dark channel prior**: the haze colour and a per-pixel haze map, so the distance
+  is cleared more than the foreground and a blue sky deepens while its clouds stay white. Negative
+  Dehaze adds atmosphere.
+- **A preview and an export look the same.** The bases are measured once on a 512-pixel reduction
+  of the whole frame, so their reach is a share of the photograph rather than a count of render
+  pixels; a tiled export stays bit-identical to a whole one. About 90 ms per preview on a 4-core
+  machine. The engine string gains `+local.1`, so cached previews refresh.
+- **Auto enhance sizes Shadows and Highlights from the photograph's regions**: a frame that is
+  mostly shadow (an interior exposed for its windows) is opened up firmly, a dark background or
+  black fur only lightly, a black backdrop not at all; bright regions with detail are recovered
+  most when they are a sky or a window and least when they are the subject. Night keeps its
+  darkness and high-key frames their white. The reason is written in the plan.
+
+## The lens, corrected the way a professional starts: colour fringing measured, purple rims removed - 2026-10-17
+
+- **Lateral chromatic aberration is measured from the photograph** (ADR-0125) - Lightroom's
+  "Remove Chromatic Aberration", without a lens profile. Clean edges round the frame are read in
+  all three channels to a quarter of a pixel; a fringe that is visible, consistent in every
+  direction and statistically clear is corrected 85 % of the way and then measured again on the
+  corrected pixels before it is kept. Auto enhance applies it in "Light & colour", Auto advanced
+  retouch in "Lens & perspective". On a painted lens it measured 1.07 px of the 1.08 px drawn.
+- **The CA correction no longer leaves a coloured line round the frame**: a channel scaled up
+  read black beyond the border. It reads the edge pixel now, on every core.
+- **Defringe**, a new Retouch tool under Cleanup: purple (and, when asked, green) rims on the
+  dark side of bright edges take the colour of their calm surroundings at their own brightness.
+  Purple things, and the glow round purple lights, keep their colour. Auto enhance and Auto
+  advanced retouch remove purple rims when they measure them; green is left to a person. 1.1 s
+  over a 24-megapixel export.
+
+## Body skin healed where the skin is, and black-and-white photographs left without colour - 2026-10-16
+
+- **Full-length portraits export faster** (ADR-0124): body-skin spot healing works on the
+  separate patches of skin - neck, arms, legs - packed into one compact plane, instead of on the
+  whole body rectangle around them. Thresholds are still measured over the whole selection, at
+  the very same samples, so the result matches the old one to rounding (largest relative
+  difference 2e-6 in the test that holds them together). On a synthetic 13.5 MP figure whose skin
+  is 15 % of the body rectangle the operation went from 6.3-6.7 s to 2.8 s (four threads,
+  development build).
+- **Matte edges refine on every core** (agreeing with the old result to about 3e-8) and each
+  brush stroke is painted over its own reach only (bit-identical): about 900 ms to 650 ms for a
+  body matte, and less sweeping for every automatic retouch selection.
+- **Auto enhance no longer tints a black-and-white or sepia photograph.** The finishing look added
+  a warm/cool split tone and vibrance to frames the planner had already recognised as monochrome
+  or toned. They now get depth only, and the explanation says why.
+
+## A different look on every photograph, a live status bar, and a folder run in two hours rather than eight - 2026-10-16
+
+- **Every photograph gets its own finishing look** (ADR-0123): tone curve, colour bands, vibrance
+  and split tone measured from the frame, with the skin in it simulated through the look and held
+  within 1.5 dE. Scene colour (saris, painted walls, stage light) is no longer read as a cast, and
+  a colour-channel clipping guard stops brightening from flattening saturated backdrops.
+- **A status bar says what the app is doing**, every second: each running job, its photo, its
+  step, done of total, elapsed time and how many image workers are busy.
+- **Folder runs and exports use the whole machine.** Photographs are analysed, edited and
+  rendered several at a time (four on a 12-thread machine, `AURA_IMAGE_WORKERS` to override),
+  and export renders ahead of the writer so the disk and the processor work at the same time.
+  Results are identical with one worker or eight.
+- **Much less arithmetic per photograph** (ADR-0123 section 10): the interpreter's convolutions
+  are parallel by work and run 1x1 layers as a blocked matrix product (segmentation 912 ms to
+  257 ms an inference, bit-identical); box blurs keep every core busy on tall faces; clarity's
+  blur is vectorised (bit-identical); frequency healing on a large face finds marks on a coarser
+  grid while keeping pores at full resolution (2.2 MP face: 3.1 s to 0.4 s, held to the exact
+  result by a test).
+- **Measured on 1,000 Indian wedding photographs in the real app** (optimised build, 12-thread
+  i7-8700, no AI): import 50 s, analysis 70 s, edit and retouch 29 min, export 89 min - 2 h 1 min
+  in all, against 7-8 hours before. 1,000 of 1,000 JPEGs were written and read back verified.
+  The one-hour goal is not met: full-length portraits spend about 11 s each healing body skin at
+  full resolution, which is the next thing to make faster.
+- **Camera files this build cannot decode at full size** (Canon CR2) are edited from their
+  embedded preview and then named and left out of the delivery, instead of failing the run.
+
+## Qualified automatic GPU output - 2026-10-14
+
+- Edited previews, live previews and whole-frame exports can use a qualified hardware GPU
+  for highlight roll-off, gamut conversion, display encoding and quantization.
+- Startup qualification checks actual shader colour and transfer-inclusive speed. Small
+  frames, absent/slower hardware and failed devices use the CPU reference automatically.
+- Reused row-stripe buffers bound GPU scratch to 72 MiB. GPU identities include the adapter,
+  driver and measured crossover; CPU and GPU preview caches remain separate.
+- `AURA_DISABLE_GPU=1` forces CPU output. The renderer reports actual GPU execution and
+  diagnostics instead of claiming the build has no GPU backend. ADR-0122 records evidence.
+
+## Measured colour, natural skin sampling and batch recovery - 2026-10-14
+
+- AI white balance, tint and colour refinements are bounded around original-pixel measurements,
+  with requested and accepted values recorded in the reasons. Manual settings remain protected.
+- Skin samples remove a smooth lighting plane from the texture measurement, so directional
+  light does not increase automatic smoothing. Colour and contamination checks are retained.
+- The shell owns a single batch-status poll. Transient errors keep the cancellation handle,
+  last progress and busy lock; bounded retries and a Retry status control reconnect monitoring.
+- Regression evidence and limits are recorded in ADR-0121. These changes do not establish
+  superiority over Evoto or add trained models to the placeholder analysis stages.
+
+## The measurement decides, the AI refines; camera files and iPhone photos - 2026-10-14
+
+- **AI proposals start from AURA's measurement.** Tested on 22 photographs and the same frames
+  overexposed, the vision models asked to darken good and overexposed photos about equally
+  often; the measurement told them apart. A model now moves exposure at most 0.15 EV from what
+  the measurement found, so "leave it" no longer undoes a detected overexposure.
+- **Camera files get the base contrast every rendering of one carries** (+15) when nothing asks
+  for more. Checked on real camera files with a professional's finished version: better on
+  the 16 used before and on 12 new ones.
+- **iPhone HEIC photos are refused with a message that says what to do** (`AURA-RAW-2009`:
+  export as JPEG, or set the camera to Most Compatible) instead of "not a photo".
+- The pair harness records a file it cannot open and continues; `aura-raw`'s `probe_file`
+  test prints the decoder's own reason for one file.
+- Final check on 30 photographs nothing had seen: 2815 untouched, 1826 after. ADR-0120
+  section 6, which also lists what is still weak.
+
+## Exposure on evidence, and any size of file - 2026-10-14
+
+- **Finished portraits are left at the exposure they were given.** With people in the frame
+  the histogram alone no longer moves exposure; skin near white or a frame whose brightest
+  non-skin tones stop well short of white does. Unchanged photographs on a held-out set of 22
+  now move 1.7 on average, from 3.4.
+- **Large files open.** JPEG, PNG and TIFF decodes are given time in proportion to their
+  size (a 35-megapixel JPEG had failed as "took too long to open"), and the image decoder is
+  optimised in development builds as the desktop shell already had it.
+- Measured: held-out 2020 untouched to 1124 (1233 before), real camera files against an
+  expert 300 to 212 (220), ten other subjects 937 to 547 (588), the six published pairs 680
+  to 444 (411; one underexposed newborn moved back). Eleven awkward files - tiny, 35 MP,
+  panorama, greyscale, transparent, 16-bit, CMYK, black, white, flat, noise - all edit and
+  render. ADR-0120 section 5.
+
+## Auto edit across shooting conditions, and the calibrated finish in one click - 2026-10-14
+
+- **Flat and veiled photographs get their black and white points back**, on every colour
+  channel alike, so contrast and colour return together. Over the flat variants of the six
+  published pairs the error against the finished photograph fell from 158.6 to 60.0 (it was
+  worse than doing nothing before).
+- **Highlights come down only where detail was lost**: a white blanket, dress or studio wall
+  is no longer greyed.
+- **Underexposed portraits are lifted** when a neutral shirt, page or wall is brighter than the
+  people and well short of white; a dark complexion in a dark room still is not.
+- **Camera files get their white balance corrected more readily** than finished photographs:
+  a camera's guess is nobody's choice, and under mixed light the whites settle which reading
+  to follow.
+- **A faint colour is the photograph's own.** Casts up to a measured size are kept, and a
+  larger one is reduced by the part beyond it; a cool studio group no longer moves 600 K.
+- **Dark but finished photographs are not brightened** once their brightest tones reach near
+  white, and frames with nothing white in them are not stretched to fill the range.
+- **One click retouches with the calibrated Portrait skin finish**, keeping freckles and dark
+  marks. A vision model's skin advice now sets only how hard marks are looked for.
+- Measured in seven conditions (`scripts/make-condition-variants.py`, harness mode `light`):
+  the published pairs 680 untouched to 411, ten other subjects 937 to 588, and 22 held-out
+  photographs nothing was tuned on 2020 to 1233. On ten real camera files from MIT-Adobe
+  FiveK, against a professional's finished version, 300 to 220. A clipped skin channel was
+  tried as an overexposure witness and dropped when the held-out set showed it darkening
+  correctly exposed bright portraits. ADR-0120 lists what is still weak.
+
+## AI providers from your own file, checked before they are used - 2026-10-14
+
+- **`AI-CONFIG.md` beside the project is imported.** AURA looks for it in the folder it was
+  started from, beside the application and in the folders above, before the original fixed
+  path. Only the desktop application looks; tests and tools never read a real key file. The
+  file is in `.gitignore`.
+- **A photo route is offered only after it read a test picture.** Each image-capable route
+  is shown a generated yellow-and-blue card at import and must name the colours within 15
+  seconds. The settings now say why a route is not used (the provider did not accept this
+  key, over its quota today, did not answer in time) instead of "catalogue ready". With a
+  real file of eleven providers, seven routes were listed as available and none answered;
+  after the check, three are offered and they answer. No photograph is sent to check a
+  provider.
+- **Two image models the catalogues do not declare** are recognised: Llama 3.2 11B vision
+  on NVIDIA's endpoint and Qwen 3.8 27B on Groq's. Up to three alternatives are tried when
+  the configured model does not read images.
+- **A failed route rests for as long as its failure says:** the provider's own pause when
+  rate limited, ten minutes when it did not answer or its answer could not be used.
+- **When no AI answers, Auto edit is AURA's own measured correction.** The stand-in it
+  replaced aimed every photograph at middle grey and darkened bright studio frames by up
+  to three quarters of a stop (error against the finished photograph 2.3 to 29.1 on one).
+- **A model's proposal is held to the photograph.** It goes through the same face and
+  intent guards as AURA's own measurement, and a change of exposure is taken only as far
+  as that measurement agrees, plus 0.15 EV. The reasons say when a proposal was adjusted.
+- Live in the desktop window with real providers (`scripts/test-ai-config-gui.py`): five
+  of six photographs graded by a model, five retouches using a model's skin advice, no
+  grade leaving a photograph more than 4 further from its finished version. ADR-0119.
+
+## One grid row per photograph, including copied and renamed files - 2026-10-14
+
+- Identical file copies no longer repeat a photograph in the grid or inflate the automatic
+  run's image count. Timeline and filename sorting page over unique photographs.
+- The grid and renderer prefer the recorded original while it is available, then an available
+  copy if the original was renamed or disconnected. Missing files remain in the catalogue.
+- The desktop reference audit waits for Undo's saved recipe rather than assuming it completes
+  within three seconds, avoiding a false failure behind a full-quality render.
+
+## Stretch marks, moles kept, and a skin finish that leaves texture - 2026-10-13
+
+- **Stretch marks** are evened out of body skin by a filter that flows across a mark and is
+  stopped by structure: hands, a navel, knuckle creases and the hem of a garment stay as they
+  are. Off unless the new Stretch marks control or the **Body skin finish** preset turns it on.
+- Body skin entirely enclosed by a body's own skin joins the selection even where the
+  segmenter is sure it is an object, so a marked abdomen is selected whole.
+- **Keep moles** (on by default): a dark, crisp-edged mark is left alone by healing, while
+  freckles, inflamed spots and the diffuse marks old spots leave are still healed. On body
+  skin every pigment-dark patch is kept, which is what keeps a navel.
+- Spot repairs are refused where the skin around them is not plain. A flat patch across a
+  nasolabial fold, a smeared corner of a mouth and a blue-grey streak beside a nose are gone.
+  The spot threshold is never under a multiple of the skin's own spread.
+- With dark marks being removed, frequency healing reaches the cheek below an eye. Lids and
+  inner corners stay protected.
+- **Portrait skin finish** is recalibrated per detail band: face smoothing 5%, light evenness
+  10%, micro dodge and burn off, pore refinement 80%. It was removing more texture than the
+  published results it was compared with; saved settings are not changed, the preset is.
+- **Keep the look as**: Choose finished reference with a name keeps the matched look as a
+  personal look, applied to other photos over their own measured correction.
+- `scripts/compare-reference-pairs.py` measures whether a pair is one frame instead of assuming
+  it. The published Events pair is aligned to 0.01 px; the earlier note that it is not was wrong,
+  as was the note that the published results are smoother overall. ADR-0118.
+
+## An untouched photo is the photo, and evening that respects a face's shading - 2026-10-13
+
+- A JPEG, a PNG and a rendered proxy are no longer tone-mapped a second time. With every
+  control at zero a white wall at 239 was delivered at 230; the untouched render is now
+  the file to within the 8-bit dither. Cached previews are invalidated by the engine string.
+- Skin evening, surface finish, dodge and burn average only what they select and take the
+  photograph's own shading back out at a selection's edge. The pale rim along a jaw and the
+  lifted shadow under a lip are gone; smoothing still runs right up to the hairline.
+- Body skin the segmenter was unsure of joins the body it sits in when it is that body's own
+  colour and no other label is sure of it. Body spot healing no longer re-paints the warm
+  side of an abdomen as a pale patch. Stretch marks are not removed.
+- Auto enhance keeps a white studio wall white when there are people in front of it.
+- A **Smooth portrait finish** preset softens forehead lines, crow's feet, smile lines and
+  under-eye bags on top of Portrait skin finish. Eyes, teeth and face shape are untouched.
+- `crates/aura-app/tests/reference_pairs.rs` and `scripts/compare-reference-pairs.py` run a
+  before/after pair through the native commands and score it without a window. ADR-0117.
+
 ## Collection cleanup settings and current studio integration - 2026-10-11
 
 - Apply cleanup settings to every photo in a collection with fresh native skin
@@ -100,6 +722,27 @@ All notable changes to AURA. One entry per phase, newest first.
 - Clear old previews, saved steps and coverage when reloading a photo or recipe.
   If loading fails, disable edits and history actions until a successful reload.
   Reload retouch and Back to Develop remain available so the editor can recover.
+## Beauty & Fashion, the Evoto way - 2026-10-11
+
+- **Auto advanced retouch** now has two styles. **Beauty & Fashion (Evoto-style)** finishes a
+  studio portrait the way Evoto's homepage example does in one pass: high-end skin with pores
+  kept, clothing creases softened, stray hair faded, and a plain grey studio backdrop lifted to a
+  clean bright grey (measured from Evoto's own before/after: about +0.4 EV, neutral, not clipped).
+- New automatic setting **Bright backdrop**; scenes, coloured and dark backdrops are never lifted.
+  ADR-0109.
+
+## Evoto-style finishing and Connect Claude / ChatGPT - 2026-10-11
+
+- New **Portrait studio** section in the Photo editor, with Evoto's finishing tools: face reshaping
+  (slim, jawline, chin, forehead, cheekbones, eye size and distance, nose, mouth, lips, smile, head
+  size), body reshaping (slim, waist, hips, arms, shoulders, legs, neck), a liquify brush (push,
+  enlarge, shrink, restore), background replacement (solid colour, gradient, blur, sky), and hair,
+  eye, lip, blush, eyeshadow and brow colour. Seven one-click presets, including a clean white
+  backdrop for headshots. Every change is one undoable step; none of it is ever automatic. ADR-0108.
+- **Connect Claude** and **Connect ChatGPT** open Anthropic's or OpenAI's key page in your browser;
+  paste the key you create there and AURA keeps it in your computer's secure key store.
+- `docs/evoto-parity.md` lists every Evoto tool and where it is in AURA.
+
 ## 1.0.0 - ready to sell - 2026-10-08
 
 - AURA is version 1.0.0.

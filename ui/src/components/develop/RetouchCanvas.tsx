@@ -1,5 +1,6 @@
-import { useEffect, useId, useMemo, useRef, useState, type PointerEvent } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type PointerEvent } from 'react';
 import type { BrushPoint, BrushStroke, NativeRetouchEdit } from '../../ipc/nativeRetouch';
+import { appendBrushPoint } from './brushPath';
 
 export type RetouchMode = 'ellipse' | 'paint' | 'erase' | 'pan' | 'gradient';
 export type SkinInspectionView = 'color' | 'grayscale' | 'high-contrast' | 'low-contrast';
@@ -26,7 +27,7 @@ export function RetouchCanvas(props: Props) {
   const photoFilter = props.maskView || props.coverageView ? undefined : INSPECTION_FILTERS[props.inspectionView ?? 'color'];
   const viewport = useRef<HTMLDivElement>(null);
   const surface = useRef<HTMLDivElement>(null);
-  const gesture = useRef<{ id: number; x: number; y: number; left: number; top: number; stroke: BrushStroke | null; gradient?: [number, number] } | null>(null);
+  const gesture = useRef<{ id: number; x: number; y: number; left: number; top: number; stroke: BrushStroke | null; gradient?: [number, number]; limitNotified?: boolean } | null>(null);
   const [active, setActive] = useState<BrushStroke | null>(null);
   const [cursor, setCursor] = useState<BrushPoint | null>(null);
   const [activeGradient, setActiveGradient] = useState<{start:[number,number];end:[number,number]}|null>(null);
@@ -35,13 +36,20 @@ export function RetouchCanvas(props: Props) {
   const [splitPosition, setSplitPosition] = useState(50);
   const dividerPointer = useRef<number | null>(null);
   const split = Boolean(props.split && props.beforeSrc && src && !compare);
-  useEffect(() => {
+  const cancelGesture = useCallback(() => {
+    const pointer = gesture.current?.id;
     dividerPointer.current = null;
     gesture.current = null;
     setActive(null);
     setCursor(null);
     setActiveGradient(null);
-  }, [split, props.maskView, props.coverageView]);
+    if (pointer !== undefined && surface.current?.hasPointerCapture?.(pointer)) surface.current.releasePointerCapture(pointer);
+  }, []);
+  useEffect(cancelGesture, [cancelGesture, split, props.maskView, props.coverageView, mode, disabled, compare, src, width, height, props.sourceMode]);
+  useEffect(() => {
+    window.addEventListener('blur', cancelGesture);
+    return () => window.removeEventListener('blur', cancelGesture);
+  }, [cancelGesture]);
   const maskId = useId().replaceAll(':', '');
   useEffect(() => {
     const element = viewport.current;
@@ -62,7 +70,7 @@ export function RetouchCanvas(props: Props) {
     if (element) { element.scrollLeft = (canvasWidth - size.width) / 2; element.scrollTop = (canvasHeight - size.height) / 2; }
   }, [zoom, canvasWidth, canvasHeight, size]);
   const setScale = (value: number) => setZoom(Math.min(8, Math.max(1, value)));
-  const position = (event: PointerEvent): BrushPoint => {
+  const position = (event: { clientX: number; clientY: number; pointerType: string; pressure: number }): BrushPoint => {
     const rect = surface.current?.getBoundingClientRect();
     if (!rect || !rect.width || !rect.height) return [.5, .5, 1];
     return [Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)),
@@ -91,6 +99,9 @@ export function RetouchCanvas(props: Props) {
     if (mode === 'paint' || mode === 'erase') setCursor(position(event));
     const current = gesture.current;
     if (!current || current.id !== event.pointerId) return;
+    // A release may happen outside this WebView without an up/cancel callback.
+    // Hovering afterwards must not extend or save that abandoned gesture.
+    if (event.buttons === 0) { finish(event, true); return; }
     if (current.gradient) {
       const [x,y] = position(event); setActiveGradient({start:current.gradient,end:[x,y]}); return;
     }
@@ -101,11 +112,18 @@ export function RetouchCanvas(props: Props) {
       }
       return;
     }
-    const point = position(event);
-    const last = current.stroke.points[current.stroke.points.length - 1];
-    if (last && Math.hypot((point[0] - last[0]) * width, (point[1] - last[1]) * height) < .75 && Math.abs(point[2] - last[2]) < .03) return;
-    if (current.stroke.points.length >= 1024) { props.onNotice('Stroke limit reached. Release and start another stroke.'); return; }
-    current.stroke = { ...current.stroke, points: [...current.stroke.points, point] };
+    const samples = event.nativeEvent.getCoalescedEvents?.() ?? [];
+    for (const sample of [...samples, event]) {
+      const points = appendBrushPoint(current.stroke.points, position(sample), width, height);
+      if (!points) {
+        if (!current.limitNotified) {
+          current.limitNotified = true;
+          props.onNotice('Stroke limit reached. Release and start another stroke.');
+        }
+        break;
+      }
+      if (points !== current.stroke.points) current.stroke = { ...current.stroke, points };
+    }
     setActive(current.stroke);
   };
   const finish = (event: PointerEvent<HTMLDivElement>, cancel = false) => {
@@ -214,6 +232,8 @@ export function RetouchCanvas(props: Props) {
               fill="rgba(161,130,255,.15)" stroke="white" strokeWidth="1.5" vectorEffect="non-scaling-stroke"/>}
             {draft.source && <><circle cx={draft.source[0] * width} cy={draft.source[1] * height} r={6 / (fit * zoom)} fill="none" stroke="white" strokeWidth="1.5" vectorEffect="non-scaling-stroke"/>
               <line x1={draft.source[0] * width} y1={draft.source[1] * height} x2={draft.region[0] * width} y2={draft.region[1] * height} stroke="white" strokeDasharray="4 4" vectorEffect="non-scaling-stroke"/></>}
+            {draft.selection?.color && <rect x={draft.selection.color.sample[0]*width-5/(fit*zoom)} y={draft.selection.color.sample[1]*height-5/(fit*zoom)}
+              width={10/(fit*zoom)} height={10/(fit*zoom)} fill="none" stroke="#ffdc79" strokeWidth="2" vectorEffect="non-scaling-stroke"/>}
             {cursor && (mode === 'paint' || mode === 'erase') && <circle cx={cursor[0] * width} cy={cursor[1] * height}
               r={props.radius * Math.min(width, height) * cursor[2]} fill="none" stroke={mode === 'erase' ? '#ffcfad' : 'white'} strokeWidth="1.5" vectorEffect="non-scaling-stroke"/>}
           </svg>}

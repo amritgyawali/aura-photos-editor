@@ -1,7 +1,9 @@
 import type { NativeRetouchEdit, RetouchSelection } from '../../ipc/nativeRetouch';
+import { RetouchColorRangeControls } from './RetouchColorRangeControls';
 
-export function RetouchSelectionControls({ draft, onChange }: {
+export function RetouchSelectionControls({ draft, onChange, colorPicking, onColorPick }: {
   draft: NativeRetouchEdit; onChange: (patch: Partial<NativeRetouchEdit>) => void;
+  colorPicking: boolean; onColorPick: () => void;
 }) {
   const selection = draft.selection ?? {};
   const update = (patch: Partial<RetouchSelection>) => onChange({ selection: { ...selection, ...patch } });
@@ -10,7 +12,8 @@ export function RetouchSelectionControls({ draft, onChange }: {
   return <details open><summary>Refine selection</summary>
     <label className="retouch-toggle"><input type="checkbox" checked={selection.inverted ?? false}
       onChange={event => update({ inverted: event.target.checked })}/>Outside shape</label>
-    <p className="lr-hint">Invert the ellipse, brush or gradient first; brightness limits are applied afterward.</p>
+    <p className="lr-hint">Invert the ellipse, brush or gradient first; brightness and color limits are applied afterward.</p>
+    <RetouchColorRangeControls selection={selection} update={update} picking={colorPicking} onPick={onColorPick}/>
     {gradient && <>
       <p className="lr-hint">{selection.inverted?'Drag from selected to protected.':'Drag from protected to selected.'} Set endpoints below for precise placement.</p>
       {(['start','end'] as const).flatMap(point => ([0,1] as const).map(axis => <label key={`${point}-${axis}`}>

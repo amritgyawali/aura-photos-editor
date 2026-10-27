@@ -37,7 +37,7 @@ pub struct RafHeader {
 }
 
 /// What the block directory said about the sensor.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RafSensor {
     /// Sensor width in photosites.
     pub width: u32,
@@ -45,6 +45,12 @@ pub struct RafSensor {
     pub height: u32,
     /// The 6x6 colour layout, when the file carried one.
     pub xtrans: Option<[u8; 36]>,
+    /// The picture inside the sensor, `[top, left, height, width]`.
+    pub crop: Option<[u32; 4]>,
+    /// As-shot white balance multipliers `[red / green, 1, blue / green]`.
+    pub as_shot: Option<[f32; 3]>,
+    /// Mean of the per-channel black levels.
+    pub black: Option<u32>,
 }
 
 /// Walk the block directory at `offset`.
@@ -70,6 +76,35 @@ pub fn sensor(bytes: &[u8], offset: usize, len: usize) -> RafSensor {
             0x0100 => {
                 out.height = u32::from(read_u16(bytes, payload));
                 out.width = u32::from(read_u16(bytes, payload + 2));
+            }
+            // Where the picture sits, then how big it is.
+            0x0110 => {
+                let (top, left) = (read_u16(bytes, payload), read_u16(bytes, payload + 2));
+                let crop = out.crop.get_or_insert([0; 4]);
+                crop[0] = u32::from(top);
+                crop[1] = u32::from(left);
+            }
+            0x0111 => {
+                let (height, width) = (read_u16(bytes, payload), read_u16(bytes, payload + 2));
+                let crop = out.crop.get_or_insert([0; 4]);
+                crop[2] = u32::from(height);
+                crop[3] = u32::from(width);
+            }
+            // As-shot white balance, green-red-green-blue.
+            0x2FF0 => {
+                let level = |i: usize| f32::from(read_u16(bytes, payload + 2 * i));
+                let green = f32::midpoint(level(0), level(2));
+                if green > 0.0 && level(1) > 0.0 && level(3) > 0.0 {
+                    out.as_shot = Some([level(1) / green, 1.0, level(3) / green]);
+                }
+            }
+            // Per-channel black levels, four or eight of them.
+            0x4000 if size >= 8 => {
+                let count = size / 2;
+                let sum: u32 = (0..count)
+                    .map(|i| u32::from(read_u16(bytes, payload + 2 * i)))
+                    .sum();
+                out.black = Some(sum / count as u32);
             }
             // The colour layout, stored back to front.
             0x0131 => {

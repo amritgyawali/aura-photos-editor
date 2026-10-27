@@ -51,7 +51,7 @@ pub fn correction(rgb: &[u8]) -> aura_core::AuraResult<(f32, i16, i16, i16)> {
         let linear: f32 = pixel
             .iter()
             .zip([0.2126, 0.7152, 0.0722])
-            .map(|(v, weight)| aura_raw::colour::curve::srgb_decode(f32::from(*v) / 255.0) * weight)
+            .map(|(v, weight)| aura_raw::colour::curve::srgb_byte_to_linear(*v) * weight)
             .sum();
         let bin =
             aura_raw::colour::curve::quantise_u8(aura_raw::colour::curve::srgb_encode(linear));

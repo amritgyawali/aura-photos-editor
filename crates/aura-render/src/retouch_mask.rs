@@ -37,7 +37,57 @@ fn stroke_bounds(stroke: &BrushStroke, w: usize, h: usize) -> [usize; 4] {
     bounds
 }
 
+/// Every pixel [`paint_stroke`] can write for `stroke`: its points' box grown by the widest
+/// dab along it, pressure included, with the same rounding as each segment's own box.
+fn reach(stroke: &BrushStroke, w: usize, h: usize) -> [usize; 4] {
+    let radius = stroke.radius * w.min(h) as f32;
+    let widest = stroke
+        .points
+        .iter()
+        .map(|p| radius * p[2].max(0.1))
+        .fold(0.0_f32, f32::max);
+    let mut out = [w, h, 0, 0];
+    for p in &stroke.points {
+        let (x, y) = (p[0] * w as f32, p[1] * h as f32);
+        out[0] = out[0].min((x - widest).max(0.0) as usize);
+        out[1] = out[1].min((y - widest).max(0.0) as usize);
+        out[2] = out[2].max((x + widest).ceil() as usize);
+        out[3] = out[3].max((y + widest).ceil() as usize);
+    }
+    out
+}
+
 impl Coverage {
+    /// The same final support envelope is used by the renderer and selection overlay.
+    pub(crate) fn protect_boundary(mut self, edit: &Edit, w: usize, h: usize) -> Self {
+        if !matches!(
+            edit.tool,
+            aura_recipe::retouch_tools::Tool::SkinSmooth
+                | aura_recipe::retouch_tools::Tool::SkinUniformity
+                | aura_recipe::retouch_tools::Tool::PortraitDodgeBurn
+                | aura_recipe::retouch_tools::Tool::UnderEye
+        ) {
+            return self;
+        }
+        let [x0, y0, x1, y1] = self.bounds;
+        if x1 <= x0 || y1 <= y0 {
+            return self;
+        }
+        let mut pixels = (y0..y1)
+            .flat_map(|y| (x0..x1).map(move |x| (x, y)))
+            .map(|(x, y)| self.at(x, y, w, h))
+            .collect::<Vec<_>>();
+        crate::retouch_boundary::inward(
+            &mut pixels,
+            x1 - x0,
+            y1 - y0,
+            edit.radius * w.min(h) as f32 * 0.5,
+            [x0 > 0, y0 > 0, x1 < w, y1 < h],
+        );
+        self.pixels = Some(pixels);
+        self
+    }
+
     /// This coverage multiplied by a segmentation matte, over the rectangle both cover.
     pub(crate) fn with_matte(
         self,
@@ -73,7 +123,11 @@ impl Coverage {
         let Some(selection) = &edit.selection else {
             return base;
         };
-        if !selection.inverted && selection.gradient.is_none() && selection.luminance.is_none() {
+        if !selection.inverted
+            && selection.gradient.is_none()
+            && selection.luminance.is_none()
+            && selection.color.is_none()
+        {
             return base;
         }
         let bounds = if selection.inverted || selection.gradient.is_some() {
@@ -82,6 +136,10 @@ impl Coverage {
             base.bounds
         };
         let [x0, y0, x1, y1] = bounds;
+        let color = selection
+            .color
+            .as_ref()
+            .map(|range| crate::retouch_color_range::Prepared::new(range, rgb, w, h));
         let pixels: Vec<f32> = (y0..y1)
             .into_par_iter()
             .flat_map_iter(|y| (x0..x1).map(move |x| (x, y)))
@@ -121,6 +179,10 @@ impl Coverage {
                         (1.0 - distance / range.softness).clamp(0.0, 1.0)
                     };
                     weight *= t * t * (3.0 - 2.0 * t);
+                }
+                if let Some(color) = &color {
+                    let index = (y * w + x) * 3;
+                    weight *= color.weight(&rgb[index..index + 3]);
                 }
                 weight
             })
@@ -165,19 +227,41 @@ impl Coverage {
         let len = (bounds[2] - bounds[0]) * (bounds[3] - bounds[1]);
         let mut pixels = vec![0.0; len];
         let mut stroke_pixels = vec![0.0; len];
+        let stride = bounds[2] - bounds[0];
         for stroke in &mask.strokes {
-            stroke_pixels.par_iter_mut().for_each(|v| *v = 0.0);
+            // A stroke paints nothing outside its own reach, and nothing there changes: a
+            // stroke of zero coverage leaves both a painted and an erased value as it was. So
+            // its plane is cleared, painted and merged over its reach only - a body is covered
+            // by a dozen strokes, each a band across it, and each used to sweep all of it twice.
+            let [x0, y0, x1, y1] = reach(stroke, w, h);
+            let (x0, y0) = (x0.max(bounds[0]), y0.max(bounds[1]));
+            let (x1, y1) = (x1.min(bounds[2]), y1.min(bounds[3]));
+            if x1 <= x0 || y1 <= y0 {
+                continue;
+            }
+            let (left, right) = (x0 - bounds[0], x1 - bounds[0]);
+            let rows = (y0 - bounds[1])..(y1 - bounds[1]);
+            stroke_pixels
+                .par_chunks_mut(stride)
+                .enumerate()
+                .filter(|(row, _)| rows.contains(row))
+                .for_each(|(_, line)| line[left..right].fill(0.0));
             paint_stroke(&mut stroke_pixels, bounds, stroke, edit.feather, w, h);
             pixels
-                .par_iter_mut()
-                .zip(stroke_pixels.par_iter())
-                .for_each(|(value, coverage)| {
-                    let alpha = coverage * stroke.opacity;
-                    *value = if stroke.erase {
-                        *value * (1.0 - alpha)
-                    } else {
-                        f32::max(*value, alpha)
-                    };
+                .par_chunks_mut(stride)
+                .zip(stroke_pixels.par_chunks(stride))
+                .enumerate()
+                .filter(|(row, _)| rows.contains(row))
+                .for_each(|(_, (line, painted))| {
+                    for (value, coverage) in line[left..right].iter_mut().zip(&painted[left..right])
+                    {
+                        let alpha = coverage * stroke.opacity;
+                        *value = if stroke.erase {
+                            *value * (1.0 - alpha)
+                        } else {
+                            f32::max(*value, alpha)
+                        };
+                    }
                 });
         }
         result.pixels = Some(pixels);
@@ -264,4 +348,111 @@ fn paint_segment(out: &mut [f32], bounds: [usize; 4], a: [f32; 3], b: [f32; 3], 
                 line[i] = line[i].max(smooth(distance, feather));
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{paint_stroke, Coverage};
+    use aura_recipe::retouch_tools::{BrushMask, BrushStroke, Edit, Tool};
+
+    /// The coverage of `mask`, every stroke cleared, painted and merged over the whole plane.
+    fn swept(edit: &Edit, w: usize, h: usize) -> Vec<f32> {
+        let bounds = Coverage::new(edit, w, h).bounds;
+        let len = (bounds[2] - bounds[0]) * (bounds[3] - bounds[1]);
+        let mut pixels = vec![0.0_f32; len];
+        for stroke in &edit.mask.as_ref().unwrap().strokes {
+            let mut painted = vec![0.0_f32; len];
+            paint_stroke(&mut painted, bounds, stroke, edit.feather, w, h);
+            for (value, coverage) in pixels.iter_mut().zip(&painted) {
+                let alpha = coverage * stroke.opacity;
+                *value = if stroke.erase {
+                    *value * (1.0 - alpha)
+                } else {
+                    f32::max(*value, alpha)
+                };
+            }
+        }
+        pixels
+    }
+
+    /// Painting each stroke over its own reach gives the coverage that sweeping every stroke
+    /// over the whole plane gives, bit for bit: bands across a body, an erased hole, a dab at
+    /// heavy pressure, a stroke off the frame and one with no points.
+    #[test]
+    fn strokes_painted_over_their_reach_equal_strokes_swept_over_the_plane() {
+        let (w, h) = (301_usize, 457_usize);
+        let band = |y: f32| BrushStroke {
+            erase: false,
+            radius: 0.06,
+            opacity: 1.0,
+            points: vec![[0.2, y, 1.0], [0.8, y, 1.0]],
+        };
+        let mut strokes: Vec<BrushStroke> = (0..9).map(|k| band(0.15 + 0.08 * k as f32)).collect();
+        strokes.push(BrushStroke {
+            erase: true,
+            radius: 0.05,
+            opacity: 0.7,
+            points: vec![[0.5, 0.4, 1.0], [0.55, 0.45, 0.4]],
+        });
+        strokes.push(BrushStroke {
+            erase: false,
+            radius: 0.03,
+            opacity: 0.6,
+            points: vec![[0.3, 0.85, 2.5], [0.35, 0.9, 0.2], [0.4, 0.86, 1.7]],
+        });
+        strokes.push(BrushStroke {
+            erase: false,
+            radius: 0.02,
+            opacity: 1.0,
+            points: vec![[1.3, 1.4, 1.0]],
+        });
+        strokes.push(BrushStroke {
+            erase: true,
+            radius: 0.2,
+            opacity: 1.0,
+            points: Vec::new(),
+        });
+        let edit = Edit {
+            id: "cover".into(),
+            tool: Tool::SkinSmooth,
+            enabled: true,
+            region: [0.5, 0.5, 0.5, 0.5],
+            source: None,
+            amount: 1.0,
+            feather: 0.6,
+            radius: 0.01,
+            source_scale: 1.0,
+            preserve_microtexture: false,
+            texture_heal: false,
+            clean_ring_fit: false,
+            curved_heal: false,
+            heal_samples: Vec::new(),
+            texture_sources: Vec::new(),
+            repair_passes: None,
+            target_color: None,
+            sensitivity: None,
+            keep_dark_marks: false,
+            mole_edge: None,
+            texture: 1.0,
+            tone: 1.0,
+            warmth: 0.0,
+            tint: 0.0,
+            selection: None,
+            matte: None,
+            mask: Some(BrushMask { strokes }),
+            skin: None,
+        };
+        let coverage = Coverage::new(&edit, w, h);
+        let [x0, y0, x1, y1] = coverage.bounds;
+        let painted: Vec<f32> = (y0..y1)
+            .flat_map(|y| (x0..x1).map(move |x| (x, y)))
+            .map(|(x, y)| coverage.at(x, y, w, h))
+            .collect();
+        let reference = swept(&edit, w, h);
+        assert!(painted.iter().any(|v| *v > 0.5));
+        assert_eq!(painted.len(), reference.len());
+        for (i, (a, b)) in painted.iter().zip(&reference).enumerate() {
+            assert_eq!(a.to_bits(), b.to_bits(), "cell {i}: {a} against {b}");
+        }
+    }
 }

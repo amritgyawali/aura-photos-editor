@@ -51,12 +51,15 @@
 
 pub mod advanced_retouch;
 pub mod ai_settings;
+pub mod automatic_strength;
 pub mod autopilot_commands;
 pub mod biometric_keys;
 pub mod blemish_review;
 pub mod camera_commands;
 pub mod cleanup_commands;
 pub mod cloud_commands;
+pub mod color_lab_commands;
+pub mod color_match;
 pub mod colour_commands;
 pub mod commands;
 pub mod composition_commands;
@@ -70,10 +73,15 @@ pub mod internal_ai;
 pub mod learn_commands;
 pub mod licensing;
 pub mod lightroom;
+pub mod material_commands;
 pub mod native_retouch;
 pub mod personal_style;
+pub mod photo_analysis;
 pub mod provider_links;
+pub mod spatial_lab_commands;
+pub mod studio_color_commands;
 pub mod studio_tools;
+pub mod workflow_lab;
 
 /// Frozen contracts. Changing anything in here requires an ADR and a matching
 /// regeneration of `ui/src/ipc/types.ts`.
@@ -81,32 +89,43 @@ pub mod contract {
     pub mod ipc;
 }
 
+pub mod activity;
+pub mod adaptive_look;
 pub mod emotion_commands;
+pub mod evoto_workflow;
 pub mod explain_commands;
+pub mod finish_commands;
+pub mod framing_workflows;
 pub mod geometry_commands;
 pub mod index_commands;
 pub mod infer_commands;
 pub mod integrity_commands;
+pub mod lateral_ca;
 pub mod local_commands;
 pub mod local_mask_commands;
+pub mod local_range;
 pub mod look_commands;
 pub mod mask_commands;
+pub mod mask_workflows;
 pub mod measured_cull;
 pub mod micro_commands;
 pub mod moment_commands;
 pub mod paired_reference;
 pub mod people_commands;
+pub mod perf;
 pub mod photo_enhance;
 mod photo_frames;
 pub mod portrait_auto;
 pub mod portrait_commands;
 pub mod portrait_features;
+mod portrait_preflight;
 pub mod preview_commands;
 pub mod preview_render;
 pub mod qc_commands;
 pub mod reference_style;
 pub mod restore_commands;
 pub mod retouch_commands;
+pub mod retouch_intensity;
 pub mod retouch_settings;
 pub mod smart_edit;
 pub mod state;
@@ -129,8 +148,8 @@ pub use cleanup_commands::{
 };
 pub use cloud_commands::{
     ai_setup_status, check_ai_key, clear_ai_key, cloud_cache_stats, cloud_calls, cloud_spend,
-    cloud_status, list_ai_providers, purge_cloud_cache, save_ai_setup, set_ai_key,
-    set_cloud_budget, set_cloud_privacy, skip_ai_setup,
+    cloud_status, list_ai_providers, open_provider_page, purge_cloud_cache, save_ai_setup,
+    set_ai_key, set_cloud_budget, set_cloud_privacy, skip_ai_setup,
 };
 pub use colour_commands::{
     accept_colour, colour_review_queue, colour_status, estimate_colour, image_colour,
@@ -236,6 +255,7 @@ pub use state::AppState;
 mod auto_edit_commands;
 // ADR-0068. The one-click finish, and its three commands.
 pub mod one_click_commands;
+pub use activity::activity_status;
 pub use auto_edit_commands::{photo_analysis, photo_auto_edit};
 pub use one_click_commands::{
     automatic_start, one_click_cancel, one_click_finish, one_click_status,

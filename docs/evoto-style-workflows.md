@@ -8,6 +8,26 @@ examples. The images do not disclose Evoto's proprietary algorithms.
 
 ## Delivered workflows
 
+- Sampled colour selection: pick a point on the photo, set colour tolerance,
+  falloff and lightness sensitivity, and intersect it with existing masks.
+  Local saturation and vibrance can then adjust just the matching colours.
+  The sample follows earlier edits; preview the mask and exclude similarly
+  coloured objects manually. See the
+  [implementation and validation](reports/AURA-sampled-colour-tools-2026-10-19.md).
+
+- Optical and colour tools: directional motion blur, radial zoom blur with a
+  movable centre, hue-selective colour-spill suppression, and highlight
+  compression. Use **Retouch** with a manual selection or saved region mask.
+  Blur sampling excludes protected pixels; highlight compression preserves
+  existing channel ratios. See the
+  [implementation and validation](reports/AURA-optical-and-colour-tools-2026-10-19.md).
+
+- Selected material and light effects: fabric chroma moiré reduction, sampled
+  fabric stain correction, bounded shadow balancing, background blur and
+  highlight glow. Find them through **Retouch → Find a retouch tool**. These are
+  manually targeted native effects with saved selections and Undo, not automatic
+  garment detection, depth estimation or generative reconstruction. See the
+  [implementation and validation](reports/AURA-material-and-light-tools-2026-10-19.md).
 - Paired finished-reference matching: choose a JPEG/PNG export of the same photo
   in the studio to fit nine native tone/colour settings. AURA keeps saved healing
   and manual settings, measures improvement at full resolution before saving,
@@ -21,6 +41,20 @@ examples. The images do not disclose Evoto's proprietary algorithms.
   shine and under-eye correction, while preserving iris, teeth and face shape.
   Compact repair slots are shared across detected faces. See the
   [paired native validation](evoto-paired-validation.md) for evidence and limits.
+- Smooth portrait finish: Portrait skin finish with forehead lines, crow's feet,
+  smile lines and under-eye bags softened and pores refined, each measured on that
+  person. It removes more texture than the published results it was compared
+  with; heavier than a newborn's skin wants.
+- Body skin finish: Portrait skin finish with stretch marks evened out of body
+  skin. Hands resting on the skin, a navel and every other contour are kept.
+  It works on all the body skin it finds and does not decide for itself
+  whether a photograph has stretch marks.
+- Moles and beauty marks are kept by every preset (Keep moles, on by default):
+  a dark, crisp-edged mark is left alone, while freckles, inflamed spots and
+  the diffuse marks old spots leave are still healed.
+- A matched look can be kept: give Choose finished reference a name and the
+  look it finds becomes a personal look under Presets, for the rest of the
+  shoot.
 - Manual cleanup: painted Acne Clear blemish brush, patch healing and donor
   controls, cloning, editable selections, and saved before/after coverage.
 - Portrait detail: measured dark-circle correction, eye and teeth controls,
@@ -59,6 +93,12 @@ examples. The images do not disclose Evoto's proprietary algorithms.
   store; API access and chat subscriptions are separate.
 
 ## Gaps and quality acceptance
+
+Stretch marks are cleared only by the Body skin finish preset or the Stretch
+marks control; no measure tried tells stretch-marked skin from ordinary skin
+texture, so nothing turns it on automatically. A navel has no crisp edge, so the
+mole rule does not protect it; it is kept because body spots are healed before
+the evening, and a manual spot heal placed on it afterwards will remove it.
 
 The full catalogue is not implemented. The chosen-color and local proportion
 tools above are manual native tools, not claims of Evoto's anatomical automation.

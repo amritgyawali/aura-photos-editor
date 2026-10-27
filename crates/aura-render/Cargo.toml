@@ -20,6 +20,9 @@ serde_json   = { workspace = true }
 toml         = { workspace = true }
 time         = { workspace = true }
 tracing      = { workspace = true }
+wgpu         = { version = "=27.0.1", default-features = false, features = ["std", "wgsl", "dx12", "vulkan", "metal"] }
+pollster     = "0.4"
+bytemuck     = "1"
 
 # `aura-raw` is here, and it is the only crate in the workspace this one reaches into for
 # maths rather than for a contract. The reason is invariant 8: `aura_raw::colour` already
@@ -28,9 +31,8 @@ tracing      = { workspace = true }
 # renderer that drifts from the first while looking identical. Phase 02 owns colour; phase 14
 # grades inside the space phase 02 defined.
 #
-# Deliberately absent: `wgpu`. See docs/adr/ADR-0029-render-pipeline.md section 4. The WGSL
-# sources ship, are compiled into the binary and are gated by `tests/shader_parity.rs`; what
-# does not ship is a backend nothing on this machine can execute or test.
+# `wgpu` executes the terminal output stage when explicitly enabled by the application.
+# The CPU reference remains the default for qualification and unsupported hardware. ADR-0122.
 #
 # `aura-portrait` is the one crate below this one that reads a photograph for a *judgement*: it
 # finds faces and the regions of a portrait, and this crate resolves the masks and retouch

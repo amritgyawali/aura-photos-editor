@@ -64,7 +64,9 @@ pub fn edit(state: &AppState, input: &RetouchInput) -> IpcResult<Vec<Edit>> {
                 .find(|e| e.id == change.id)
                 .ok_or_else(|| invalid("Retouch operation no longer exists"))?;
             *saved = change.clone();
-            if crate::portrait_auto::group_of(&saved.id).is_some() {
+            if crate::portrait_auto::group_of(&saved.id).is_some()
+                || saved.id.starts_with(crate::automatic_strength::MANAGED)
+            {
                 saved.id = format!("manual-{}", saved.id);
             }
             preserve_manual_matte(saved, &mut mattes)?;
@@ -120,7 +122,7 @@ pub fn edit(state: &AppState, input: &RetouchInput) -> IpcResult<Vec<Edit>> {
 
 // An automatic pass reuses its mask IDs. Snapshot a manually chosen mask so a later
 // detection cannot silently move an existing manual edit to another person's skin.
-fn preserve_manual_matte(
+pub(crate) fn preserve_manual_matte(
     edit: &mut Edit,
     mattes: &mut std::collections::BTreeMap<String, retouch_tools::Matte>,
 ) -> aura_core::AuraResult<()> {
@@ -269,7 +271,13 @@ pub fn draft_preview(state: &AppState, input: &DraftInput) -> IpcResult<RenderDt
             .iter_mut()
             .find(|e| &e.id == id)
             .ok_or_else(|| invalid("Retouch operation no longer exists"))?;
-        draft.id.clone_from(id);
+        // Saving a changed automatic operation makes it the photographer's, which takes it out
+        // of the intensity sliders (ADR-0130); the preview renders it the way it will be saved.
+        draft.id = if crate::portrait_auto::group_of(id).is_some() {
+            format!("manual-{id}")
+        } else {
+            id.clone()
+        };
         *current = draft;
     } else {
         // Stable unused ID keeps repeated draft renders cacheable without colliding with saved IDs.

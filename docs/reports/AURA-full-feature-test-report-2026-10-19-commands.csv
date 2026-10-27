@@ -1,0 +1,326 @@
+﻿command,registrations,harnessCalls,harnessSuccesses,harnessRefusals,guiAuditSuccesses,coverage,bindings
+ui_audit,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+automatic_start,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/nativeBindings.test.ts; ui/src/ipc/client.ts
+photo_analysis,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/nativeBindings.test.ts; ui/src/ipc/client.ts
+photo_auto_edit,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/audit/log.test.ts; ui/src/ipc/client.ts
+one_click_finish,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+one_click_status,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+one_click_cancel,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+activity_status,1,6,6,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/activity.ts
+analyse_portrait,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+portrait_retouch,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+set_portrait_retouch,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+auto_portrait_retouch,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+sync_settings,1,10,9,1,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+pick_white_balance,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+native_retouch_edit,1,159,159,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/nativeRetouch.ts
+native_retouch_blemish_review,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/nativeRetouch.ts
+native_retouch_selection_preview,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/nativeRetouch.ts
+native_retouch_saved_selection,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/nativeRetouch.ts
+local_masks,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/localMasks.ts
+create_local_mask,1,18,18,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/localMasks.ts
+save_local_masks,1,13,13,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/localMasks.ts
+local_mask_coverage,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/localMasks.ts
+native_retouch_preview,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/nativeRetouch.ts
+photo_original,1,1,1,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/nativeRetouch.ts
+live_preview,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/nativeRetouch.ts
+native_retouch_draft_preview,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/nativeRetouch.ts
+list_edit_profiles,1,2,2,0,10,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+learn_lightroom_style,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+licence_status,1,1,1,0,4,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+activate_licence,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+deactivate_licence,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+refresh_licence,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+delete_personal_style,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+apply_edit_profile,1,1,1,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+preview_edit_profile,1,0,0,0,48,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+analyse_reference_style,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+apply_reference_style,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+match_paired_reference,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+import_color_reference,1,1,1,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/colorMatch.ts
+list_color_references,1,2,2,0,12,Harness-invoked: inspect case outcome and scope,ui/src/ipc/colorMatch.ts
+prepare_color_match,1,2,2,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/colorMatch.ts
+apply_color_match,1,6,5,1,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/colorMatch.ts
+color_match_status,1,0,0,0,12,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/colorMatch.ts
+enhance_photo,1,2,2,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+enhance_portrait,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/nativeRetouch.ts
+auto_retouch,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/nativeRetouch.ts
+auto_advanced_retouch,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/advancedRetouch.ts
+create_project,1,2,2,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+list_projects,1,0,0,0,10,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+start_ingest,1,7,7,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+cancel_job,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+ingest_progress,1,14,14,0,0,Harness-invoked: inspect case outcome and scope,ui/src/audit/log.test.ts; ui/src/audit/log.ts; ui/src/ipc/client.ts
+list_images,1,3,3,0,0,Harness-invoked: inspect case outcome and scope,ui/src/audit/log.ts; ui/src/ipc/client.ts
+set_camera_label,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+list_problems,1,4,4,0,2,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+composition_status,1,1,1,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+image_composition,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+flagged_composition,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+dismiss_composition_flag,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+analyse_composition,1,1,1,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+cull_status,1,1,1,0,1,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+gallery,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts; ui/src/components/delivery/Delivery.test.tsx; ui/src/components/delivery/DeliveryPanel.tsx
+image_decision,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+cull_project,1,2,2,0,0,Harness-invoked: inspect case outcome and scope,ui/src/audit/log.test.ts; ui/src/components/LogPanel.test.tsx; ui/src/ipc/client.ts
+resize_gallery,1,2,1,1,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+set_cull_mode,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+override_decision,1,6,3,3,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+explain_image,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+decision_history,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+decision_by_id,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+ledger_status,1,1,1,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+review_queue,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+record_decisions,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+export_support_bundle,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+compact_ledger,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+tone_status,1,1,1,0,1,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+image_tone,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+tone_review_queue,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+reference_frames,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+accept_tone,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+set_tone_override,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+estimate_tone,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+colour_status,1,1,1,0,1,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+image_colour,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+colour_review_queue,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+accept_colour,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+set_colour_override,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+select_colour_variant,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+estimate_colour,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+look_status,1,1,1,0,1,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+list_looks,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+parse_reference,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+look_buckets,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+look_match_report,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+measure_look,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+select_look,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+set_look_strength,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+rename_look,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+forget_look,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+style_status,1,1,1,0,1,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+list_profiles,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+profile_report,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+profile_pairs,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+scan_archive,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+train_profile,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+adopt_profile,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+compare_profiles,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+export_profile,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+import_profile,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+set_project_profile,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+local_status,1,1,1,0,1,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+image_local,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+local_review_queue,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+accept_local,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+set_local_strength,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+sculpt_local,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+retouch_status,1,1,1,0,1,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+image_retouch,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+protected_features,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+retouch_review_queue,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+accept_retouch,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+set_retouch,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+set_protection,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+retouch_pass,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+micro_status,1,1,1,0,1,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+image_micro,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+micro_composites,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+micro_review_queue,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+micro_matrix,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+set_micro_matrix,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+accept_micro,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+micro_pass,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+micro_reason_codes,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+restore_status,1,1,1,0,1,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+image_restore,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+restore_identity_refusals,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+restore_review_queue,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+accept_restore,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+set_restore_override,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+restore_pass,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+restore_reason_codes,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+geometry_status,1,1,1,0,1,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+image_geometry,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+geometry_review_queue,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+accept_geometry,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+cleanup_status,1,1,1,0,1,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+image_cleanup,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+cleanup_blocked,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+cleanup_disclosures,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+cleanup_pass,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+decide_cleanup,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+disable_cleanup,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+manual_remove,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+cleanup_reason_codes,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+gallery_status,1,1,1,0,1,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+gallery_nodes,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+gallery_node_strip,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+image_gallery,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+gallery_outliers,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+gallery_pass,1,1,1,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+pin_gallery_anchor,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+set_gallery_override,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+disable_gallery,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+gallery_reason_codes,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+camera_status,1,1,1,0,1,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+camera_transforms,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+camera_fingerprints,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+camera_reports,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+camera_pairs,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+camera_shooter_bias,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+camera_pass,1,1,1,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+set_camera_reference,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+disable_camera,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+set_camera_override,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+camera_reason_codes,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+qc_status,1,1,1,0,1,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+qc_report,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+qc_report_markdown,1,1,1,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+qc_queue,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+qc_queue_grouped,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+qc_tickets,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+qc_rounds,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+qc_run,1,1,1,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+qc_decide,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+qc_decide_bulk,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+set_framing,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+plan_geometry,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+analyse_integrity,1,1,1,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+build_index,1,1,1,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+cancel_previews,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+ai_setup_status,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/audit/log.ts; ui/src/ipc/client.ts
+check_ai_key,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+classify_scenes,1,1,1,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+clear_ai_key,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+cloud_cache_stats,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+cloud_calls,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+cloud_spend,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+cloud_status,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+internal_ai_status,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+internal_ai_feedback,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+develop_status,1,1,1,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+dismiss_flag,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+edit_mask,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+embed_project,1,1,1,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+emotion_status,1,1,1,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+ensure_masks,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+erase_biometrics,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+find_similar,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+flagged_images,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+get_preview,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/audit/log.test.ts; ui/src/audit/log.ts; ui/src/ipc/client.ts
+group_moments,1,1,1,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+group_people,1,1,1,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+hardware_plan,1,1,1,0,1,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+history_step,1,160,160,0,2,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+identity_cover,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+image_subjects,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+identity_timelines,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+image_descriptors,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+image_emotion,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+image_history,1,0,0,0,12,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+image_integrity,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+image_masks,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+image_recipe,1,4,4,0,12,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+image_scene,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+index_status,1,1,1,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+infer_stats,1,1,1,0,1,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+integrity_status,1,1,1,0,1,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+list_identities,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+list_models,1,1,1,0,1,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+list_moments,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+lock_moment,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+mask_allowance,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+mask_kinds,1,1,1,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+mask_overlay,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+mask_status,1,1,1,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+merge_chapters,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+merge_identities,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+merge_moments,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+moment_duplicates,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+moment_of_image,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+moment_peak,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+moment_status,1,1,1,0,1,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+within_moment,2,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+move_chapter_boundary,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+people_status,1,1,1,0,1,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+prefer_frame,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+prefetch_previews,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+preview_problems,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+preview_stats,1,1,1,0,1,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+purge_cache,1,1,1,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+purge_cloud_cache,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+ranked_by_emotion,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+reactions_of,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+recheck_hardware,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+regenerate_mask,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+rename_identity,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+render_caps,1,2,2,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+render_image,1,448,447,1,0,Harness-invoked: inspect case outcome and scope,ui/src/audit/log.ts; ui/src/components/LogPanel.test.tsx; ui/src/ipc/client.ts
+scan_faces,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+scene_profiles,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+score_emotion,1,1,1,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+segment_story,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+list_ai_providers,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+open_ai_provider_page,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+save_ai_setup,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+set_ai_key,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+skip_ai_setup,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+set_cache_budget,1,2,2,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+set_chapter,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+set_cloud_budget,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+set_cloud_privacy,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+set_execution_provider,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+set_identity_importance,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+set_identity_role,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+set_keep_hint,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+set_moment_peak,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+set_param,1,107,102,5,2,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+snapshot,1,97,97,0,0,Harness-invoked: inspect case outcome and scope,ui/src/components/SimilarPanel.test.tsx; ui/src/ipc/client.ts
+split_chapter,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+split_identity,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+split_moment,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+story_outline,1,0,0,0,2,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+story_status,1,1,1,0,1,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+undo_moment_edit,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+warmup_models,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+autopilot_status,1,0,0,0,2,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+autopilot_preflight,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+autopilot_start,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+autopilot_progress,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/audit/log.ts; ui/src/ipc/client.ts
+autopilot_cancel,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+autopilot_stages,1,0,0,0,2,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+autopilot_summary,1,0,0,0,2,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+autopilot_events,1,0,0,0,2,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+autopilot_set_settings,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+curate_status,1,1,1,0,1,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+curate_project,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+curate_bw,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+curate_heroes,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+curate_album,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+curate_spread,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+curate_social,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+curate_teaser,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+curate_set_order,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+curate_decide,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+curate_export,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+export_status,1,1,1,0,1,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+export_presets,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+export_preview_names,1,1,1,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+export_run,1,1,1,0,0,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+export_run_watermarked,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+export_files,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+export_manifest,1,1,1,0,1,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+delivery_status,1,1,1,0,1,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+delivery_providers,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+delivery_backup,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+delivery_upload,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+delivery_items,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+learn_status,1,1,1,0,1,Harness-invoked: inspect case outcome and scope,ui/src/ipc/client.ts
+learn_buckets,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+learn_compare,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+learn_adopt,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+learn_roll_back,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+learn_consent,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts
+learn_set_consent,1,0,0,0,0,Registered; no invocation captured by the harness or UI ring log,ui/src/ipc/client.ts
+diagnostics_report,1,0,0,0,1,GUI-wrapper invocation observed; inspect panel scope,ui/src/ipc/client.ts

@@ -1,0 +1,1875 @@
+{
+  "review_date": "2026-10-19",
+  "scope": "AURA desktop vs documented Evoto desktop feature families",
+  "complete_parity": false,
+  "superiority_established": false,
+  "note": "143 historical marketing routes overlap and include use cases and separate video products. Historical statuses are preserved unless this change supplies new evidence. No UI label or test count certifies photographic equivalence.",
+  "sources": [
+    "https://www.evoto.ai/ai-photo-editor",
+    "https://support.evoto.ai/ai-lab/",
+    "https://support.evoto.ai/color-adjustments-module/",
+    "https://support.evoto.ai/clothing-accessories-adjustments-module/",
+    "https://blog.evoto.ai/evoto-product-launch-2026/",
+    "https://www.evoto.ai/features/motion-blur-effect"
+  ],
+  "route_count": 143,
+  "route_status_counts": {
+    "missing_or_unassessed": 46,
+    "manual_partial": 5,
+    "partial": 64,
+    "manual": 14,
+    "use_case": 10,
+    "separate_product": 4
+  },
+  "features": [
+    {
+      "id": "add-aegyo-sal",
+      "source": "https://www.evoto.ai/features/add-aegyo-sal",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "add-film-grain-to-photo",
+      "source": "https://www.evoto.ai/features/add-film-grain-to-photo",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "add-text-to-image",
+      "source": "https://www.evoto.ai/features/add-text-to-image",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-background-blur",
+      "source": "https://www.evoto.ai/features/ai-background-blur",
+      "status": "manual_partial",
+      "implementation": [
+        "crates/aura-render/src/retouch_material.rs",
+        "ui/src/components/develop/RetouchControls.tsx"
+      ],
+      "limitation": "Manual selection blur excludes masked subjects from the filter; no learned depth, focus range or optical bokeh shapes.",
+      "category": "model-dependent",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Pixel behavior, native persistence/history/export, UI authoring tests.",
+      "native_tool": "background_blur"
+    },
+    {
+      "id": "ai-background-fusion",
+      "source": "https://www.evoto.ai/features/ai-background-fusion",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-background-remover",
+      "source": "https://www.evoto.ai/features/ai-background-remover",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-beard-remover",
+      "source": "https://www.evoto.ai/features/ai-beard-remover",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-camera-profile-matching",
+      "source": "https://www.evoto.ai/features/ai-camera-profile-matching",
+      "status": "partial",
+      "implementation": [
+        "ui/src/components/develop/DevelopWorkspace.tsx",
+        "crates/aura-render/src/colour.rs"
+      ],
+      "limitation": "Existing grading and local adjustment workflows; no reference-quality parity established.",
+      "category": "color",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-catchlights",
+      "source": "https://www.evoto.ai/features/ai-catchlights",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-clothes-lint-remover",
+      "source": "https://www.evoto.ai/features/ai-clothes-lint-remover",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-app/src/advanced_retouch.rs"
+      ],
+      "limitation": "Existing selective texture, shine and localized cleanup. New hair generation and structural part editing absent.",
+      "category": "hair-clothing",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-color-looks",
+      "source": "https://www.evoto.ai/features/ai-color-looks",
+      "status": "partial",
+      "implementation": [
+        "ui/src/components/develop/DevelopWorkspace.tsx",
+        "crates/aura-render/src/colour.rs"
+      ],
+      "limitation": "Existing grading and local adjustment workflows; no reference-quality parity established.",
+      "category": "color",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-color-match",
+      "source": "https://www.evoto.ai/features/ai-color-match",
+      "status": "partial",
+      "implementation": [
+        "ui/src/components/develop/DevelopWorkspace.tsx",
+        "crates/aura-render/src/colour.rs"
+      ],
+      "limitation": "Existing grading and local adjustment workflows; no reference-quality parity established.",
+      "category": "color",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-crop-image",
+      "source": "https://www.evoto.ai/features/ai-crop-image",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/geometry_commands.rs",
+        "ui/src/components/develop/MasksPanel.tsx"
+      ],
+      "limitation": "Existing geometry/masks/export sizing; learned selections require available models.",
+      "category": "geometry-mask",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-culling",
+      "source": "https://www.evoto.ai/features/ai-culling",
+      "status": "partial",
+      "implementation": [
+        "ui/src/App.tsx",
+        "ui/src/components/develop/batchRetouch.ts"
+      ],
+      "limitation": "Native organization, grading, presets, independent cleanup and export; full product/hardware/format parity not validated.",
+      "category": "workflow",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-dodge-and-burn",
+      "source": "https://www.evoto.ai/features/ai-dodge-and-burn",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-render/src/retouch_tools.rs"
+      ],
+      "limitation": "Native face/body selections and manual repair; incomplete blemish-removal quality remains.",
+      "category": "skin",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-eye-color-changer",
+      "source": "https://www.evoto.ai/features/ai-eye-color-changer",
+      "status": "manual",
+      "implementation": [
+        "ui/src/components/develop/RetouchControls.tsx",
+        "crates/aura-render/src/retouch_color.rs"
+      ],
+      "limitation": "Chosen color inside a saved or painted selection; no new automatic region detection or commercial equivalence.",
+      "category": "explicit-color",
+      "baseline_status": "manual",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-eye-symmetry",
+      "source": "https://www.evoto.ai/features/ai-eye-symmetry",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-face-editor",
+      "source": "https://www.evoto.ai/features/ai-face-editor",
+      "status": "manual",
+      "implementation": [
+        "crates/aura-render/src/retouch_reshape.rs"
+      ],
+      "limitation": "Explicit bounded local width/height warp; no automatic anatomical or landmark proportion engine.",
+      "category": "manual-shape",
+      "baseline_status": "manual",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-glow-effect",
+      "source": "https://www.evoto.ai/features/ai-glow-effect",
+      "status": "manual_partial",
+      "implementation": [
+        "crates/aura-render/src/retouch_material.rs",
+        "ui/src/components/develop/RetouchControls.tsx"
+      ],
+      "limitation": "Native highlight-gated spread with radius, threshold and amount; no complete mist/halation model family.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Pixel behavior, native persistence/history/export, UI authoring tests.",
+      "native_tool": "highlight_glow"
+    },
+    {
+      "id": "ai-hair-editor",
+      "source": "https://www.evoto.ai/features/ai-hair-editor",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-app/src/advanced_retouch.rs"
+      ],
+      "limitation": "Existing selective texture, shine and localized cleanup. New hair generation and structural part editing absent.",
+      "category": "hair-clothing",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-hand-rejuvenation",
+      "source": "https://www.evoto.ai/features/ai-hand-rejuvenation",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-render/src/retouch_tools.rs"
+      ],
+      "limitation": "Native face/body selections and manual repair; incomplete blemish-removal quality remains.",
+      "category": "skin",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-image-denoiser",
+      "source": "https://www.evoto.ai/features/ai-image-denoiser",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-generative/src",
+        "crates/aura-restore/src"
+      ],
+      "limitation": "Related interfaces/foundations exist. Provider/model execution and specific requested effect are not established by code presence.",
+      "category": "model-dependent",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-image-extender",
+      "source": "https://www.evoto.ai/features/ai-image-extender",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-masking-editor",
+      "source": "https://www.evoto.ai/features/ai-masking-editor",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/geometry_commands.rs",
+        "ui/src/components/develop/MasksPanel.tsx"
+      ],
+      "limitation": "Existing geometry/masks/export sizing; learned selections require available models.",
+      "category": "geometry-mask",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-object-remover",
+      "source": "https://www.evoto.ai/features/ai-object-remover",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-generative/src",
+        "crates/aura-restore/src"
+      ],
+      "limitation": "Related interfaces/foundations exist. Provider/model execution and specific requested effect are not established by code presence.",
+      "category": "model-dependent",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-open-eyes",
+      "source": "https://www.evoto.ai/features/ai-open-eyes",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-perspective-correction",
+      "source": "https://www.evoto.ai/features/ai-perspective-correction",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/geometry_commands.rs",
+        "ui/src/components/develop/MasksPanel.tsx"
+      ],
+      "limitation": "Existing geometry/masks/export sizing; learned selections require available models.",
+      "category": "geometry-mask",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-photo-sharpener",
+      "source": "https://www.evoto.ai/features/ai-photo-sharpener",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-generative/src",
+        "crates/aura-restore/src"
+      ],
+      "limitation": "Related interfaces/foundations exist. Provider/model execution and specific requested effect are not established by code presence.",
+      "category": "model-dependent",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-product-retouching",
+      "source": "https://www.evoto.ai/features/ai-product-retouching",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-red-eye-removal",
+      "source": "https://www.evoto.ai/features/ai-red-eye-removal",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_features.rs"
+      ],
+      "limitation": "Measured eye, teeth and brow finishing; no synthesis of obscured eyes or brace removal.",
+      "category": "portrait-detail",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-relight",
+      "source": "https://www.evoto.ai/features/ai-relight",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-skin-retouching",
+      "source": "https://www.evoto.ai/features/ai-skin-retouching",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-render/src/retouch_tools.rs"
+      ],
+      "limitation": "Native face/body selections and manual repair; incomplete blemish-removal quality remains.",
+      "category": "skin",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-stray-fur-removal",
+      "source": "https://www.evoto.ai/features/ai-stray-fur-removal",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ai-teeth-fixer",
+      "source": "https://www.evoto.ai/features/ai-teeth-fixer",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_features.rs"
+      ],
+      "limitation": "Measured eye, teeth and brow finishing; no synthesis of obscured eyes or brace removal.",
+      "category": "portrait-detail",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "background-generator",
+      "source": "https://www.evoto.ai/features/background-generator",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "background-replacer",
+      "source": "https://www.evoto.ai/features/background-replacer",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "batch-edits",
+      "source": "https://www.evoto.ai/features/batch-edits",
+      "status": "partial",
+      "implementation": [
+        "ui/src/App.tsx",
+        "ui/src/components/develop/batchRetouch.ts"
+      ],
+      "limitation": "Native organization, grading, presets, independent cleanup and export; full product/hardware/format parity not validated.",
+      "category": "workflow",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "black-and-white-filter",
+      "source": "https://www.evoto.ai/features/black-and-white-filter",
+      "status": "partial",
+      "implementation": [
+        "ui/src/components/develop/DevelopWorkspace.tsx",
+        "crates/aura-render/src/colour.rs"
+      ],
+      "limitation": "Existing grading and local adjustment workflows; no reference-quality parity established.",
+      "category": "color",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "black-background",
+      "source": "https://www.evoto.ai/features/black-background",
+      "status": "manual",
+      "implementation": [
+        "ui/src/components/develop/RetouchControls.tsx",
+        "crates/aura-render/src/retouch_color.rs"
+      ],
+      "limitation": "Chosen color inside a saved or painted selection; no new automatic region detection or commercial equivalence.",
+      "category": "explicit-color",
+      "baseline_status": "manual",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "blemish-removal",
+      "source": "https://www.evoto.ai/features/blemish-removal",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-render/src/retouch_tools.rs"
+      ],
+      "limitation": "Native face/body selections and manual repair; incomplete blemish-removal quality remains.",
+      "category": "skin",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "body-editor",
+      "source": "https://www.evoto.ai/features/body-editor",
+      "status": "manual",
+      "implementation": [
+        "crates/aura-render/src/retouch_reshape.rs"
+      ],
+      "limitation": "Explicit bounded local width/height warp; no automatic anatomical or landmark proportion engine.",
+      "category": "manual-shape",
+      "baseline_status": "manual",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "bokeh-effect",
+      "source": "https://www.evoto.ai/features/bokeh-effect",
+      "status": "manual_partial",
+      "implementation": [
+        "crates/aura-render/src/retouch_material.rs",
+        "ui/src/components/develop/RetouchControls.tsx"
+      ],
+      "limitation": "Only selection blur; optical bokeh shape, highlight boost and depth remain absent.",
+      "category": "model-dependent",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Pixel behavior, native persistence/history/export, UI authoring tests.",
+      "native_tool": "background_blur"
+    },
+    {
+      "id": "bulk-background-remover",
+      "source": "https://www.evoto.ai/features/bulk-background-remover",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "camera-raw-photo-editor",
+      "source": "https://www.evoto.ai/features/camera-raw-photo-editor",
+      "status": "partial",
+      "implementation": [
+        "ui/src/App.tsx",
+        "ui/src/components/develop/batchRetouch.ts"
+      ],
+      "limitation": "Native organization, grading, presets, independent cleanup and export; full product/hardware/format parity not validated.",
+      "category": "workflow",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "change-background-color",
+      "source": "https://www.evoto.ai/features/change-background-color",
+      "status": "manual",
+      "implementation": [
+        "ui/src/components/develop/RetouchControls.tsx",
+        "crates/aura-render/src/retouch_color.rs"
+      ],
+      "limitation": "Chosen color inside a saved or painted selection; no new automatic region detection or commercial equivalence.",
+      "category": "explicit-color",
+      "baseline_status": "manual",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "change-color-of-image",
+      "source": "https://www.evoto.ai/features/change-color-of-image",
+      "status": "manual",
+      "implementation": [
+        "ui/src/components/develop/RetouchControls.tsx",
+        "crates/aura-render/src/retouch_color.rs"
+      ],
+      "limitation": "Chosen color inside a saved or painted selection; no new automatic region detection or commercial equivalence.",
+      "category": "explicit-color",
+      "baseline_status": "manual",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "change-skin-color",
+      "source": "https://www.evoto.ai/features/change-skin-color",
+      "status": "partial",
+      "implementation": [
+        "ui/src/components/develop/DevelopWorkspace.tsx",
+        "crates/aura-render/src/colour.rs"
+      ],
+      "limitation": "Existing grading and local adjustment workflows; no reference-quality parity established.",
+      "category": "color",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "change-smile-filter",
+      "source": "https://www.evoto.ai/features/change-smile-filter",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "cinematic-filters",
+      "source": "https://www.evoto.ai/features/cinematic-filters",
+      "status": "partial",
+      "implementation": [
+        "ui/src/components/develop/DevelopWorkspace.tsx",
+        "crates/aura-render/src/colour.rs"
+      ],
+      "limitation": "Existing grading and local adjustment workflows; no reference-quality parity established.",
+      "category": "color",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "clean-background",
+      "source": "https://www.evoto.ai/features/clean-background",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "client-gallery",
+      "source": "https://www.evoto.ai/features/client-gallery",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "clothes-color-changer",
+      "source": "https://www.evoto.ai/features/clothes-color-changer",
+      "status": "manual",
+      "implementation": [
+        "ui/src/components/develop/RetouchControls.tsx",
+        "crates/aura-render/src/retouch_color.rs"
+      ],
+      "limitation": "Chosen color inside a saved or painted selection; no new automatic region detection or commercial equivalence.",
+      "category": "explicit-color",
+      "baseline_status": "manual",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "cloud-storage",
+      "source": "https://www.evoto.ai/features/cloud-storage",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "color-splash",
+      "source": "https://www.evoto.ai/features/color-splash",
+      "status": "partial",
+      "implementation": [
+        "ui/src/components/develop/DevelopWorkspace.tsx",
+        "crates/aura-render/src/colour.rs"
+      ],
+      "limitation": "Existing grading and local adjustment workflows; no reference-quality parity established.",
+      "category": "color",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "colorize-photo",
+      "source": "https://www.evoto.ai/features/colorize-photo",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "cutout-image",
+      "source": "https://www.evoto.ai/features/cutout-image",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "darken-image",
+      "source": "https://www.evoto.ai/features/darken-image",
+      "status": "partial",
+      "implementation": [
+        "ui/src/components/develop/DevelopWorkspace.tsx",
+        "crates/aura-render/src/colour.rs"
+      ],
+      "limitation": "Existing grading and local adjustment workflows; no reference-quality parity established.",
+      "category": "color",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "dehaze-photo",
+      "source": "https://www.evoto.ai/features/dehaze-photo",
+      "status": "partial",
+      "implementation": [
+        "ui/src/components/develop/DevelopWorkspace.tsx",
+        "crates/aura-render/src/colour.rs"
+      ],
+      "limitation": "Existing grading and local adjustment workflows; no reference-quality parity established.",
+      "category": "color",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "double-chin-remover",
+      "source": "https://www.evoto.ai/features/double-chin-remover",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "double-exposure",
+      "source": "https://www.evoto.ai/features/double-exposure",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "double-eyelids",
+      "source": "https://www.evoto.ai/features/double-eyelids",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "ecommerce-photography",
+      "source": "https://www.evoto.ai/features/ecommerce-photography",
+      "status": "use_case",
+      "implementation": [],
+      "limitation": "Photography use case, not a distinct algorithm. Requires representative-photo acceptance tests.",
+      "baseline_status": "use_case",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "eye-contact-correction",
+      "source": "https://www.evoto.ai/features/eye-contact-correction",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "eye-editor",
+      "source": "https://www.evoto.ai/features/eye-editor",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_features.rs"
+      ],
+      "limitation": "Measured eye, teeth and brow finishing; no synthesis of obscured eyes or brace removal.",
+      "category": "portrait-detail",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "eyebrow-filter",
+      "source": "https://www.evoto.ai/features/eyebrow-filter",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_features.rs"
+      ],
+      "limitation": "Measured eye, teeth and brow finishing; no synthesis of obscured eyes or brace removal.",
+      "category": "portrait-detail",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "face-reshaping-tool",
+      "source": "https://www.evoto.ai/features/face-reshaping-tool",
+      "status": "manual",
+      "implementation": [
+        "crates/aura-render/src/retouch_reshape.rs"
+      ],
+      "limitation": "Explicit bounded local width/height warp; no automatic anatomical or landmark proportion engine.",
+      "category": "manual-shape",
+      "baseline_status": "manual",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "face-slimming-ai-app",
+      "source": "https://www.evoto.ai/features/face-slimming-ai-app",
+      "status": "manual",
+      "implementation": [
+        "crates/aura-render/src/retouch_reshape.rs"
+      ],
+      "limitation": "Explicit bounded local width/height warp; no automatic anatomical or landmark proportion engine.",
+      "category": "manual-shape",
+      "baseline_status": "manual",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "facial-expression-changer",
+      "source": "https://www.evoto.ai/features/facial-expression-changer",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "family-photography",
+      "source": "https://www.evoto.ai/features/family-photography",
+      "status": "use_case",
+      "implementation": [],
+      "limitation": "Photography use case, not a distinct algorithm. Requires representative-photo acceptance tests.",
+      "baseline_status": "use_case",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "fashion-photography",
+      "source": "https://www.evoto.ai/features/fashion-photography",
+      "status": "use_case",
+      "implementation": [],
+      "limitation": "Photography use case, not a distinct algorithm. Requires representative-photo acceptance tests.",
+      "baseline_status": "use_case",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "fix-overexposed-photos",
+      "source": "https://www.evoto.ai/features/fix-overexposed-photos",
+      "status": "partial",
+      "implementation": [
+        "ui/src/components/develop/DevelopWorkspace.tsx",
+        "crates/aura-render/src/colour.rs"
+      ],
+      "limitation": "Existing grading and local adjustment workflows; no reference-quality parity established.",
+      "category": "color",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "flat-stomach-editor",
+      "source": "https://www.evoto.ai/features/flat-stomach-editor",
+      "status": "manual",
+      "implementation": [
+        "crates/aura-render/src/retouch_reshape.rs"
+      ],
+      "limitation": "Explicit bounded local width/height warp; no automatic anatomical or landmark proportion engine.",
+      "category": "manual-shape",
+      "baseline_status": "manual",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "flip-image",
+      "source": "https://www.evoto.ai/features/flip-image",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/geometry_commands.rs",
+        "ui/src/components/develop/MasksPanel.tsx"
+      ],
+      "limitation": "Existing geometry/masks/export sizing; learned selections require available models.",
+      "category": "geometry-mask",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "floor-reflection",
+      "source": "https://www.evoto.ai/features/floor-reflection",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "freckles-filter",
+      "source": "https://www.evoto.ai/features/freckles-filter",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "frequency-separation",
+      "source": "https://www.evoto.ai/features/frequency-separation",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-render/src/retouch_tools.rs"
+      ],
+      "limitation": "Native face/body selections and manual repair; incomplete blemish-removal quality remains.",
+      "category": "skin",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "glitch-effect",
+      "source": "https://www.evoto.ai/features/glitch-effect",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "hair-color-changer",
+      "source": "https://www.evoto.ai/features/hair-color-changer",
+      "status": "manual",
+      "implementation": [
+        "ui/src/components/develop/RetouchControls.tsx",
+        "crates/aura-render/src/retouch_color.rs"
+      ],
+      "limitation": "Chosen color inside a saved or painted selection; no new automatic region detection or commercial equivalence.",
+      "category": "explicit-color",
+      "baseline_status": "manual",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "hair-part",
+      "source": "https://www.evoto.ai/features/hair-part",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "hair-shine-enhancement",
+      "source": "https://www.evoto.ai/features/hair-shine-enhancement",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-app/src/advanced_retouch.rs"
+      ],
+      "limitation": "Existing selective texture, shine and localized cleanup. New hair generation and structural part editing absent.",
+      "category": "hair-clothing",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "headshot-photography",
+      "source": "https://www.evoto.ai/features/headshot-photography",
+      "status": "use_case",
+      "implementation": [],
+      "limitation": "Photography use case, not a distinct algorithm. Requires representative-photo acceptance tests.",
+      "baseline_status": "use_case",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "image",
+      "source": "https://www.evoto.ai/features/image",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "image-brightener",
+      "source": "https://www.evoto.ai/features/image-brightener",
+      "status": "partial",
+      "implementation": [
+        "ui/src/components/develop/DevelopWorkspace.tsx",
+        "crates/aura-render/src/colour.rs"
+      ],
+      "limitation": "Existing grading and local adjustment workflows; no reference-quality parity established.",
+      "category": "color",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "image-enlarger",
+      "source": "https://www.evoto.ai/features/image-enlarger",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-generative/src",
+        "crates/aura-restore/src"
+      ],
+      "limitation": "Related interfaces/foundations exist. Provider/model execution and specific requested effect are not established by code presence.",
+      "category": "model-dependent",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "image-resizer",
+      "source": "https://www.evoto.ai/features/image-resizer",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/geometry_commands.rs",
+        "ui/src/components/develop/MasksPanel.tsx"
+      ],
+      "limitation": "Existing geometry/masks/export sizing; learned selections require available models.",
+      "category": "geometry-mask",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "image-splitter",
+      "source": "https://www.evoto.ai/features/image-splitter",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "image-upscaler",
+      "source": "https://www.evoto.ai/features/image-upscaler",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-generative/src",
+        "crates/aura-restore/src"
+      ],
+      "limitation": "Related interfaces/foundations exist. Provider/model execution and specific requested effect are not established by code presence.",
+      "category": "model-dependent",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "invert-image-color",
+      "source": "https://www.evoto.ai/features/invert-image-color",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "light-leak-effect",
+      "source": "https://www.evoto.ai/features/light-leak-effect",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "magic-eraser",
+      "source": "https://www.evoto.ai/features/magic-eraser",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-generative/src",
+        "crates/aura-restore/src"
+      ],
+      "limitation": "Related interfaces/foundations exist. Provider/model execution and specific requested effect are not established by code presence.",
+      "category": "model-dependent",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "makeup-beauty-filter",
+      "source": "https://www.evoto.ai/features/makeup-beauty-filter",
+      "status": "manual",
+      "implementation": [
+        "ui/src/components/develop/RetouchControls.tsx",
+        "crates/aura-render/src/retouch_color.rs"
+      ],
+      "limitation": "Chosen color inside a saved or painted selection; no new automatic region detection or commercial equivalence.",
+      "category": "explicit-color",
+      "baseline_status": "manual",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "maternity-photography",
+      "source": "https://www.evoto.ai/features/maternity-photography",
+      "status": "use_case",
+      "implementation": [],
+      "limitation": "Photography use case, not a distinct algorithm. Requires representative-photo acceptance tests.",
+      "baseline_status": "use_case",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "motion-blur-effect",
+      "source": "https://www.evoto.ai/features/motion-blur-effect",
+      "status": "manual_partial",
+      "implementation": [
+        "crates/aura-render/src/retouch_optics.rs",
+        "ui/src/components/develop/RetouchOpticsControls.tsx"
+      ],
+      "limitation": "Directional selected-only motion trails with editable travel and angle. Reuses available masks; dedicated automatic subject separation and photographic equivalence are not established.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Native signal tests, persisted recipes/history/export, UI authoring and desktop verification; see AURA-optical-and-colour-tools-2026-10-19.md.",
+      "native_tool": "motion_blur"
+    },
+    {
+      "id": "newborn-photography",
+      "source": "https://www.evoto.ai/features/newborn-photography",
+      "status": "use_case",
+      "implementation": [],
+      "limitation": "Photography use case, not a distinct algorithm. Requires representative-photo acceptance tests.",
+      "baseline_status": "use_case",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "nose-job-simulator",
+      "source": "https://www.evoto.ai/features/nose-job-simulator",
+      "status": "manual",
+      "implementation": [
+        "crates/aura-render/src/retouch_reshape.rs"
+      ],
+      "limitation": "Explicit bounded local width/height warp; no automatic anatomical or landmark proportion engine.",
+      "category": "manual-shape",
+      "baseline_status": "manual",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "old-photo-restoration",
+      "source": "https://www.evoto.ai/features/old-photo-restoration",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-generative/src",
+        "crates/aura-restore/src"
+      ],
+      "limitation": "Related interfaces/foundations exist. Provider/model execution and specific requested effect are not established by code presence.",
+      "category": "model-dependent",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "outfit-extractor",
+      "source": "https://www.evoto.ai/features/outfit-extractor",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "people-remover",
+      "source": "https://www.evoto.ai/features/people-remover",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-generative/src",
+        "crates/aura-restore/src"
+      ],
+      "limitation": "Related interfaces/foundations exist. Provider/model execution and specific requested effect are not established by code presence.",
+      "category": "model-dependent",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "personal-ai-preset",
+      "source": "https://www.evoto.ai/features/personal-ai-preset",
+      "status": "partial",
+      "implementation": [
+        "ui/src/App.tsx",
+        "ui/src/components/develop/batchRetouch.ts"
+      ],
+      "limitation": "Native organization, grading, presets, independent cleanup and export; full product/hardware/format parity not validated.",
+      "category": "workflow",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "photo-delivery",
+      "source": "https://www.evoto.ai/features/photo-delivery",
+      "status": "partial",
+      "implementation": [
+        "ui/src/App.tsx",
+        "ui/src/components/develop/batchRetouch.ts"
+      ],
+      "limitation": "Native organization, grading, presets, independent cleanup and export; full product/hardware/format parity not validated.",
+      "category": "workflow",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "photo-enhancer",
+      "source": "https://www.evoto.ai/features/photo-enhancer",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-generative/src",
+        "crates/aura-restore/src"
+      ],
+      "limitation": "Related interfaces/foundations exist. Provider/model execution and specific requested effect are not established by code presence.",
+      "category": "model-dependent",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "photo-filters",
+      "source": "https://www.evoto.ai/features/photo-filters",
+      "status": "partial",
+      "implementation": [
+        "ui/src/components/develop/DevelopWorkspace.tsx",
+        "crates/aura-render/src/colour.rs"
+      ],
+      "limitation": "Existing grading and local adjustment workflows; no reference-quality parity established.",
+      "category": "color",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "photo-glare-remover",
+      "source": "https://www.evoto.ai/features/photo-glare-remover",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_features.rs"
+      ],
+      "limitation": "Measured eye, teeth and brow finishing; no synthesis of obscured eyes or brace removal.",
+      "category": "portrait-detail",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "photo-organizer",
+      "source": "https://www.evoto.ai/features/photo-organizer",
+      "status": "partial",
+      "implementation": [
+        "ui/src/App.tsx",
+        "ui/src/components/develop/batchRetouch.ts"
+      ],
+      "limitation": "Native organization, grading, presets, independent cleanup and export; full product/hardware/format parity not validated.",
+      "category": "workflow",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "photo-straightener",
+      "source": "https://www.evoto.ai/features/photo-straightener",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/geometry_commands.rs",
+        "ui/src/components/develop/MasksPanel.tsx"
+      ],
+      "limitation": "Existing geometry/masks/export sizing; learned selections require available models.",
+      "category": "geometry-mask",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "png-maker",
+      "source": "https://www.evoto.ai/features/png-maker",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "portrait-retouching",
+      "source": "https://www.evoto.ai/features/portrait-retouching",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-render/src/retouch_tools.rs"
+      ],
+      "limitation": "Native face/body selections and manual repair; incomplete blemish-removal quality remains.",
+      "category": "skin",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "preset-photo-editor",
+      "source": "https://www.evoto.ai/features/preset-photo-editor",
+      "status": "partial",
+      "implementation": [
+        "ui/src/App.tsx",
+        "ui/src/components/develop/batchRetouch.ts"
+      ],
+      "limitation": "Native organization, grading, presets, independent cleanup and export; full product/hardware/format parity not validated.",
+      "category": "workflow",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "raw-converter",
+      "source": "https://www.evoto.ai/features/raw-converter",
+      "status": "partial",
+      "implementation": [
+        "ui/src/App.tsx",
+        "ui/src/components/develop/batchRetouch.ts"
+      ],
+      "limitation": "Native organization, grading, presets, independent cleanup and export; full product/hardware/format parity not validated.",
+      "category": "workflow",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "remove-dark-circles",
+      "source": "https://www.evoto.ai/features/remove-dark-circles",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-render/src/retouch_tools.rs"
+      ],
+      "limitation": "Native face/body selections and manual repair; incomplete blemish-removal quality remains.",
+      "category": "skin",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "remove-frown-lines",
+      "source": "https://www.evoto.ai/features/remove-frown-lines",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-render/src/retouch_tools.rs"
+      ],
+      "limitation": "Native face/body selections and manual repair; incomplete blemish-removal quality remains.",
+      "category": "skin",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "remove-green-screen",
+      "source": "https://www.evoto.ai/features/remove-green-screen",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "remove-marionette-lines",
+      "source": "https://www.evoto.ai/features/remove-marionette-lines",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-render/src/retouch_tools.rs"
+      ],
+      "limitation": "Native face/body selections and manual repair; incomplete blemish-removal quality remains.",
+      "category": "skin",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "remove-pet-leash",
+      "source": "https://www.evoto.ai/features/remove-pet-leash",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "remove-shadow-from-photo",
+      "source": "https://www.evoto.ai/features/remove-shadow-from-photo",
+      "status": "manual_partial",
+      "implementation": [
+        "crates/aura-render/src/retouch_material.rs",
+        "ui/src/components/develop/RetouchControls.tsx"
+      ],
+      "limitation": "Bounded selected-surface shadow lift; no learned shadow detection or generative relighting.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Pixel behavior, native persistence/history/export, UI authoring tests.",
+      "native_tool": "shadow_balance"
+    },
+    {
+      "id": "remove-tan-lines",
+      "source": "https://www.evoto.ai/features/remove-tan-lines",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-render/src/retouch_tools.rs"
+      ],
+      "limitation": "Native face/body selections and manual repair; incomplete blemish-removal quality remains.",
+      "category": "skin",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "remove-tattoo-from-photo",
+      "source": "https://www.evoto.ai/features/remove-tattoo-from-photo",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "remove-wrinkles-from-clothes",
+      "source": "https://www.evoto.ai/features/remove-wrinkles-from-clothes",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-app/src/advanced_retouch.rs"
+      ],
+      "limitation": "Existing selective texture, shine and localized cleanup. New hair generation and structural part editing absent.",
+      "category": "hair-clothing",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "rosy-complexion-ai-tool",
+      "source": "https://www.evoto.ai/features/rosy-complexion-ai-tool",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-render/src/retouch_tools.rs"
+      ],
+      "limitation": "Native face/body selections and manual repair; incomplete blemish-removal quality remains.",
+      "category": "skin",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "rotate-image",
+      "source": "https://www.evoto.ai/features/rotate-image",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/geometry_commands.rs",
+        "ui/src/components/develop/MasksPanel.tsx"
+      ],
+      "limitation": "Existing geometry/masks/export sizing; learned selections require available models.",
+      "category": "geometry-mask",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "school-photography",
+      "source": "https://www.evoto.ai/features/school-photography",
+      "status": "use_case",
+      "implementation": [],
+      "limitation": "Photography use case, not a distinct algorithm. Requires representative-photo acceptance tests.",
+      "baseline_status": "use_case",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "shadow-maker",
+      "source": "https://www.evoto.ai/features/shadow-maker",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "shoes-editor",
+      "source": "https://www.evoto.ai/features/shoes-editor",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "sky-replacement",
+      "source": "https://www.evoto.ai/features/sky-replacement",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "smooth-hair",
+      "source": "https://www.evoto.ai/features/smooth-hair",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-app/src/advanced_retouch.rs"
+      ],
+      "limitation": "Existing selective texture, shine and localized cleanup. New hair generation and structural part editing absent.",
+      "category": "hair-clothing",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "soften-skin",
+      "source": "https://www.evoto.ai/features/soften-skin",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-render/src/retouch_tools.rs"
+      ],
+      "limitation": "Native face/body selections and manual repair; incomplete blemish-removal quality remains.",
+      "category": "skin",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "sports-photography",
+      "source": "https://www.evoto.ai/features/sports-photography",
+      "status": "use_case",
+      "implementation": [],
+      "limitation": "Photography use case, not a distinct algorithm. Requires representative-photo acceptance tests.",
+      "baseline_status": "use_case",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "stray-hair-remover",
+      "source": "https://www.evoto.ai/features/stray-hair-remover",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-app/src/advanced_retouch.rs"
+      ],
+      "limitation": "Existing selective texture, shine and localized cleanup. New hair generation and structural part editing absent.",
+      "category": "hair-clothing",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "tethering-shooting-software",
+      "source": "https://www.evoto.ai/features/tethering-shooting-software",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "transparent-background-maker",
+      "source": "https://www.evoto.ai/features/transparent-background-maker",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "unblur-image",
+      "source": "https://www.evoto.ai/features/unblur-image",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-generative/src",
+        "crates/aura-restore/src"
+      ],
+      "limitation": "Related interfaces/foundations exist. Provider/model execution and specific requested effect are not established by code presence.",
+      "category": "model-dependent",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "underwater-photography",
+      "source": "https://www.evoto.ai/features/underwater-photography",
+      "status": "use_case",
+      "implementation": [],
+      "limitation": "Photography use case, not a distinct algorithm. Requires representative-photo acceptance tests.",
+      "baseline_status": "use_case",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "video-ai-color-match",
+      "source": "https://www.evoto.ai/features/video-ai-color-match",
+      "status": "separate_product",
+      "implementation": [],
+      "limitation": "Separate Evoto Video capability; AURA has no equivalent video retouch pipeline.",
+      "baseline_status": "separate_product",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "video-blemish-remover",
+      "source": "https://www.evoto.ai/features/video-blemish-remover",
+      "status": "separate_product",
+      "implementation": [],
+      "limitation": "Separate Evoto Video capability; AURA has no equivalent video retouch pipeline.",
+      "baseline_status": "separate_product",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "video-face-editor",
+      "source": "https://www.evoto.ai/features/video-face-editor",
+      "status": "separate_product",
+      "implementation": [],
+      "limitation": "Separate Evoto Video capability; AURA has no equivalent video retouch pipeline.",
+      "baseline_status": "separate_product",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "video-portrait-retouching",
+      "source": "https://www.evoto.ai/features/video-portrait-retouching",
+      "status": "separate_product",
+      "implementation": [],
+      "limitation": "Separate Evoto Video capability; AURA has no equivalent video retouch pipeline.",
+      "baseline_status": "separate_product",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "vignette-effect",
+      "source": "https://www.evoto.ai/features/vignette-effect",
+      "status": "partial",
+      "implementation": [
+        "ui/src/components/develop/DevelopWorkspace.tsx",
+        "crates/aura-render/src/colour.rs"
+      ],
+      "limitation": "Existing grading and local adjustment workflows; no reference-quality parity established.",
+      "category": "color",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "vintage-filter",
+      "source": "https://www.evoto.ai/features/vintage-filter",
+      "status": "partial",
+      "implementation": [
+        "ui/src/components/develop/DevelopWorkspace.tsx",
+        "crates/aura-render/src/colour.rs"
+      ],
+      "limitation": "Existing grading and local adjustment workflows; no reference-quality parity established.",
+      "category": "color",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "watermark-photos",
+      "source": "https://www.evoto.ai/features/watermark-photos",
+      "status": "missing_or_unassessed",
+      "implementation": [],
+      "limitation": "No complete dedicated equivalent established in this audit.",
+      "baseline_status": "missing_or_unassessed",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "wedding-photography",
+      "source": "https://www.evoto.ai/features/wedding-photography",
+      "status": "use_case",
+      "implementation": [],
+      "limitation": "Photography use case, not a distinct algorithm. Requires representative-photo acceptance tests.",
+      "baseline_status": "use_case",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "white-background",
+      "source": "https://www.evoto.ai/features/white-background",
+      "status": "manual",
+      "implementation": [
+        "ui/src/components/develop/RetouchControls.tsx",
+        "crates/aura-render/src/retouch_color.rs"
+      ],
+      "limitation": "Chosen color inside a saved or painted selection; no new automatic region detection or commercial equivalence.",
+      "category": "explicit-color",
+      "baseline_status": "manual",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "white-hair-blackening",
+      "source": "https://www.evoto.ai/features/white-hair-blackening",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-app/src/advanced_retouch.rs"
+      ],
+      "limitation": "Existing selective texture, shine and localized cleanup. New hair generation and structural part editing absent.",
+      "category": "hair-clothing",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    },
+    {
+      "id": "wrinkle-remover-for-face",
+      "source": "https://www.evoto.ai/features/wrinkle-remover-for-face",
+      "status": "partial",
+      "implementation": [
+        "crates/aura-app/src/portrait_auto.rs",
+        "crates/aura-render/src/retouch_tools.rs"
+      ],
+      "limitation": "Native face/body selections and manual repair; incomplete blemish-removal quality remains.",
+      "category": "skin",
+      "baseline_status": "partial",
+      "baseline_date": "2026-10-11",
+      "verification": "Historical code inventory; not requalified by this change."
+    }
+  ],
+  "supplemental_features": [
+    {
+      "id": "clothing-chroma-moire",
+      "source": "https://support.evoto.ai/ai-lab/",
+      "status": "manual_partial",
+      "native_tool": "fabric_moire",
+      "limitation": "Preserves luminance weave while filtering chroma. No automatic garment detection or luminance moire reconstruction."
+    },
+    {
+      "id": "clothing-sweat-stain",
+      "source": "https://support.evoto.ai/clothing-accessories-adjustments-module/",
+      "status": "manual_partial",
+      "native_tool": "fabric_stain",
+      "limitation": "Requires a user-selected clean reference and repair mask. Changes broad ratios, not generated fabric or learned stain detection."
+    },
+    {
+      "id": "face-shadow-removal",
+      "source": "https://support.evoto.ai/ai-lab/",
+      "status": "manual_partial",
+      "native_tool": "shadow_balance",
+      "limitation": "Selected-surface exposure balancing only; automatic facial shadow classification and reconstruction remain absent."
+    },
+    {
+      "id": "liquify-background-repair",
+      "source": "https://support.evoto.ai/ai-lab/",
+      "status": "missing_or_unassessed",
+      "limitation": "No dedicated background reconstruction after reshape established."
+    },
+    {
+      "id": "grass-fill",
+      "source": "https://support.evoto.ai/ai-lab/",
+      "status": "missing_or_unassessed",
+      "limitation": "No dedicated lawn detection and generative repair established."
+    },
+    {
+      "id": "tool-search",
+      "source": "https://blog.evoto.ai/evoto-product-launch-2026/",
+      "status": "manual_partial",
+      "implementation": [
+        "ui/src/components/develop/RetouchToolPicker.tsx"
+      ],
+      "limitation": "Local keyword search of executable retouch tools. No conversational assistant or automatic command execution."
+    }
+  ],
+  "aura_additional_tools": [
+    {
+      "id": "zoom_blur",
+      "status": "implemented_manual",
+      "implementation": [
+        "crates/aura-render/src/retouch_optics.rs",
+        "ui/src/components/develop/RetouchOpticsControls.tsx"
+      ],
+      "evidence": "AURA-optical-and-colour-tools-2026-10-19.md",
+      "note": "Additional AURA capability; not counted as verified Evoto parity."
+    },
+    {
+      "id": "color_despill",
+      "status": "implemented_manual",
+      "implementation": [
+        "crates/aura-render/src/retouch_optics.rs",
+        "ui/src/components/develop/RetouchOpticsControls.tsx"
+      ],
+      "evidence": "AURA-optical-and-colour-tools-2026-10-19.md",
+      "note": "Additional AURA capability; not counted as verified Evoto parity."
+    },
+    {
+      "id": "highlight_compress",
+      "status": "implemented_manual",
+      "implementation": [
+        "crates/aura-render/src/retouch_optics.rs",
+        "ui/src/components/develop/RetouchOpticsControls.tsx"
+      ],
+      "evidence": "AURA-optical-and-colour-tools-2026-10-19.md",
+      "note": "Additional AURA capability; not counted as verified Evoto parity."
+    },
+    {
+      "id": "sampled-color-range",
+      "status": "implemented_manual",
+      "implementation": [
+        "crates/aura-render/src/retouch_color_range.rs",
+        "ui/src/components/develop/RetouchColorRangeControls.tsx"
+      ],
+      "evidence": "AURA-sampled-colour-tools-2026-10-19.md",
+      "note": "Additional AURA capability; not counted as verified Evoto parity."
+    },
+    {
+      "id": "color_saturation",
+      "status": "implemented_manual",
+      "implementation": [
+        "crates/aura-render/src/retouch_optics.rs",
+        "ui/src/components/develop/RetouchOpticsControls.tsx"
+      ],
+      "evidence": "AURA-sampled-colour-tools-2026-10-19.md",
+      "note": "Additional AURA capability; not counted as verified Evoto parity."
+    }
+  ]
+}

@@ -23,8 +23,50 @@ impl Transport for FakeTransport {
         if fail {
             self.failed.fetch_add(1, Ordering::Relaxed);
         }
+        let asked = String::from_utf8_lossy(&request.body).to_string();
+        // A service that is silent the first time it is asked, and one that stays silent.
+        let earlier = self
+            .calls
+            .lock()
+            .iter()
+            .filter(|call| call.method == "POST" && call.url == request.url)
+            .count();
+        if request.method == "POST"
+            && (request.url.contains("silent.example")
+                || (request.url.contains("slow-once.example") && earlier == 1))
+        {
+            return Err(aura_core::errors::cloud::unreachable(
+                "test",
+                "no answer".to_string(),
+            ));
+        }
+        let said = |text: &str| {
+            serde_json::to_vec(&serde_json::json!({"model":"vision-model","choices":[{"message":{"content":text},"finish_reason":"stop"}],"usage":{"prompt_tokens":100,"completion_tokens":4}})).unwrap()
+        };
+        // The check picture: most models read it, one cannot see, one is over its quota.
+        let busy = request.url.contains("busy.example") || asked.contains("\"a-vision\"");
+        if request.method == "POST" && !fail && (busy || asked.contains("left half")) {
+            return Ok(HttpResponse {
+                status: if busy { 429 } else { 200 },
+                headers: vec![],
+                body: if request.url.contains("blind.example") {
+                    said("Red and green.")
+                } else {
+                    said("Yellow, blue.")
+                },
+            });
+        }
         let body = if fail {
             b"secret-echo-that-must-not-escape".to_vec()
+        } else if request.method == "GET" && request.url.contains("two.example") {
+            serde_json::to_vec(&serde_json::json!({"data":[
+                {"id":"text-model","pricing":{"prompt":"0.000001","completion":"0.000002"}},
+                {"id":"a-vision","architecture":{"input_modalities":["text","image"]},"pricing":{"prompt":"0.000001","completion":"0.000002"}},
+                {"id":"b-vision","architecture":{"input_modalities":["text","image"]},"pricing":{"prompt":"0.000001","completion":"0.000002"}}]})).unwrap()
+        } else if request.method == "GET" && request.url.contains("integrate.api.nvidia.com") {
+            serde_json::to_vec(&serde_json::json!({"data":[{"id":"nvidia/text-model"},{"id":"meta/llama-3.2-90b-vision-instruct"},{"id":"meta/llama-3.2-11b-vision-instruct"}]})).unwrap()
+        } else if request.method == "GET" && request.url.contains("api.groq.com") {
+            serde_json::to_vec(&serde_json::json!({"data":[{"id":"openai/gpt-oss-120b"},{"id":"qwen/qwen3.8-27b"}]})).unwrap()
         } else if request.method == "GET"
             && request.url.contains("generativelanguage.googleapis.com")
         {
@@ -316,6 +358,111 @@ fn importing_stores_keys_separately_and_discovers_capabilities_and_prices() {
     );
 }
 #[test]
+fn a_photo_route_is_offered_only_after_it_read_the_check_picture() {
+    let keys = MemoryKeyStore::new();
+    let transport = FakeTransport::default();
+    let profiles = import(
+        "SEES_API_KEY=test-key-one\nSEES_BASE_URL=https://good.example/v1\nSEES_MODEL=vision-model\n\
+         BLIND_API_KEY=test-key-two\nBLIND_BASE_URL=https://blind.example/v1\nBLIND_MODEL=vision-model\n\
+         BUSY_API_KEY=test-key-three\nBUSY_BASE_URL=https://busy.example/v1\nBUSY_MODEL=vision-model",
+        &keys,
+        &transport,
+    )
+    .unwrap();
+    let status = |id: &str| profiles.iter().find(|p| p.id == id).unwrap();
+    assert!(status("SEES").available() && status("SEES").vision);
+    // Listed as image-capable and priced, and still not a route: it did not read the picture.
+    assert_eq!(status("BLIND").status, "check_image_not_read");
+    assert_eq!(status("BUSY").status, "check_http_429");
+    assert!(!status("BLIND").available() && !status("BUSY").available());
+    // The picture is generated here: every check carried the same small image and no photograph.
+    let calls = transport.calls.lock();
+    let checks: Vec<_> = calls.iter().filter(|c| c.method == "POST").collect();
+    assert_eq!(checks.len(), 3);
+    assert!(checks
+        .iter()
+        .all(|c| String::from_utf8_lossy(&c.body).contains("data:image/jpeg;base64,")));
+    assert!(saw_the_card("Yellow, then blue") && !saw_the_card("blue and yellow"));
+    assert!(!saw_the_card("I cannot see images"));
+}
+#[test]
+fn a_check_that_met_silence_is_tried_once_more_and_a_refusal_is_not() {
+    let keys = MemoryKeyStore::new();
+    let transport = FakeTransport::default();
+    let profiles = import(
+        "ONCE_API_KEY=test-key-one
+ONCE_BASE_URL=https://slow-once.example/v1
+ONCE_MODEL=vision-model
+         NEVER_API_KEY=test-key-two
+NEVER_BASE_URL=https://silent.example/v1
+NEVER_MODEL=vision-model
+         BUSY_API_KEY=test-key-three
+BUSY_BASE_URL=https://busy.example/v1
+BUSY_MODEL=vision-model",
+        &keys,
+        &transport,
+    )
+    .unwrap();
+    let route = |id: &str| profiles.iter().find(|p| p.id == id).unwrap();
+    assert!(route("ONCE").available());
+    assert_eq!(route("NEVER").status, "check_no_answer_in_time");
+    assert_eq!(route("BUSY").status, "check_http_429");
+    let asked = |host: &str| {
+        transport
+            .calls
+            .lock()
+            .iter()
+            .filter(|call| call.method == "POST" && call.url.contains(host))
+            .count()
+    };
+    assert_eq!(
+        (
+            asked("slow-once.example"),
+            asked("silent.example"),
+            asked("busy.example")
+        ),
+        (2, 2, 1)
+    );
+}
+#[test]
+fn the_first_alternative_that_reads_the_picture_becomes_the_photo_route() {
+    let keys = MemoryKeyStore::new();
+    let profiles = import(
+        "TWO_API_KEY=test-key-one\nTWO_BASE_URL=https://two.example/v1\nTWO_MODEL=text-model",
+        &keys,
+        &FakeTransport::default(),
+    )
+    .unwrap();
+    let text = profiles.iter().find(|p| p.id == "TWO").unwrap();
+    let photo = profiles.iter().find(|p| p.id == "TWO:vision").unwrap();
+    assert!(text.available() && !text.vision);
+    // `a-vision` sorts first and is over its quota; `b-vision` answered.
+    assert_eq!(photo.model, "b-vision");
+    assert!(photo.available() && photo.vision);
+    assert_eq!(profiles.len(), 2);
+}
+#[test]
+fn catalogues_that_omit_modalities_still_yield_their_documented_image_models() {
+    let keys = MemoryKeyStore::new();
+    let profiles = import(
+        "NIM_API_KEY=test-key-one\nNIM_BASE_URL=https://integrate.api.nvidia.com/v1\nNIM_MODEL=nvidia/text-model\n\
+         GROQ_API_KEY=test-key-two\nGROQ_BASE_URL=https://api.groq.com/openai/v1\nGROQ_MODEL=openai/gpt-oss-120b",
+        &keys,
+        &FakeTransport::default(),
+    )
+    .unwrap();
+    let route = |id: &str| profiles.iter().find(|p| p.id == id).unwrap();
+    // The smaller model is asked first: it answers in seconds where the larger timed out.
+    assert_eq!(
+        route("NIM:vision").model,
+        "meta/llama-3.2-11b-vision-instruct"
+    );
+    assert_eq!(route("GROQ:vision").model, "qwen/qwen3.8-27b");
+    assert!(route("NIM:vision").available() && route("GROQ:vision").available());
+    assert_eq!(route("GROQ:vision").input_usd_per_mtok, Some(0.80));
+    assert!(!route("GROQ").vision && !route("NIM").vision);
+}
+#[test]
 fn authentication_failure_uses_the_next_models_own_key_and_audit_identity() {
     let transport = Arc::new(FakeTransport::default());
     let audit = Arc::new(MemoryAudit::new());
@@ -453,6 +600,77 @@ fn fallback_is_bounded_to_three_routes_and_cancel_never_calls_a_provider() {
         )
         .is_err());
     assert_eq!(transport.calls.lock().len(), 3);
+}
+#[test]
+fn a_route_rests_for_as_long_as_its_failure_says() {
+    let note = |code: &str, pause: Option<u64>| {
+        serde_json::json!({ "errorCode": code, "retryAfterMs": pause }).to_string()
+    };
+    let rest = |code: &str, pause: Option<u64>| {
+        crate::gateway::rest_after_for_tests(Some(&note(code, pause)))
+    };
+    // No answer in time: the same a minute later.
+    assert_eq!(rest("AURA-CLOUD-6003", None), 600_000);
+    // A per-minute allowance says when it is free again, and that is when it is asked again.
+    assert_eq!(rest("AURA-CLOUD-6004", Some(18_100)), 18_100);
+    assert_eq!(rest("AURA-CLOUD-6004", Some(3_000)), 5_000);
+    // A daily allowance asks for hours; the day's import check will have dropped it by then.
+    assert_eq!(rest("AURA-CLOUD-6004", Some(40_000_000)), 600_000);
+    // The one or two seconds filled in when no pause was named are not a pause.
+    assert_eq!(rest("AURA-CLOUD-6004", Some(1_000)), 60_000);
+    // An answer that could not be used after the repair: the model will not learn in a minute.
+    assert_eq!(rest("AURA-CLOUD-6005", None), 600_000);
+    assert_eq!(rest("AURA-CLOUD-6002", None), 60_000);
+    assert_eq!(crate::gateway::rest_after_for_tests(None), 60_000);
+}
+#[test]
+fn a_provider_that_names_no_pause_rests_a_minute_and_is_then_asked_again() {
+    let transport = Arc::new(FakeTransport::default());
+    let clock = FixedClock::at(time::OffsetDateTime::UNIX_EPOCH);
+    let cloud = gateway(
+        &[
+            profile("BUSY", "busy.example", true),
+            profile("GOOD", "good.example", true),
+        ],
+        CloudPolicy::enabled(),
+        true,
+        transport.clone(),
+        Arc::new(MemoryAudit::new()),
+        clock.clone(),
+    );
+    let project = project();
+    let cancel = CancelToken::new();
+    let ask = |photo: &str| {
+        cloud
+            .run(
+                &Task { images: true },
+                &photo.to_string(),
+                &CallContext {
+                    project: &project,
+                    decision_ref: None,
+                    cancel: &cancel,
+                },
+            )
+            .unwrap()
+            .source
+    };
+    let to = |host: &str| {
+        transport
+            .calls
+            .lock()
+            .iter()
+            .filter(|call| call.url.contains(host))
+            .count()
+    };
+    assert_eq!(ask("one"), Source::Cloud);
+    assert_eq!((to("busy.example"), to("good.example")), (1, 1));
+    // Half a minute later it is still resting: the second photograph does not wait for it.
+    clock.advance_ms(30_000);
+    assert_eq!(ask("two"), Source::Cloud);
+    assert_eq!((to("busy.example"), to("good.example")), (1, 2));
+    clock.advance_ms(31_000);
+    assert_eq!(ask("three"), Source::Cloud);
+    assert_eq!((to("busy.example"), to("good.example")), (2, 3));
 }
 #[test]
 fn explicit_quality_feedback_changes_daily_order_but_not_within_the_same_day() {

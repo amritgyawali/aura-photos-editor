@@ -18,7 +18,7 @@ use aura_core::errors::raw::{corrupt, mosaic_unsupported, too_large};
 use aura_core::AuraResult;
 use rayon::prelude::*;
 
-use crate::codecs::{nikon, olympus, sony};
+use crate::codecs::{canon, crx, nikon, olympus, sony};
 use crate::losslessjpeg;
 use crate::meta::{MosaicRef, MosaicScheme};
 
@@ -63,6 +63,26 @@ pub fn decode(
     little: bool,
     max_pixels: u64,
 ) -> AuraResult<Mosaic> {
+    let plane = decode_sensor(bytes, mosaic, little, max_pixels)?;
+    Ok(crop_to_picture(plane, mosaic))
+}
+
+/// Decode the whole sensor, masked borders included, with any linearisation
+/// table applied - the plane a reference decoder calls the raw image.
+///
+/// [`decode`] is this followed by the crop to the picture; the two are separate
+/// so the masked border can be measured and so a decode can be compared with
+/// another decoder's sample for sample.
+///
+/// # Errors
+///
+/// The same as [`decode`].
+pub fn decode_sensor(
+    bytes: &[u8],
+    mosaic: &MosaicRef,
+    little: bool,
+    max_pixels: u64,
+) -> AuraResult<Mosaic> {
     let pixels = u64::from(mosaic.width) * u64::from(mosaic.height);
     if pixels == 0 {
         return Err(corrupt("mosaic declares a zero dimension"));
@@ -74,6 +94,40 @@ pub fn decode(
     let plane = match &mosaic.scheme {
         MosaicScheme::Packed => decode_packed(bytes, mosaic, little),
         MosaicScheme::LosslessJpeg => decode_lossless(bytes, mosaic),
+        MosaicScheme::SonyLossless => decode_sony_lossless(bytes, mosaic),
+        MosaicScheme::NikonPacked14 => decode_whole(bytes, mosaic, |payload, width, height| {
+            Ok(decode_nikon_packed14(payload, width, height))
+        }),
+        MosaicScheme::PackedWords => decode_packed_words(bytes, mosaic, little),
+        MosaicScheme::PackedLsb => decode_whole(bytes, mosaic, |payload, width, height| {
+            Ok(decode_packed_lsb(
+                payload,
+                mosaic.bits_per_sample,
+                width,
+                height,
+            ))
+        }),
+        MosaicScheme::Fuji(layout) => decode_whole(bytes, mosaic, |payload, _, _| {
+            crate::codecs::fuji::decode(payload, &layout.header, &layout.pattern, layout.bayer)
+        }),
+        MosaicScheme::Pana8(tags) => Ok(Mosaic {
+            width: mosaic.width,
+            height: mosaic.height,
+            data: crate::codecs::pana8::decode(
+                bytes,
+                tags,
+                mosaic.width as usize,
+                mosaic.height as usize,
+            ),
+        }),
+        MosaicScheme::Panasonic(params) => {
+            let params = *params;
+            decode_whole(bytes, mosaic, |payload, width, height| {
+                Ok(crate::codecs::panasonic::decode(
+                    payload, params, width, height,
+                ))
+            })
+        }
         MosaicScheme::Nikon(params) => decode_whole(bytes, mosaic, |strip, width, height| {
             nikon::decode(strip, params, width, height)
         }),
@@ -84,11 +138,36 @@ pub fn decode(
             })
         }
         MosaicScheme::Olympus => decode_whole(bytes, mosaic, olympus::decode),
+        MosaicScheme::Olympus14(params) => decode_whole(bytes, mosaic, |payload, width, height| {
+            crate::codecs::olympus14::decode(payload, params, width, height)
+        }),
+        MosaicScheme::CanonLossless { slices } => {
+            let slices = *slices;
+            decode_whole(bytes, mosaic, |strip, width, height| {
+                let frame = losslessjpeg::decode(strip)?;
+                Ok(canon::unslice(
+                    &frame.samples,
+                    slices,
+                    width as u32,
+                    height as u32,
+                ))
+            })
+        }
+        MosaicScheme::Crx(header) => decode_whole(bytes, mosaic, |frame, width, height| {
+            let plane = crx::decode(frame, header)?;
+            if plane.len() != width * height {
+                return Err(corrupt(format!(
+                    "crx frame decoded {} samples, the track declares {width}x{height}",
+                    plane.len()
+                )));
+            }
+            Ok(plane)
+        }),
         MosaicScheme::Unsupported(code) => Err(mosaic_unsupported(format!(
             "mosaic compression {code} is not implemented"
         ))),
     }?;
-    let mut plane = crop_to_picture(plane, mosaic);
+    let mut plane = plane;
     if let Some(table) = &mosaic.linearization {
         let last = table.last().copied().unwrap_or(0);
         plane.data.par_iter_mut().for_each(|code| {
@@ -342,6 +421,149 @@ fn decode_lossless_tiles(
                 return Err(corrupt("lossless tile is shorter than it declares"));
             };
             slot.copy_from_slice(line);
+        }
+    }
+    Ok(Mosaic {
+        width: mosaic.width,
+        height: mosaic.height,
+        data: plane,
+    })
+}
+
+/// Nikon's fourteen-bit uncompressed rows: seven bytes give four samples,
+/// least significant bit first, and every row is padded to sixteen bytes.
+fn decode_nikon_packed14(payload: &[u8], width: usize, height: usize) -> Vec<u16> {
+    let row_bytes = (width * 7 / 4).div_ceil(16) * 16;
+    let mut plane = vec![0u16; width * height];
+    plane
+        .par_chunks_mut(width.max(1))
+        .enumerate()
+        .for_each(|(row, out)| {
+            let line = payload
+                .get(row * row_bytes..(row + 1) * row_bytes)
+                .unwrap_or(&[]);
+            for (group, (source, target)) in line.chunks_exact(7).zip(out.chunks_mut(4)).enumerate()
+            {
+                if group * 4 + 3 >= width {
+                    break;
+                }
+                let b = |i: usize| u16::from(source.get(i).copied().unwrap_or(0));
+                let values = [
+                    ((b(1) & 0x3F) << 8) | b(0),
+                    ((b(3) & 0xF) << 10) | (b(2) << 2) | (b(1) >> 6),
+                    ((b(5) & 0x3) << 12) | (b(4) << 4) | (b(3) >> 4),
+                    (b(6) << 6) | (b(5) >> 2),
+                ];
+                for (slot, value) in target.iter_mut().zip(values) {
+                    *slot = value;
+                }
+            }
+        });
+    plane
+}
+
+/// Samples packed least significant bit first in one continuous stream.
+fn decode_packed_lsb(payload: &[u8], bits: u16, width: usize, height: usize) -> Vec<u16> {
+    let bits = u32::from(bits.clamp(1, 16));
+    let row_bits = width * bits as usize;
+    let mask = (1u32 << bits) - 1;
+    let mut plane = vec![0u16; width * height];
+    plane
+        .par_chunks_mut(width.max(1))
+        .enumerate()
+        .for_each(|(row, out)| {
+            let start = row * row_bits;
+            for (column, slot) in out.iter_mut().enumerate() {
+                let at = start + column * bits as usize;
+                let byte = at >> 3;
+                let mut word = 0u32;
+                for k in 0..4usize {
+                    word |= u32::from(payload.get(byte + k).copied().unwrap_or(0)) << (8 * k);
+                }
+                *slot = ((word >> (at & 7)) & mask) as u16;
+            }
+        });
+    plane
+}
+
+/// Twelve-bit samples inside 32-bit little-endian words: swap each word into
+/// byte order and the result is an ordinary most-significant-bit-first stream.
+fn decode_packed_words(bytes: &[u8], mosaic: &MosaicRef, little: bool) -> AuraResult<Mosaic> {
+    let (offset, length) = mosaic
+        .segments
+        .first()
+        .copied()
+        .ok_or_else(|| corrupt("mosaic declares no data segment"))?;
+    let payload = bytes
+        .get(offset..offset.saturating_add(length).min(bytes.len()))
+        .ok_or_else(|| corrupt("mosaic data offset is outside the file"))?;
+    let mut swapped = Vec::with_capacity(payload.len() + 4);
+    for word in payload.chunks(4) {
+        let mut quad = [0u8; 4];
+        for (slot, byte) in quad.iter_mut().zip(word) {
+            *slot = *byte;
+        }
+        quad.reverse();
+        swapped.extend_from_slice(&quad);
+    }
+    let local = MosaicRef {
+        segments: vec![(0, swapped.len())],
+        rows_per_strip: mosaic.height,
+        scheme: MosaicScheme::Packed,
+        ..mosaic.clone()
+    };
+    decode_packed(&swapped, &local, little)
+}
+
+/// Sony's lossless ARW: tiles of lossless JPEG with four components, where
+/// sample `k` of frame pixel `(jx, jy)` is photosite `(2jx + k % 2, 2jy + k / 2)`
+/// of the tile. Tiles are independent, so they decode in parallel.
+fn decode_sony_lossless(bytes: &[u8], mosaic: &MosaicRef) -> AuraResult<Mosaic> {
+    let (width, height) = (mosaic.width as usize, mosaic.height as usize);
+    let (tile_width, tile_length) = mosaic
+        .tile
+        .map_or((width, height), |(w, h)| (w as usize, h as usize));
+    let across = width.div_ceil(tile_width.max(1));
+    let frames: Vec<AuraResult<losslessjpeg::LosslessImage>> = mosaic
+        .segments
+        .par_iter()
+        .map(|(offset, length)| {
+            let end = offset.saturating_add(*length).min(bytes.len());
+            let tile = bytes
+                .get(*offset..end)
+                .ok_or_else(|| corrupt("mosaic tile offset is outside the file"))?;
+            losslessjpeg::decode(tile)
+        })
+        .collect();
+    let mut plane = vec![0u16; width * height];
+    for (index, frame) in frames.into_iter().enumerate() {
+        let frame = frame?;
+        let components = frame.components.max(1);
+        let frame_width = frame.width as usize / components;
+        let (x0, y0) = (
+            (index % across) * tile_width,
+            (index / across) * tile_length,
+        );
+        for jy in 0..frame.height as usize {
+            let row = y0 + 2 * jy;
+            if row + 1 >= height {
+                break;
+            }
+            for jx in 0..frame_width {
+                let column = x0 + 2 * jx;
+                if column + 1 >= width {
+                    break;
+                }
+                let base = (jy * frame_width + jx) * components;
+                for k in 0..4usize.min(components) {
+                    let target = (row + k / 2) * width + column + k % 2;
+                    if let (Some(slot), Some(value)) =
+                        (plane.get_mut(target), frame.samples.get(base + k))
+                    {
+                        *slot = *value;
+                    }
+                }
+            }
         }
     }
     Ok(Mosaic {

@@ -36,6 +36,7 @@
 )]
 
 pub mod measure;
+pub mod quality;
 
 use crate::{
     commands::IpcResult,
@@ -61,7 +62,7 @@ use std::collections::BTreeMap;
 /// Where the run's report is stored in the recipe.
 pub const KEY: &str = "studio_advanced_retouch_v1";
 /// The planner version written into the report; bump on any behavioural change.
-pub const VERSION: &str = "auto-advanced-v1";
+pub const VERSION: &str = "auto-advanced-v4-revision-bound-qc";
 /// Below this share of fine skin texture kept, quality control softens the skin steps.
 pub const TEXTURE_FLOOR: f32 = 0.6;
 /// Above this skin chromaticity shift, quality control halves the skin colour steps.
@@ -174,6 +175,10 @@ impl Stage {
 #[must_use]
 pub fn stage_of(edit: &Edit) -> Option<Stage> {
     portrait_auto::group_of(&edit.id)?;
+    // Purple fringes are cleaned off the frame with the dust, before any skin is touched.
+    if edit.id == smart_edit::DEFRINGE_ID {
+        return Some(Stage::Background);
+    }
     if edit.id.starts_with(SCENE_PREFIX) {
         return Some(Stage::BackgroundToning);
     }
@@ -195,7 +200,7 @@ pub fn stage_of(edit: &Edit) -> Option<Stage> {
         "tone" | "body-tone" | "body-match" | "colour" | "body-redness" => Some(Stage::SkinColour),
         "teeth" => Some(Stage::EyesLipsTeeth),
         "fabric" => Some(Stage::Clothing),
-        "background-tone" => Some(Stage::BackgroundToning),
+        "background-tone" | "background-lift" => Some(Stage::BackgroundToning),
         n if n.starts_with("dust-") => Some(Stage::Background),
         n if n.starts_with("hair-") || n.starts_with("stray-") => Some(Stage::Hair),
         n if n.starts_with("spot") => Some(Stage::SkinCleanup),
@@ -215,10 +220,121 @@ pub fn stage_of(edit: &Edit) -> Option<Stage> {
     };
     by_name.or(Some(match edit.tool {
         // These tools are explicit manual edits and must never be planned as automatic retouch.
-        Tool::Colorize | Tool::BackgroundColor | Tool::Reshape => return None,
-        Tool::AutoBlemish | Tool::PatchHeal | Tool::FrequencyHeal | Tool::AcneClear => {
-            Stage::SkinCleanup
-        }
+        // So are the material, optical and colour finishing tools (ADR-0127..0129) and the selected
+        // effects (ADR-0131): a photographer places every one of them.
+        Tool::Colorize
+        | Tool::BackgroundColor
+        | Tool::Reshape
+        | Tool::FabricMoire
+        | Tool::FabricStain
+        | Tool::ShadowBalance
+        | Tool::BackgroundBlur
+        | Tool::HighlightGlow
+        | Tool::MotionBlur
+        | Tool::ZoomBlur
+        | Tool::ColorDespill
+        | Tool::HighlightCompress
+        | Tool::ColorSaturation
+        | Tool::LiquifyPush
+        | Tool::LiquifyBloat
+        | Tool::LiquifyPucker
+        | Tool::LiquifyTwirl
+        | Tool::SpinBlur
+        | Tool::Pixelate
+        | Tool::PrivacyBlur
+        | Tool::SoftFocus
+        | Tool::OrtonGlow
+        | Tool::LocalSharpen
+        | Tool::LocalDenoise
+        | Tool::HueShift
+        | Tool::InvertColors
+        | Tool::ChromaKey
+        | Tool::VeinReduce
+        | Tool::ColorUnify
+        | Tool::LightLeak
+        | Tool::Glitch
+        | Tool::Haze
+        | Tool::Starburst
+        | Tool::LocalWhiteBalance
+        | Tool::Catchlight
+        | Tool::EyeGlowFix
+        | Tool::LipGloss
+        | Tool::Freckles
+        | Tool::FloorReflection
+        | Tool::DropShadow
+        | Tool::Halation
+        | Tool::DustScratches
+        | Tool::JpegCleanup
+        | Tool::Deband
+        | Tool::AutoLevels
+        | Tool::AutoNeutral
+        | Tool::FlattenLight
+        | Tool::HdrDetail
+        | Tool::BokehHighlights
+        | Tool::TiltShift
+        | Tool::Duotone
+        | Tool::Posterize
+        | Tool::Halftone
+        | Tool::PencilSketch
+        | Tool::OilPaint
+        | Tool::CrossProcess
+        | Tool::Infrared
+        | Tool::MirrorSymmetry
+        | Tool::LensFlare
+        | Tool::GodRays
+        | Tool::Weather
+        | Tool::SplitTone
+        | Tool::FilmFade
+        | Tool::BleachBypass
+        | Tool::TealOrange
+        | Tool::ColourSplash
+        | Tool::SkyBlue
+        | Tool::Spotlight
+        | Tool::RimLight
+        | Tool::ChromaticAberration
+        | Tool::Fisheye
+        | Tool::AnamorphicStreak
+        | Tool::Kaleidoscope
+        | Tool::Watercolor
+        | Tool::StainedGlass
+        | Tool::Cartoon
+        | Tool::NeonEdges
+        | Tool::Thermal
+        | Tool::ClippedHighlightRepair
+        | Tool::LocalDehaze
+        | Tool::LimbalRing
+        | Tool::LashDarken
+        | Tool::HairFill
+        | Tool::MatchGrain
+        | Tool::ChannelSwap
+        | Tool::SunsetGlow
+        | Tool::DayToNight
+        | Tool::Lomo
+        | Tool::InstantFilm
+        | Tool::PopArt
+        | Tool::IrisBlur
+        | Tool::EchoDouble
+        | Tool::Ripple
+        | Tool::FrostedGlass
+        | Tool::PixelSort
+        | Tool::VhsRetro
+        | Tool::Emboss
+        | Tool::Crosshatch
+        | Tool::Sparkle
+        | Tool::FairyLights
+        | Tool::RainbowPrism
+        | Tool::BodyHairSoften
+        | Tool::Cellulite
+        | Tool::TanLine
+        | Tool::HandRejuvenate
+        | Tool::KnuckleEven
+        | Tool::LensReflection
+        | Tool::ShadowRemove => return None,
+        Tool::AutoBlemish
+        | Tool::PatchHeal
+        | Tool::FrequencyHeal
+        | Tool::AcneClear
+        | Tool::StretchMarks => Stage::SkinCleanup,
         Tool::SkinSmooth | Tool::Frequency | Tool::Wrinkle | Tool::TextureGraft => {
             Stage::FrequencySeparation
         }
@@ -231,7 +347,7 @@ pub fn stage_of(edit: &Edit) -> Option<Stage> {
         }
         Tool::Fabric => Stage::Clothing,
         Tool::Glare => Stage::Jewellery,
-        Tool::Backdrop | Tool::Heal | Tool::Clone => Stage::Background,
+        Tool::Backdrop | Tool::Heal | Tool::Clone | Tool::Defringe => Stage::Background,
         Tool::PortraitDodgeBurn | Tool::Mattify | Tool::Dodge | Tool::Burn => {
             Stage::MediumDodgeBurn
         }
@@ -324,10 +440,77 @@ pub struct QualityReport {
     pub clipped_final: Option<f32>,
     /// Larger over smaller change between the two halves of each face (1 is balanced).
     pub mirror_balance: Option<f32>,
-    /// True when every measurement is within its limit.
+    /// Actual QC render dimensions. These checks do not attest full-resolution export.
+    #[serde(default)]
+    pub analysis_width: usize,
+    #[serde(default)]
+    pub analysis_height: usize,
+    #[serde(default)]
+    pub contours: Vec<quality::ContourReading>,
+    #[serde(default)]
+    pub incomplete_reasons: Vec<String>,
+    /// `measured`, `incomplete`, or `not_measured`; old reports default to unmeasured.
+    #[serde(default)]
+    pub measurement_status: String,
+    /// True only when all required measurements were available and within their limits.
     pub passed: bool,
     /// True when quality control softened a stage and measured again.
     pub corrected: bool,
+}
+
+impl QualityReport {
+    fn finish(&mut self, expected_faces: usize) {
+        self.incomplete_reasons.clear();
+        let valid = |v: Option<f32>| v.is_some_and(f32::is_finite);
+        for (available, reason) in [
+            (
+                self.analysis_width > 0 && self.analysis_height > 0,
+                "No QC render dimensions recorded.",
+            ),
+            (
+                valid(self.texture_retention),
+                "Fine skin texture was not measured.",
+            ),
+            (
+                valid(self.skin_shift),
+                "Skin colour drift was not measured.",
+            ),
+            (
+                valid(self.clipped_original) && valid(self.clipped_final),
+                "Clipping was not measured.",
+            ),
+            (
+                expected_faces > 0
+                    && self.contours.len() == expected_faces
+                    && self
+                        .contours
+                        .iter()
+                        .enumerate()
+                        .all(|(i, c)| c.face == i && c.complete()),
+                "Contour checks did not cover every face and local feature region.",
+            ),
+        ] {
+            if !available {
+                self.incomplete_reasons.push(reason.into());
+            }
+        }
+        self.measurement_status = if self.analysis_width == 0 {
+            "not_measured"
+        } else if self.incomplete_reasons.is_empty() {
+            "measured"
+        } else {
+            "incomplete"
+        }
+        .into();
+        self.passed = self.incomplete_reasons.is_empty()
+            && self.texture_retention.is_some_and(|v| v >= TEXTURE_FLOOR)
+            && self.skin_shift.is_some_and(|v| v <= SKIN_SHIFT_CEILING)
+            && self
+                .clipped_original
+                .zip(self.clipped_final)
+                .is_some_and(|(a, b)| b <= a + 0.005)
+            && self.contours.iter().all(|c| !c.needs_review());
+    }
 }
 
 /// The whole run.
@@ -341,6 +524,27 @@ pub struct Report {
     /// History entries this run added.
     pub history_steps: usize,
     pub summary: String,
+    /// Recipe parameters checked by this run, without this report or edit provenance.
+    /// The UI compares the snapshot structurally at recipe canonical precision.
+    #[serde(default)]
+    pub checked_recipe: Option<String>,
+    #[serde(default)]
+    pub checked_photo_id: Option<String>,
+}
+
+fn checked_recipe(recipe: &Recipe) -> AuraResult<String> {
+    let mut parameters = recipe.clone();
+    parameters.extra.remove(KEY);
+    let canonical = aura_recipe::canonical(&parameters)?;
+    let mut value: serde_json::Value = serde_json::from_str(&canonical)
+        .map_err(|e| aura_core::errors::render::recipe_invalid(KEY, &e.to_string()))?;
+    if let Some(object) = value.as_object_mut() {
+        object.remove("provenance");
+    }
+    // Keep the snapshot opaque to schema::merge: flattening nested objects drops
+    // empty maps/arrays that are meaningful to structural recipe comparison.
+    serde_json::to_string(&value)
+        .map_err(|e| aura_core::errors::render::recipe_invalid(KEY, &e.to_string()))
 }
 
 /// Progress of a running pass, one event before and one after each stage.
@@ -365,6 +569,10 @@ pub struct AdvancedRetouchInput {
     /// The retouch choices; absent uses [`options`], the workflow's own defaults.
     #[serde(default)]
     pub options: Option<Options>,
+    /// A named starting point when `options` is absent: `beauty_fashion` is
+    /// [`beauty_fashion_options`]. Anything else, or nothing, is [`options`].
+    #[serde(default)]
+    pub preset: Option<String>,
 }
 
 /// The finished recipe and the stage-by-stage report.
@@ -430,6 +638,34 @@ pub fn options() -> Options {
     }
 }
 
+/// Evoto's "Beauty & Fashion" pass, as its homepage before/after shows it (ADR-0109): the
+/// high-end skin work of [`options`], with clothing creases softened, stray hairs faded against
+/// the backdrop, and a plain grey studio backdrop lifted neutrally to a clean bright grey - all in
+/// one automatic run, face and body. Identity rules are unchanged: moles, freckles and skin tone
+/// are kept.
+#[must_use]
+pub fn beauty_fashion_options() -> Options {
+    let mut o = options();
+    o.scope = Scope::FaceAndBody;
+    o.settings.fabric = 0.5;
+    o.settings.backdrop = 0.5;
+    o.settings.backdrop_lift = 1.0;
+    o.settings.hair_detail = 0.3;
+    o.settings.hair_shine = 0.2;
+    o
+}
+
+/// The options a request resolves to.
+#[must_use]
+pub fn resolve_options(input: &AdvancedRetouchInput) -> Options {
+    input
+        .options
+        .unwrap_or_else(|| match input.preset.as_deref() {
+            Some("beauty_fashion") => beauty_fashion_options(),
+            _ => options(),
+        })
+}
+
 /// Everything decided before anything is saved.
 #[derive(Debug, Clone)]
 pub struct Planned {
@@ -453,7 +689,7 @@ fn report_mut(reports: &mut [StageReport], stage: Stage) -> Option<&mut StageRep
     reports.iter_mut().find(|r| r.stage == stage)
 }
 
-fn base_edit(id: String, tool: Tool, region: [f32; 4], amount: f32) -> Edit {
+pub(crate) fn base_edit(id: String, tool: Tool, region: [f32; 4], amount: f32) -> Edit {
     Edit {
         id,
         tool,
@@ -475,6 +711,7 @@ fn base_edit(id: String, tool: Tool, region: [f32; 4], amount: f32) -> Edit {
         target_color: None,
         sensitivity: None,
         keep_dark_marks: false,
+        mole_edge: None,
         tone: 0.5,
         warmth: 0.0,
         tint: 0.0,
@@ -520,10 +757,13 @@ pub fn plan(
         .unwrap_or(thumb);
 
     // ---- 1. RAW foundation -----------------------------------------------------------------
+    // The same guards, in the same order, as Auto enhance: one answer to how this frame's
+    // light should be read, whichever button asked.
     let mut tone = crate::photo_enhance::correction(rgb)?;
-    let (capped, note) = smart_edit::face_exposure_cap(tone.0, &thumb, &faces);
-    tone.0 = capped;
-    let note = note.or_else(|| smart_edit::respect_intent(&mut tone, &thumb, &faces));
+    if smart_edit::veiled(&thumb, &faces) {
+        tone = (0.0, 0, 0, 0);
+    }
+    let note = smart_edit::guard_tone(&mut tone, &thumb, &faces);
     let exposure = smart_edit::effective_exposure(base, tone.0, true);
     let mut global = smart_edit::analyse(&px, frame, &faces, exposure);
     if let Some(r) = report_mut(&mut reports, Stage::Foundation) {
@@ -551,6 +791,8 @@ pub fn plan(
                         && !d.starts_with("Clarity")
                         && !d.starts_with("Sharpening")
                         && !d.starts_with("Sky")
+                        && !d.starts_with("Colour fringing")
+                        && !d.starts_with("Purple fringes")
                 })
                 .cloned(),
         );
@@ -652,10 +894,20 @@ pub fn plan(
             )),
             Tilt::Unsure(why) => r.checks.push(format!("Horizon left as shot: {why}.")),
         }
+        // Colour fringing is measured from the photograph's own edges, not looked up: the
+        // misregistration of the three channels is in the pixels. ADR-0125.
+        let has_scales = base.lens.coefficients.is_some_and(|c| {
+            (c.ca_red - 1.0).abs() >= f32::EPSILON || (c.ca_blue - 1.0).abs() >= f32::EPSILON
+        });
+        if has_scales {
+            r.checks.push("Colour fringing: this photograph already carries chromatic scales; they are kept as set.".into());
+        } else if let Some(found) = &global.fringing {
+            r.checks.push(found.sentence());
+        }
         r.checks.push(if base.lens.coefficients.is_some() {
             "Lens: this photograph already carries lens coefficients; they are kept as set.".into()
         } else {
-            "Lens: no measured profile for this lens, so distortion, vignetting and chromatic aberration are left as shot rather than guessed.".into()
+            "Lens: no measured profile for this lens, so distortion and vignetting are left as shot rather than guessed.".into()
         });
         r.checks.push("Structure: correct photographic distortion, never redesign the person - this workflow has no liquify and reshapes no face or body.".into());
     }
@@ -744,6 +996,13 @@ pub fn plan(
             _ => r.checks.push(format!("Dust search skipped: {no_person}")),
         }
         r.checks.push("Distracting objects and people are never removed automatically: what belongs to the story is a person's decision.".into());
+        if let Some(op) = global.defringe.take() {
+            r.changes.push("Purple fringes on the dark side of bright edges given the colour of their surroundings; purple things and coloured lights kept.".into());
+            stages.entry(Stage::Background).or_default().push(op);
+        } else if frame.is_some() {
+            r.checks
+                .push("Purple fringes: none to correct along the bright edges.".into());
+        }
     }
 
     // 4. Hair: silhouette strays, then the hair's own detail and shine.
@@ -915,7 +1174,9 @@ pub fn plan(
                         .take(n)
                         .enumerate()
                         .map(|(k, s)| {
-                            let mut e = base_edit(format!("{PREFIX}jewel-{k}"), Tool::Glare, s.region, 0.5);
+                            // The reflection tool removes this share of the excess over the surface around it:
+                            // a quarter takes a burnt-out highlight down by about a sixth.
+                            let mut e = base_edit(format!("{PREFIX}jewel-{k}"), Tool::Glare, s.region, 0.25);
                             e.feather = 0.6;
                             e
                         })
@@ -946,7 +1207,70 @@ pub fn plan(
             (Some(bg), true) => {
                 let away = portrait_auto::erode(bg, (bg.width.max(bg.height) / 25).max(3));
                 let plane = measure::matte_plane(&away, pw, ph);
+                // A plain studio backdrop lifted to a clean bright grey (ADR-0109). When it is,
+                // the backdrop is a high-key look by choice and is not also lowered.
+                let lift = (options.settings.backdrop_lift > 0.0)
+                    .then(|| {
+                        measure::backdrop_lift(
+                            &px,
+                            &plane,
+                            exposure.exp2(),
+                            options.settings.backdrop_lift,
+                        )
+                    })
+                    .flatten();
+                let lifted = match lift {
+                    Some(l) if l.gain > 1.02 && room(&stages) > 0 => {
+                        let id = format!("{PREFIX}background-lift");
+                        if let Some(m) = encode_matte(&away) {
+                            mattes.insert(id.clone(), m);
+                            let [l0, tp, rt, b] = away.bounds;
+                            let mut e = base_edit(
+                                id.clone(),
+                                Tool::Dodge,
+                                [
+                                    (l0 + rt) * 0.5,
+                                    (tp + b) * 0.5,
+                                    (rt - l0) * 0.71,
+                                    (b - tp) * 0.71,
+                                ],
+                                measure::dodge_amount(l.gain),
+                            );
+                            e.feather = 0.0;
+                            e.matte = Some(id);
+                            stages.entry(Stage::BackgroundToning).or_default().push(e);
+                            r.changes.push(format!(
+                                "Plain studio backdrop lifted from {:.0}% to a clean bright grey (+{:.2} EV, the same on every channel so it stays neutral, its fall-off kept).",
+                                l.background * 100.0,
+                                l.gain.log2()
+                            ));
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    Some(l) if l.texture > measure::PLAIN_TEXTURE => {
+                        r.checks.push("Backdrop lift: the background is a scene, not plain studio paper, so its light is kept.".into());
+                        false
+                    }
+                    Some(l) if l.chroma > measure::NEUTRAL_CHROMA => {
+                        r.checks.push("Backdrop lift: a coloured backdrop keeps its depth of colour, so it is not lifted.".into());
+                        false
+                    }
+                    Some(l) if l.background < measure::LOW_KEY => {
+                        r.checks.push(format!("Backdrop lift: a dark ({:.0}%) backdrop is a low-key look, so it is kept.", l.background * 100.0));
+                        false
+                    }
+                    Some(_) => {
+                        r.checks.push(
+                            "Backdrop lift: the backdrop is already bright and clean.".into(),
+                        );
+                        false
+                    }
+                    None => false,
+                };
                 match measure::background_tone(&px, &plane, &face_plane) {
+                    _ if lifted => {}
                     Some(t) if t.reduction > 0.0 && room(&stages) > 0 => {
                         let id = format!("{PREFIX}background-tone");
                         if let Some(m) = encode_matte(&away) {
@@ -1017,6 +1341,23 @@ pub fn plan(
                 }
             }
             aid.get_or_insert(Vec::new()).push((index, reading));
+        }
+    }
+
+    // Additional sculpting must obey the same persistent portrait policy as
+    // the ordinary automatic planner. Background toning is a scene adjustment.
+    if !portrait_auto::finish_policy::advanced_allowed(&faces, &options.settings) {
+        for (stage, edits) in &mut stages {
+            if *stage == Stage::BackgroundToning {
+                continue;
+            }
+            let before = edits.len();
+            edits.retain(|e| !portrait_auto::finish_policy::is_advanced(e.tool));
+            if before != edits.len() {
+                if let Some(r) = report_mut(&mut reports, *stage) {
+                    r.checks.push("Portrait-only policy: frequency separation and dodge/burn require one confident subject; this stage was left unchanged.".into());
+                }
+            }
         }
     }
 
@@ -1203,7 +1544,7 @@ pub fn plan(
         r.checks.push("Sharpened last, after every retouch, so the retouch is never sharpened into artefacts; export adds output sharpening for screen or print on top.".into());
     }
     if let Some(r) = report_mut(&mut reports, Stage::QualityControl) {
-        r.checks.push("Inspected after saving: overall (25%): clipping and tonal range; consistency (50%): skin colour drift; retouch quality (100%): fine skin texture kept; the mirror: whether one half of a face was changed more than the other.".into());
+        r.checks.push("Screen-resolution QC measures clipping, skin colour drift, fine-band texture, per-face contour changes and the change on each half of a face. Full-resolution export appearance still needs separate inspection.".into());
     }
 
     for r in &mut reports {
@@ -1245,6 +1586,9 @@ fn apply_globals(stage: Stage, recipe: &mut Recipe, planned: &Planned) {
             }
             g.whites = plan.whites;
             g.blacks = plan.blacks;
+            if let Some(points) = plan.levels {
+                crate::smart_edit::set_levels(g, points);
+            }
             g.dehaze = plan.dehaze;
             if let Some((luminance, colour)) = plan.noise {
                 g.noise.luminance = luminance;
@@ -1256,6 +1600,9 @@ fn apply_globals(stage: Stage, recipe: &mut Recipe, planned: &Planned) {
             if let Some((rotate, crop)) = planned.level {
                 recipe.geometry.rotate = rotate;
                 recipe.geometry.crop = crop;
+            }
+            if let Some(global) = &planned.global {
+                crate::smart_edit::apply_fringing(recipe, global);
             }
         }
         Stage::ColourGrade => {
@@ -1329,6 +1676,23 @@ fn describe_globals(stage: Stage, before: &Recipe, after: &Recipe) -> Vec<String
             {
                 out.push("Cropped just enough to hide the corners the rotation opened.".into());
             }
+            let scales = |r: &Recipe| {
+                r.lens
+                    .coefficients
+                    .filter(|_| r.lens.ca)
+                    .map_or([1.0, 1.0], |c| [c.ca_red, c.ca_blue])
+            };
+            let (was, now) = (scales(before), scales(after));
+            if was
+                .iter()
+                .zip(now)
+                .any(|(x, y)| (x - y).abs() > f32::EPSILON)
+            {
+                out.push(format!(
+                    "Colour fringing corrected: red scaled {:.4}, blue {:.4} against green, from the photograph's own edges.",
+                    now[0], now[1]
+                ));
+            }
         }
         Stage::ColourGrade => {
             for (name, x, y) in [
@@ -1367,12 +1731,55 @@ fn changed(a: &Recipe, b: &Recipe) -> AuraResult<bool> {
     Ok(aura_recipe::recipe_hash(&a)? != aura_recipe::recipe_hash(b)?)
 }
 
+/// The box quality control renders into, unless a face needs more pixels to be checked.
+const QC_SIZE: RenderLevel = RenderLevel::Screen(1600, 1200);
+/// The longest screen render: anything larger is drawn from the 2048 px preview and so adds
+/// no detail; past it only the full-resolution render has more pixels.
+const QC_PREVIEW_EDGE: f32 = 2048.0;
+/// Eye-to-eye distance, in QC pixels, a face is rendered up to: the contour check needs 20.
+const QC_FACE_IOD: f32 = 24.0;
+
+/// The render at which every retouched face is large enough for its contours to be checked.
+/// A guest seated across a stage is retouched like the person at the lectern, so a face too
+/// small at `QC_SIZE` is not a reason to leave it unchecked: the render grows until the
+/// smallest face reaches `QC_FACE_IOD`, through a larger screen box to the full resolution an
+/// export is made at. `w` and `h` are the dimensions of the render at `QC_SIZE`.
+fn qc_level(faces: &[PortraitFace], w: usize, h: usize) -> RenderLevel {
+    let smallest = faces
+        .iter()
+        .map(|f| {
+            let [a, b] = [f.landmarks[0], f.landmarks[1]];
+            ((a[0] - b[0]) * w as f32).hypot((a[1] - b[1]) * h as f32)
+        })
+        .filter(|iod| iod.is_finite() && *iod > 0.0)
+        .reduce(f32::min);
+    let Some(smallest) = smallest.filter(|iod| *iod < QC_FACE_IOD) else {
+        return QC_SIZE;
+    };
+    let edge = w.max(h) as f32 * QC_FACE_IOD / smallest;
+    if edge > QC_PREVIEW_EDGE {
+        return RenderLevel::Full;
+    }
+    let edge = edge.ceil() as u32;
+    RenderLevel::Screen(edge, edge)
+}
+
 /// Pixels of a recipe at screen size with crop, rotation, grain, vignette and sharpening
 /// switched off, so two renders line up pixel for pixel and only the retouch differs.
-fn qc_render(
+pub(crate) fn qc_render(
     state: &AppState,
     photo: PhotoId,
     recipe: &Recipe,
+) -> AuraResult<(Vec<u8>, usize, usize)> {
+    qc_render_at(state, photo, recipe, QC_SIZE)
+}
+
+/// `qc_render` at a level of the caller's choosing.
+fn qc_render_at(
+    state: &AppState,
+    photo: PhotoId,
+    recipe: &Recipe,
+    level: RenderLevel,
 ) -> AuraResult<(Vec<u8>, usize, usize)> {
     let mut recipe = recipe.clone();
     recipe.geometry = aura_recipe::Geometry::default();
@@ -1381,7 +1788,7 @@ fn qc_render(
     let result = state.render()?.render(aura_render::RenderRequest {
         image_id: photo,
         recipe,
-        level: RenderLevel::Screen(1600, 1200),
+        level,
         // Measured, so nothing may be skipped.
         purpose: aura_render::RenderPurpose::Analysis,
         output: aura_render::OutputSpec {
@@ -1447,7 +1854,7 @@ pub fn run(
         .as_ref()
         .and_then(|p| p.as_srgb8().map(|pixels| (pixels, p.width, p.height)));
     let base = crate::develop_commands::load_or_neutral(state, photo)?;
-    let options = input.options.unwrap_or_else(options);
+    let options = resolve_options(input);
     let faces = if std::env::var_os("AURA_DISABLE_AUTO_PORTRAIT").is_some_and(|v| v == "1") {
         Vec::new()
     } else {
@@ -1603,15 +2010,32 @@ pub fn run(
     let mut quality = QualityReport::default();
     let mut qc_notes = Vec::new();
     let mut qc_changes = Vec::new();
-    let renders = qc_render(state, photo, &base).and_then(|original| {
+    let renders = qc_render(state, photo, &base).and_then(|first| {
+        let size = qc_level(&planned.faces, first.1, first.2);
+        let original = if size == QC_SIZE {
+            first
+        } else {
+            qc_render_at(state, photo, &base, size)?
+        };
         Ok((
             original,
-            qc_render(state, photo, &foundation)?,
-            qc_render(state, photo, &current)?,
+            qc_render_at(state, photo, &foundation, size)?,
+            qc_render_at(state, photo, &current, size)?,
+            size,
         ))
     });
     match renders {
-        Ok(((original, ow, oh), (before, w, h), (after, aw, ah))) => {
+        Ok(((original, ow, oh), (before, w, h), (after, aw, ah), size)) => {
+            quality.analysis_width = w;
+            quality.analysis_height = h;
+            let contours = |pixels: &[u8]| {
+                planned
+                    .faces
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, face)| quality::contour(&before, pixels, w, h, face, i))
+                    .collect::<Vec<_>>()
+            };
             let skin = {
                 let mut plane = vec![0.0_f32; w * h];
                 for person in &planned.people {
@@ -1636,6 +2060,7 @@ pub fn run(
                 )
             };
             let (retention, shift) = measure_after(&after);
+            let initial_contours = contours(&after);
             let soft = retention.is_some_and(|r| r < TEXTURE_FLOOR);
             let moved = shift.is_some_and(|(s, _)| s > SKIN_SHIFT_CEILING);
             let mut final_pixels = after;
@@ -1666,23 +2091,44 @@ pub fn run(
                     &corrected,
                     &all_mattes(&current, &planned)?,
                 )?;
-                if let Ok((pixels, rw, rh)) = qc_render(state, photo, &proposal) {
+                if let Ok((pixels, rw, rh)) = qc_render_at(state, photo, &proposal, size) {
                     if (rw, rh) == (w, h) {
                         let (r2, s2) = measure_after(&pixels);
-                        qc_changes.push(format!(
+                        let candidate_contours = contours(&pixels);
+                        let contours_safe = candidate_contours.len() == initial_contours.len()
+                            && candidate_contours
+                                .iter()
+                                .zip(&initial_contours)
+                                .all(|(new, old)| new.non_regressing(old));
+                        let clipping_safe =
+                            measure::clipped(&pixels) <= measure::clipped(&final_pixels) + 0.0001;
+                        if contours_safe
+                            && clipping_safe
+                            && quality::correction_improves(
+                                (retention, shift.map(|s| s.0)),
+                                (r2, s2.map(|s| s.0)),
+                                TEXTURE_FLOOR,
+                                SKIN_SHIFT_CEILING,
+                            )
+                        {
+                            qc_changes.push(format!(
                             "{}{}",
                             if soft { format!("Skin smoothing softened: texture kept was {:.0}%, now {:.0}%. ", retention.unwrap_or(0.0) * 100.0, r2.unwrap_or(0.0) * 100.0) } else { String::new() },
                             if moved { format!("Skin colour steps halved: colour had moved {:.3}, now {:.3}.", shift.map_or(0.0, |s| s.0), s2.map_or(0.0, |s| s.0)) } else { String::new() },
                         ));
-                        (retention, shift) = (r2, s2);
-                        final_pixels = pixels;
-                        current = proposal;
-                        quality.corrected = true;
+                            (retention, shift) = (r2, s2);
+                            final_pixels = pixels;
+                            current = proposal;
+                            quality.corrected = true;
+                        } else {
+                            qc_notes.push("The proposed QC correction did not show an improvement without worsening another measured check; it was discarded.".into());
+                        }
                     }
                 }
             }
             quality.texture_retention = retention;
             quality.skin_shift = shift.map(|s| s.0);
+            quality.contours = contours(&final_pixels);
             quality.clipped_final = Some(measure::clipped(&final_pixels));
             quality.mirror_balance = planned
                 .faces
@@ -1691,29 +2137,44 @@ pub fn run(
                 .filter(|(_, change)| *change > 0.004)
                 .map(|(ratio, _)| ratio)
                 .reduce(f32::max);
-            quality.passed = retention.is_none_or(|r| r >= TEXTURE_FLOOR)
-                && shift.is_none_or(|(s, _)| s <= SKIN_SHIFT_CEILING);
+            quality.finish(planned.faces.len());
             qc_notes.push(match (quality.clipped_original, quality.clipped_final) {
                 (Some(a), Some(b)) => format!(
-                    "25% - overall: clipped pixels {:.2}% in the original, {:.2}% finished.",
+                    "Clipping at QC resolution: {:.2}% in the original, {:.2}% finished (allowed increase 0.5 percentage points).",
                     a * 100.0,
                     b * 100.0
                 ),
-                _ => "25% - overall: not measured.".into(),
+                _ => "Clipping: not measured.".into(),
             });
             qc_notes.push(match shift {
-                Some((s, l)) => format!("50% - consistency: skin colour moved {s:.3} during the retouch (limit {SKIN_SHIFT_CEILING}); skin brightness {:+.0}%.", (l - 1.0) * 100.0),
-                None => "50% - consistency: no segmented face skin to measure.".into(),
+                Some((s, l)) => format!("Skin colour at QC resolution: moved {s:.3} during the retouch (limit {SKIN_SHIFT_CEILING}); skin brightness {:+.0}%.", (l - 1.0) * 100.0),
+                None => "Skin colour: no segmented face skin to measure.".into(),
             });
             qc_notes.push(match retention {
                 Some(r) => format!(
-                    "100% - retouch quality: {:.0}% of the fine skin texture kept (floor {:.0}%).",
+                    "Texture at QC resolution: {:.0}% of the fine-band energy kept (floor {:.0}%).",
                     r * 100.0,
                     TEXTURE_FLOOR * 100.0
                 ),
-                None => "100% - retouch quality: no segmented face skin to measure.".into(),
+                None => "Texture: no measurable segmented face skin.".into(),
             });
-            qc_notes.push("200% - edges: every automatic operation is limited by a feathered selection refined to the photograph's own edges.".into());
+            qc_notes.push(if size == RenderLevel::Full {
+                format!("Measured at the full {w} x {h} pixels, because a face was too small to check at screen size, with geometry, grain, vignette and sharpening disabled.")
+            } else {
+                format!("Measured at {w} x {h} pixels with geometry, grain, vignette and sharpening disabled; this is not a full-resolution export inspection.")
+            });
+            for reading in &quality.contours {
+                qc_notes.push(format!("Face {} and adjacent neck: {} new seam pairs, {} weakened source-edge pairs of {} source edges ({} sampled pairs). {}", reading.face + 1, reading.new_seam_pairs, reading.weakened_edge_pairs, reading.source_edge_pairs, reading.sampled_pairs, if reading.review { "Review contours; these are heuristic warnings, not a diagnosis." } else { "Within the pilot contour limits at this resolution." }));
+                for region in &reading.regions {
+                    qc_notes.push(format!("Face {}, estimated {} region: {} new seam pairs, {} weakened edges of {} source edges. {}",
+                        reading.face + 1, region.region.label(), region.new_seam_pairs,
+                        region.weakened_edge_pairs, region.source_edge_pairs,
+                        if !region.measured { "Insufficient samples; not measured." }
+                        else if region.review { "Local contour review required." }
+                        else { "Within the local pilot limits." }));
+                }
+            }
+            qc_notes.extend(quality.incomplete_reasons.iter().cloned());
             qc_notes.push(match quality.mirror_balance {
                 Some(b) if b > 3.0 => format!("Mirror check: one half of a face was changed {b:.1}x more than the other - review it flipped; this is expected when the light falls from one side."),
                 Some(b) => format!("Mirror check: both halves of each face changed alike ({b:.1}x)."),
@@ -1721,10 +2182,11 @@ pub fn run(
             });
         }
         Err(error) => {
+            quality.finish(planned.faces.len());
             qc_notes.push(format!("The finished photograph could not be rendered for inspection ({}); review it yourself before delivery.", error.code));
         }
     }
-    qc_notes.push("Identity: nothing was reshaped, moles and freckles were kept, and every skin decision was measured against the person's own skin.".into());
+    qc_notes.push("Identity preservation is the editing policy, not a measured identity guarantee. Review permanent marks, makeup and ceremonial marks against the source.".into());
     qc_notes.push("Compare RAW -> corrected -> retouched -> final by stepping through this run's history entries.".into());
     qc_notes.push("Export: the master as 16-bit TIFF in Adobe RGB (album preset), web and social copies in sRGB (gallery and social presets). AURA never chooses a destination; export from the Export step.".into());
 
@@ -1735,6 +2197,8 @@ pub fn run(
         quality: quality.clone(),
         history_steps: saved,
         summary: String::new(),
+        checked_recipe: Some(checked_recipe(&current)?),
+        checked_photo_id: Some(input.photo_id.clone()),
     };
     if let Some(r) = report
         .stages
@@ -1757,7 +2221,13 @@ pub fn run(
     report.history_steps = saved + 1;
     report.summary = format!(
         "All 18 stages ran in order: {applied} changed the photograph and each is its own history step; the rest were inspected and needed nothing or did not apply. {}",
-        if quality.passed { "Quality control passed." } else { "Quality control flagged something - see its notes." }
+        if quality.passed {
+            "The measured checks passed at QC resolution; inspect full-resolution output before delivery."
+        } else if quality.measurement_status != "measured" {
+            "Quality control is incomplete; missing measurements must not be treated as a pass."
+        } else {
+            "Quality control flagged something - see its notes."
+        }
     );
     let mut proposal = current.clone();
     proposal.extra.insert(
@@ -1810,6 +2280,112 @@ pub fn run(
 mod tests {
     use super::*;
 
+    #[test]
+    fn a_fringing_correction_is_described_in_the_lens_step() {
+        let before = aura_recipe::fixtures::neutral(aura_recipe::fixtures::FIXTURE_HASH, "");
+        let mut after = before.clone();
+        after.lens.ca = true;
+        after.lens.coefficients = Some(aura_recipe::LensCoefficients {
+            k1: 0.0,
+            k2: 0.0,
+            k3: 0.0,
+            ca_red: 1.0004,
+            ca_blue: 0.9997,
+        });
+        let lines = describe_globals(Stage::LensPerspective, &before, &after);
+        assert!(
+            lines
+                .iter()
+                .any(|l| l.starts_with("Colour fringing corrected")),
+            "{lines:?}"
+        );
+        assert!(describe_globals(Stage::LensPerspective, &after, &after).is_empty());
+    }
+
+    #[test]
+    fn qc_binding_tracks_visual_edits_without_recursion_or_history_metadata() {
+        let mut recipe = aura_recipe::fixtures::neutral("test", "test");
+        recipe.global.exposure = 0.123_456_7;
+        let snapshot = checked_recipe(&recipe).unwrap();
+        let report = Report {
+            checked_recipe: Some(snapshot.clone()),
+            ..Report::default()
+        };
+        recipe
+            .extra
+            .insert(KEY.into(), serde_json::to_value(report).unwrap());
+        recipe.provenance.source = EditSource::User;
+        assert_eq!(checked_recipe(&recipe).unwrap(), snapshot);
+        let stored = aura_recipe::canonical(&recipe).unwrap();
+        let loaded: Recipe = serde_json::from_str(&stored).unwrap();
+        assert_eq!(checked_recipe(&loaded).unwrap(), snapshot);
+        let base = aura_recipe::fixtures::neutral("test", "test");
+        let (merged, _) = schema::merge(&base, &recipe, EditSource::User).unwrap();
+        let saved: Report = serde_json::from_value(merged.extra.get(KEY).unwrap().clone()).unwrap();
+        assert_eq!(
+            saved.checked_recipe.as_deref(),
+            Some(checked_recipe(&merged).unwrap().as_str()),
+            "schema merge must preserve empty containers inside the checked snapshot"
+        );
+        recipe.global.exposure += 0.01;
+        assert_ne!(checked_recipe(&recipe).unwrap(), snapshot);
+        recipe = loaded;
+        recipe.geometry.rotate = 2.0;
+        assert_ne!(checked_recipe(&recipe).unwrap(), snapshot);
+        recipe.geometry.rotate = 0.0;
+        let op = base_edit("manual-skin".into(), Tool::Dodge, [0.5, 0.5, 0.2, 0.2], 0.4);
+        retouch_tools::write(&mut recipe, &[op]).unwrap();
+        assert_ne!(checked_recipe(&recipe).unwrap(), snapshot);
+    }
+
+    #[test]
+    fn missing_measurements_and_partial_face_coverage_never_pass_qc() {
+        let mut report = QualityReport::default();
+        report.finish(1);
+        assert!(!report.passed);
+        assert_eq!(report.measurement_status, "not_measured");
+        report.analysis_width = 1200;
+        report.analysis_height = 800;
+        report.texture_retention = Some(0.8);
+        report.skin_shift = Some(0.005);
+        report.clipped_original = Some(0.0);
+        report.clipped_final = Some(0.001);
+        report.contours.push(quality::ContourReading {
+            face: 0,
+            sampled_pairs: 1000,
+            new_seam_pairs: 0,
+            source_edge_pairs: 80,
+            weakened_edge_pairs: 0,
+            review: false,
+            regions: quality::REGIONS
+                .map(|region| quality::RegionReading {
+                    region,
+                    sampled_pairs: 100,
+                    new_seam_pairs: 0,
+                    source_edge_pairs: 20,
+                    weakened_edge_pairs: 0,
+                    measured: true,
+                    review: false,
+                })
+                .into(),
+        });
+        report.finish(1);
+        assert!(report.passed);
+        report.finish(2);
+        assert!(!report.passed);
+        report.texture_retention = None;
+        report.finish(1);
+        assert!(!report.passed);
+        assert_eq!(report.measurement_status, "incomplete");
+        report.texture_retention = Some(f32::NAN);
+        report.finish(1);
+        assert!(!report.passed);
+        report.texture_retention = Some(0.8);
+        report.clipped_final = Some(0.02);
+        report.finish(1);
+        assert!(!report.passed);
+    }
+
     fn edit(id: &str, tool: Tool) -> Edit {
         base_edit(id.into(), tool, [0.5, 0.5, 0.1, 0.1], 0.5)
     }
@@ -1828,6 +2404,31 @@ mod tests {
         assert!(Stage::GlobalDodgeBurn < Stage::SkinColour);
         assert!(Stage::BackgroundToning < Stage::ColourGrade);
         assert!(Stage::Grain < Stage::OutputSharpening);
+    }
+
+    #[test]
+    fn quality_control_renders_large_enough_to_check_a_small_face() {
+        let face = |eye_gap: f32| PortraitFace {
+            bounds: [0.4, 0.4, 0.4 + eye_gap * 2.0, 0.4 + eye_gap * 2.5],
+            landmarks: [
+                [0.45, 0.45],
+                [0.45 + eye_gap, 0.45],
+                [0.47, 0.5],
+                [0.46, 0.52],
+                [0.48, 0.52],
+            ],
+            confidence: 0.9,
+        };
+        // A face at the lectern: 64 px between the eyes at the usual size.
+        assert_eq!(qc_level(&[face(0.04)], 1600, 788), QC_SIZE);
+        assert_eq!(qc_level(&[], 1600, 788), QC_SIZE);
+        // 21.6 px: a larger screen render reaches 24.
+        let RenderLevel::Screen(edge, _) = qc_level(&[face(0.04), face(0.0135)], 1600, 788) else {
+            panic!("a screen render is enough")
+        };
+        assert!(edge > 1600 && edge <= 2048, "{edge}");
+        // 13 px needs more than the preview has: the full-resolution render.
+        assert_eq!(qc_level(&[face(0.0082)], 1600, 788), RenderLevel::Full);
     }
 
     #[test]
@@ -1956,6 +2557,35 @@ mod tests {
             stage_of(&edit("manual-auto-portrait-v1-0-texture", Tool::SkinSmooth)),
             None
         );
+    }
+
+    #[test]
+    fn beauty_and_fashion_is_the_evoto_pass_and_keeps_identity() {
+        let input = |preset: Option<&str>| AdvancedRetouchInput {
+            project_id: String::new(),
+            photo_id: String::new(),
+            options: None,
+            preset: preset.map(str::to_string),
+        };
+        let o = resolve_options(&input(Some("beauty_fashion")));
+        assert_eq!(o, beauty_fashion_options());
+        assert!((o.settings.backdrop_lift - 1.0).abs() < f32::EPSILON);
+        assert!(
+            o.settings.fabric > options().settings.fabric,
+            "clothing creases are part of it"
+        );
+        assert_eq!(o.scope, Scope::FaceAndBody);
+        // Identity is untouched: the same mark, freckle and skin-colour rules as the default.
+        assert_eq!(o.settings.keep_freckles, options().settings.keep_freckles);
+        assert_eq!(
+            o.settings.remove_dark_marks,
+            options().settings.remove_dark_marks
+        );
+        assert!(o.settings.skin_brightness.abs() < f32::EPSILON);
+        // No preset, or an unknown one, is the workflow's own default with no lift.
+        assert_eq!(resolve_options(&input(None)), options());
+        assert_eq!(resolve_options(&input(Some("nonsense"))), options());
+        assert!(options().settings.backdrop_lift.abs() < f32::EPSILON);
     }
 
     #[test]

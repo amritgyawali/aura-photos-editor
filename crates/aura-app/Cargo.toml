@@ -69,6 +69,12 @@ time.workspace        = true
 tracing.workspace     = true
 parking_lot.workspace = true
 uuid.workspace        = true
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "tiff"] }
+moxcms = "0.8.1"
+# Adobe's embedded RGB-table wire format uses a zlib stream and an MD5 content
+# identifier. The MD5 here is format interoperability, never a security decision.
+flate2 = { version = "1.1", default-features = false, features = ["rust_backend"] }
+md5 = "0.8"
 
 [dev-dependencies]
 tempfile.workspace = true

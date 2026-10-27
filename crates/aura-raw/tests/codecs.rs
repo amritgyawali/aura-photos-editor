@@ -420,10 +420,10 @@ fn a_truncated_proprietary_mosaic_fails_with_a_code_rather_than_a_wrong_image() 
 fn the_sony_fallback_curve_is_a_plain_expansion_and_says_so() {
     let linear = sony::build_curve(None);
     // Eleven bits in, fourteen bits out, with no shaping: index i is the
-    // twelve-bit form of an eleven-bit sample, so `curve[p << 1] >> 2` is
-    // `p * 8`.
+    // twelve-bit form of an eleven-bit sample, and the curve's output is already
+    // fourteen-bit, so `curve[p << 1]` is `p * 8`.
     for sample in [0usize, 1, 1_000, 2_047] {
-        let mapped = linear.get(sample << 1).copied().unwrap_or(0) >> 2;
+        let mapped = linear.get(sample << 1).copied().unwrap_or(0);
         assert_eq!(u32::from(mapped), sample as u32 * 8);
     }
 

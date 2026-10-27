@@ -28,10 +28,13 @@ use aura_vision::portrait::PortraitFace;
 use serde::{Deserialize, Serialize};
 
 /// The planner version recorded in the report; bump on any behavioural change.
-pub const VERSION: &str = "measured-features-v25";
+pub const VERSION: &str = "measured-features-v36-expression-contours";
+mod anatomy_edges;
+mod ceremonial_marks;
 pub(crate) mod deep_blemish;
 pub mod expert;
 pub(crate) mod eye_guard;
+mod jaw_guard;
 mod nose_openings;
 /// At most this many healed spots per face. A face with more is left for a person to judge.
 pub const MAX_SPOTS: usize = 12;
@@ -88,7 +91,7 @@ impl<'a> Pixels<'a> {
 }
 
 fn decode(v: u8) -> f32 {
-    aura_raw::colour::curve::srgb_decode(f32::from(v) / 255.0)
+    aura_raw::colour::curve::srgb_byte_to_linear(v)
 }
 
 /// Rec.709 luminance of linear RGB.
@@ -364,6 +367,7 @@ fn base_edit(id: String, tool: Tool, amount: f32, px: &Pixels<'_>, region_px: [f
         target_color: None,
         sensitivity: None,
         keep_dark_marks: false,
+        mole_edge: None,
         texture: 1.0,
         tone: 0.5,
         warmth: 0.0,
@@ -384,6 +388,7 @@ fn masked(mut edit: Edit, px: &Pixels<'_>, capsules: &[Capsule]) -> Edit {
 
 fn brighter_than(stops: f32, softness: f32) -> Selection {
     Selection {
+        color: None,
         inverted: false,
         gradient: None,
         luminance: Some(LuminanceRange {
@@ -518,6 +523,19 @@ impl Default for Options {
 }
 
 impl Options {
+    /// The shared built-in finish used by both desktop controls and native automation.
+    #[must_use]
+    pub fn polished_wedding() -> Self {
+        static PROFILE: std::sync::OnceLock<Options> = std::sync::OnceLock::new();
+        *PROFILE.get_or_init(|| {
+            serde_json::from_str(include_str!("../../../ui/src/config/polishedWedding.json"))
+                .unwrap_or_else(|error| {
+                    tracing::error!(%error, "Invalid bundled wedding profile; using conservative defaults");
+                    Self::default()
+                })
+        })
+    }
+
     /// Clamp values a caller might send out of range.
     #[must_use]
     pub fn sanitised(self) -> Self {
@@ -1531,8 +1549,8 @@ fn eyes(
         }
     }
     // Dark circles: the shadow between the lower lashes and the cheek, measured against this
-    // person's own cheek just below it and corrected toward it - brightness and cast, never
-    // past it, pores kept. Decided per face, not per eye: when one circle is clearly there,
+    // person's own cheek just below it. A bounded lift and partial cast adjustment retain
+    // the socket's lighting and pores. Decided per face, not per eye: when one circle is clearly there,
     // the other open eye is corrected too (by its own measurement, which may be much less),
     // so one eye is never finished and the other left as shot. ADR-0094.
     let clear = |f: &DarkCircle| {
@@ -1543,14 +1561,14 @@ fn eyes(
             .into_iter()
             .filter(|(_, _, f)| f.drop > 0.03 || (f.cast > 0.025 && f.drop > 0.015))
         {
-            let band = under_eye_band(g, eye);
+            let band = under_eye_correction_band(g, eye);
             let mut edit = masked(
                 base_edit(
                     format!("{prefix}{face}-undereye-{name}"),
                     Tool::UnderEye,
-                    // The share of the shadow removed: most of it, never all - the skin under
-                    // an eye is thinner and a trace of shadow is natural.
-                    ((0.5 + found.drop * 1.2).clamp(0.5, 0.72) * circles.min(1.25)).min(0.85),
+                    // Scale the bounded correction conservatively: thin under-eye skin
+                    // retains its natural colour and socket shadow.
+                    ((0.45 + found.drop * 0.5).clamp(0.45, 0.6) * circles.min(1.1)).min(0.65),
                     px,
                     [eye[0], eye[1] + 0.2 * d, 0.34 * d, 0.3 * d],
                 ),
@@ -1564,9 +1582,9 @@ fn eyes(
             ]);
             // Low-band size: larger than a pore, smaller than the shadow.
             edit.radius = (0.03 * d / short).clamp(0.0005, 0.05);
-            // Match the cast of a dark circle (purple, brown) to the cheek.
-            edit.tone = 0.75;
-            edit.feather = 0.85;
+            // Reduce a fraction of the purple/brown cast without copying cheek colour.
+            edit.tone = 0.35;
+            edit.feather = 0.9;
             out.eyes.push(edit);
             lifted += 1;
             deepest = deepest.max(found.drop);
@@ -1593,7 +1611,7 @@ fn eyes(
     }
     if lifted > 0 {
         parts.push(format!(
-            "corrected {lifted} dark circle{} toward the cheek below (up to {:.0}% darker than it), matching its colour and keeping the pores",
+            "softened {lifted} dark circle{} (up to {:.0}% darker than the cheek), preserving eye-socket shading with bounded exposure and partial cast correction",
             plural(lifted),
             deepest * 100.0
         ));
@@ -1633,6 +1651,30 @@ fn under_eye_band(g: &Geometry, eye: [f32; 2]) -> [Capsule; 2] {
             a: at(0.10, 0.27),
             b: at(-0.17, 0.25),
             r: 0.09 * d,
+        },
+    ]
+}
+
+/// One connected curved swath. Two parallel ribbons create separate correction
+/// peaks and can make the lower lid appear detached from the cheek.
+fn under_eye_correction_band(g: &Geometry, eye: [f32; 2]) -> [Capsule; 2] {
+    let inner = if (g.mid[0] - eye[0]) * g.u[0] + (g.mid[1] - eye[1]) * g.u[1] >= 0.0 {
+        1.0
+    } else {
+        -1.0
+    };
+    let at = |x: f32, y: f32| add(add(eye, g.u, inner * x * g.d), g.v, y * g.d);
+    let middle = at(-0.05, 0.20);
+    [
+        Capsule {
+            a: at(-0.22, 0.13),
+            b: middle,
+            r: 0.13 * g.d,
+        },
+        Capsule {
+            a: middle,
+            b: at(0.17, 0.17),
+            r: 0.13 * g.d,
         },
     ]
 }
@@ -1789,6 +1831,7 @@ fn mouth(
         r: 0.2 * mw,
     };
     let not_teeth = Selection {
+        color: None,
         inverted: false,
         gradient: None,
         luminance: Some(LuminanceRange {
@@ -2228,7 +2271,7 @@ mod tests {
         assert!(
             (cheek[0] - 0.38).abs() < 0.01 && (cheek[1] - (160.0 + 0.5 * d) / 400.0).abs() < 0.01
         );
-        assert!((0.5..=0.85).contains(&edit.amount), "{}", edit.amount);
+        assert!((0.35..=0.65).contains(&edit.amount), "{}", edit.amount);
         retouch_tools::validate(&plan.eyes).unwrap();
         assert!(plan
             .report
@@ -2240,6 +2283,39 @@ mod tests {
         off.settings.dark_circles = 0.0;
         let none = plan_eyes_only(&px, &off);
         assert!(none.iter().all(|e| e.tool != Tool::UnderEye));
+    }
+
+    #[test]
+    fn under_eye_correction_has_one_continuous_peak_instead_of_parallel_ribbons() {
+        let rgb = canvas(400, [170, 120, 95]);
+        let px = Pixels::new(&rgb, 400, 400).unwrap();
+        let g = Geometry::new(&face(), &px).unwrap();
+        let eye = g.eyes[1];
+        let band = under_eye_correction_band(&g, eye);
+        let mut values = Vec::new();
+        for row in 0..=60 {
+            let point = add(eye, g.v, row as f32 * g.d / 120.0);
+            let nearest = band
+                .iter()
+                .map(|capsule| {
+                    let dx = capsule.b[0] - capsule.a[0];
+                    let dy = capsule.b[1] - capsule.a[1];
+                    let t = (((point[0] - capsule.a[0]) * dx + (point[1] - capsule.a[1]) * dy)
+                        / (dx * dx + dy * dy).max(1e-6))
+                    .clamp(0.0, 1.0);
+                    distance(point, [capsule.a[0] + t * dx, capsule.a[1] + t * dy]) / capsule.r
+                })
+                .fold(f32::INFINITY, f32::min);
+            values.push((1.0 - nearest).max(0.0));
+        }
+        let peak = values
+            .iter()
+            .enumerate()
+            .max_by(|a, b| a.1.total_cmp(b.1))
+            .unwrap()
+            .0;
+        assert!(values[..=peak].windows(2).all(|p| p[1] >= p[0] - 1e-5));
+        assert!(values[peak..].windows(2).all(|p| p[1] <= p[0] + 1e-5));
     }
 
     #[test]

@@ -17,7 +17,7 @@ import { audit, drainAuditBatch, isQuietIpc } from '../audit/log';
  * always recorded. `ui_audit` is exempt from logging too: it is the log's own pipe,
  * and watching the watcher doubles the traffic it exists to reduce.
  */
-function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+export function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   const quiet = isQuietIpc(command);
   const relay = command === 'ui_audit';
   if (!quiet && !relay) {
@@ -95,6 +95,9 @@ if (typeof window !== 'undefined') {
 }
 void relayTimer;
 
+/** What happened when a provider's key page was asked for (ADR-0108). */
+export type ProviderPageDto = { url: string | null; opened: boolean; message: string };
+
 export const photoAutoEdit = (input: PhotoAutoEditInput): Promise<PhotoAutoEditDto> =>
   invoke<PhotoAutoEditDto>('photo_auto_edit', { input });
 
@@ -127,9 +130,13 @@ export async function pickImportPaths(directory: boolean): Promise<string[]> {
 export type ReferenceAnalysis = {
   id: string; origin: string; measured: number; skipped: number; colors: string[];
   brightness: number; contrast: number; warmth: number; saturation: number;
+  calibration?: { trainingSamples: number; validationSamples: number; meanError: number; p95Error: number; occupiedColorCells: number;
+    selectionSamples?: number; residualRefined?: boolean };
 };
 export type ReferenceSelection = { analysis: ReferenceAnalysis; strength: number };
-export type ApplyReport = { changed: number; beforeDistance: number; afterDistance: number; protectedFields: number };
+export type ApplyReport = { changed: number; beforeDistance: number; afterDistance: number; protectedFields: number;
+  /** The reference's own original, found in the collection, that the look was learned from. */
+  learnedFrom?: string };
 
 export type HslShift = { h: number; s: number; l: number };
 export type ProfileAdjust = {
@@ -203,9 +210,9 @@ export async function pickLightroomCatalog(): Promise<string | null> {
 
 export const referenceStyle = {
   /** Measure a folder of reference photos, or an Instagram data export when `fromExport`. Nothing is downloaded. */
-  analyse: (address: string, folder: string, cancelId: string, fromExport = false) => invoke<ReferenceAnalysis>('analyse_reference_style', { input: { address, folder, cancelId, export: fromExport } }),
-  apply: (photoId: string, referenceId: string, strength: number, profile?: ProfileSelection | null) => invoke<ApplyReport>('apply_reference_style', {
-    input: { photoId, referenceId, strength, profileId: profile?.profileId ?? null, profileStrength: profile?.strength ?? null } }),
+  analyse: (address: string, folder: string, cancelId: string, fromExport = false, original?: string) => invoke<ReferenceAnalysis>('analyse_reference_style', { input: { address, folder, cancelId, export: fromExport, ...(original ? { original } : {}) } }),
+  apply: (photoId: string, referenceId: string, strength: number, profile?: ProfileSelection | null, cancelId?: string) => invoke<ApplyReport>('apply_reference_style', {
+    input: { photoId, referenceId, strength, profileId: profile?.profileId ?? null, profileStrength: profile?.strength ?? null, cancelId: cancelId ?? null } }),
 };
 
 export type PairedReferenceReport = {
@@ -213,11 +220,14 @@ export type PairedReferenceReport = {
   exactMatch: boolean; matchingPixels: number; totalPixels: number;
   protectedFields: number; referenceHash: string; width: number; height: number;
   subjectErrorsBefore: number[]; subjectErrorsAfter: number[];
+  /** The personal look that was kept, when a name was given and the match changed the edit. */
+  keptLook?: string;
 };
 
 export const pairedReference = {
-  match: (photoId: string, referencePath: string, cancelId: string) =>
-    invoke<PairedReferenceReport>('match_paired_reference', { input: { photoId, referencePath, cancelId } }),
+  /** `keepAs` keeps the look the match finds as a personal look of that name. */
+  match: (photoId: string, referencePath: string, cancelId: string, keepAs?: string) =>
+    invoke<PairedReferenceReport>('match_paired_reference', { input: { photoId, referencePath, cancelId, keepAs: keepAs?.trim() || null } }),
 };
 
 export async function pickPairedReference(): Promise<string | null> {
@@ -716,6 +726,13 @@ export const api = {
   checkAiKey: (): Promise<KeyCheckDto> => invoke<KeyCheckDto>('check_ai_key'),
   openAiProviderPage: (provider: string): Promise<string> =>
     invoke<string>('open_ai_provider_page', { provider }),
+
+  /**
+   * "Connect Claude" / "Connect ChatGPT": open the provider's own key page in the default
+   * browser. The address comes from the catalogue in the backend, never from here.
+   */
+  openProviderPage: (provider: string): Promise<ProviderPageDto> =>
+    invoke<ProviderPageDto>('open_provider_page', { input: { provider } }),
 
   /** Every provider AURA knows how to reach. Static, and cheap to ask for. */
   listAiProviders: (): Promise<AiProviderDto[]> =>

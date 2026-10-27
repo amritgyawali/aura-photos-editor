@@ -170,6 +170,14 @@ impl Executable {
         self.nodes.len()
     }
 
+    /// The nodes in execution order and the weights they read, for measuring a graph one
+    /// operator at a time.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn parts(&self) -> (&[Node], &BTreeMap<String, Value>, Precision) {
+        (&self.nodes, &self.initialisers, self.precision)
+    }
+
     /// Run the graph over one set of inputs.
     ///
     /// # Errors

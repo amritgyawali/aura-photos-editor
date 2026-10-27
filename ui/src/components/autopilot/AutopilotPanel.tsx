@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { asIpcError, autopilot as api } from '../../ipc/client';
+import { asIpcError, api as jobs, autopilot as api } from '../../ipc/client';
 import type {
   AutopilotEventDto,
   AutopilotPreflightDto,
@@ -81,11 +81,17 @@ export function AutopilotPanel({ projectId, onError, onBusyChange, automaticRequ
   const [starting, setStarting] = useState(false);
   const startingRef = useRef(false);
   const stopPreparation = useRef(false);
+  const preparationJob = useRef<string | null>(null);
+  const preparationError = useRef(onError);
+  preparationError.current = onError;
   const consumedRequest = useRef(0);
   const [preparation, setPreparation] = useState<string | null>(null);
   const [prepared, setPrepared] = useState<PreparedPhoto[]>([]);
   const [selected, setSelected] = useState<string[] | null>(null);
-  useEffect(() => () => { stopPreparation.current = true; }, []);
+  useEffect(() => () => {
+    stopPreparation.current = true;
+    if (preparationJob.current) void jobs.cancelJob(preparationJob.current).catch(error => preparationError.current(toBanner(error)));
+  }, []);
   useEffect(() => { onBusyChange?.(starting || progress !== null); }, [starting, progress, onBusyChange]);
 
   // What the poll is watching, without making the effect depend on the value it sets.
@@ -152,12 +158,14 @@ export function AutopilotPanel({ projectId, onError, onBusyChange, automaticRequ
     }
     startingRef.current = true;
     setStarting(true);
+    setPreparation('Preparing photos for automatic editing…');
     stopPreparation.current = false;
+    preparationJob.current = `reference-prepare-${crypto.randomUUID()}`;
     if (!retry) setPrepared([]);
     onError(null);
     try {
       const results = await prepareCollection(projectId, () => stopPreparation.current, setPreparation,
-        photo => setPrepared(current => [...current.filter(row => row.photoId !== photo.photoId), photo]), reference, profile, profileName, photoIds);
+        photo => setPrepared(current => [...current.filter(row => row.photoId !== photo.photoId), photo]), reference, profile, profileName, photoIds, preparationJob.current);
       if (!retry) setPrepared(results);
       if (stopPreparation.current) { setPreparation('Stopped. Completed edits are saved.'); return; }
       const ready = results.filter(photo => photo.outcome === 'ready').length;
@@ -169,7 +177,7 @@ export function AutopilotPanel({ projectId, onError, onBusyChange, automaticRequ
       setProgress(await api.autopilotStart({ projectId, disabled, zeroTouch, allowOnBattery: false, quietMode: true }));
     } catch (error) {
       onError(toBanner(error));
-    } finally { startingRef.current = false; setStarting(false); }
+    } finally { preparationJob.current = null; startingRef.current = false; setStarting(false); }
   }, [disabled, onError, projectId, zeroTouch, reference, profile, profileName]);
 
   useEffect(() => {
@@ -269,7 +277,10 @@ export function AutopilotPanel({ projectId, onError, onBusyChange, automaticRequ
     <BatchPhotoPicker key={projectId} projectId={projectId} disabled={starting || progress !== null} selected={selected} onSelect={setSelected} />
     {preparation && <section className="automatic-result" aria-label="Automatic preparation">
       <p role="status">{preparation}</p>
-      {starting && <button type="button" onClick={() => { stopPreparation.current = true; }}>Stop automatic editing</button>}
+      {starting && <button type="button" onClick={() => {
+        stopPreparation.current = true;
+        if (preparationJob.current) void jobs.cancelJob(preparationJob.current).catch(error => onError(toBanner(error)));
+      }}>Stop automatic editing</button>}
       {!starting && !progress && prepared.some(photo => photo.outcome === 'failed') && <button type="button" onClick={() => void openPreflight(false, prepared.filter(photo => photo.outcome === 'failed').map(photo => photo.photoId), true)}>Retry failed photos only</button>}
       {!starting && !progress && prepared.some(photo => photo.outcome === 'ready') && <>
         <h2>{prepared.filter(photo => photo.outcome === 'ready').length} photos have saved edits, ready to render.</h2>

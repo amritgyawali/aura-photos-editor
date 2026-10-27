@@ -96,12 +96,22 @@ pub fn render_streamed(
     let native_retouch = retouch.iter().any(|edit| edit.enabled && edit.amount > 0.0);
     let portrait = crate::portrait::wants_parse(&clamped);
     // A mask's AI edge, a gradient and a brush stroke are drawn on the whole photograph.
-    let masked = aura_recipe::local_masks::any_active(&clamped);
+    let masked = aura_recipe::local_masks::any_active(&clamped)
+        || aura_recipe::studio_color::read(&clamped).is_ok_and(|c| !c.local.is_empty())
+        || aura_recipe::material_lab::read(&clamped)
+            .is_ok_and(|ops| ops.iter().any(|op| op.enabled && op.amount > 0.0))
+        || aura_recipe::color_lab::read(&clamped).is_ok_and(|ops| ops.iter().any(|op| op.enabled))
+        || aura_recipe::spatial_lab::read(&clamped)
+            .is_ok_and(|ops| ops.iter().any(|op| op.enabled));
+    // A reshape moves pixels across tile boundaries and a background replacement reads the
+    // whole person, so a finished frame is rendered whole too.
+    let finished = crate::studio_finish::wants(&clamped);
     if clamped.geometry.rotate.abs() > f32::EPSILON
         || clamped.geometry.perspective.is_some()
         || native_retouch
         || portrait
         || masked
+        || finished
     {
         let mut whole = engine.render_frame(frame, &clamped, level, purpose, output)?;
         whole.notes.push(RenderNote {
@@ -112,6 +122,8 @@ pub fn render_streamed(
                     "a portrait retouch is rendered whole rather than streamed"
                 } else if masked {
                     "local masks are rendered whole rather than streamed"
+                } else if finished {
+                    "a reshape or background replacement is rendered whole rather than streamed"
                 } else if native_retouch {
                     "a native retouch is rendered whole rather than streamed"
                 } else {
@@ -122,8 +134,6 @@ pub fn render_streamed(
         });
         return Ok(whole);
     }
-
-    let stats = spatial::measure(&frame.rgb, frame.width as usize, frame.height as usize);
 
     // The geometry stage must not run inside a tile: the crop *is* the tile grid.
     let mut tile_recipe = clamped.clone();
@@ -138,6 +148,12 @@ pub fn render_streamed(
         graph::Capabilities::default(),
     );
     let halo = tile_plan.halo();
+
+    // The frame-wide numbers every tile reads, measured once: the sharpening normaliser and,
+    // since ADR-0126, the edge-aware base layers. A tile that measured its own base would
+    // light its own regions, and the seams would be the regions' edges.
+    let mut stats = spatial::measure(&frame.rgb, frame.width as usize, frame.height as usize);
+    stats.base = crate::cpu::frame_base(frame, &tile_recipe, &tile_plan).map(std::sync::Arc::new);
 
     // The crop restricts the tile grid rather than being a stage of its own. Crop commutes
     // with every point-wise and local stage in front of it, so this is the same pixels in a
@@ -188,7 +204,7 @@ pub fn render_streamed(
                 &tile_recipe,
                 &tile_plan,
                 RenderLevel::Full,
-                Some(stats),
+                Some(stats.clone()),
             );
 
             // Commit the middle of the tile, which is the part the halo protected.

@@ -12,6 +12,12 @@ within each tool's limits. Everything else is off until you turn it up.
 
 ## Presets
 
+**Polished wedding** is the default for new photographs: stronger compact spot
+and dark-circle cleanup, controlled pore refinement, face and exposed body skin,
+and a persistent single-portrait restriction for frequency separation and
+dodge/burn. Saved photo choices are retained. See the
+[processing strategy and validation](polished-wedding-finish.md).
+
 Natural · Deep acne cleanup · Professional retouch · Subtle · Soft glow · Polished beauty ·
 Bridal · Groom & men · Editorial · Body focus · Studio clean. A preset only sets the controls
 below; change any of them and it becomes *Custom*.
@@ -77,7 +83,7 @@ targeted healing/light balancing in [Retouch4me](https://global.retouch4.me/reto
 and restrained finishing styles in [Imagen](https://support.imagen-ai.com/hc/en-us/articles/36160335937949-Retouch-all-faces-in-your-gallery).
 Those products are workflow references; their proprietary code and models are not used.
 
-## The controls (60)
+## The controls (64)
 
 **Always visible:** what to retouch (face / body skin / both), overall strength, heal
 blemishes, soften lines and redness, eyes, teeth.
@@ -109,9 +115,13 @@ definition, brow definition.
 **Portrait volumes & make-up** - contour, highlight, blush, face fill light.
 
 **Body** - body smoothing, even body tone, match body to face, body shine, red hands &
-elbows, body blemishes.
+elbows, body blemishes, stretch marks. Stretch marks is off unless you raise it or choose
+**Body skin finish**: it evens long, faint marks out of all the body skin it finds and keeps
+hands, a navel and every other contour as they are.
 
-**Hair, clothes & backdrop** - hair detail, hair shine, fabric creases, clean backdrop.
+**Hair, clothes & backdrop** - hair detail, hair shine, fabric creases, clean backdrop, bright
+backdrop (lifts a plain grey studio backdrop to a clean bright grey, as Evoto does; off unless a
+preset such as *Beauty & Fashion (Evoto-style)* or you turn it on - ADR-0109).
 
 ## What AURA will not do
 
@@ -121,7 +131,9 @@ elbows, body blemishes.
   move them.
 - Remove a mole, a birthmark or a tattoo automatically. Darker marks that are not redder than
   the skin around them are kept and counted; a field of many small marks is treated as
-  freckles and kept unless you switch that off.
+  freckles and kept unless you switch that off. With **Remove dark marks** on, freckles and
+  the diffuse marks old spots leave are healed, and **Keep moles** (on by default) still
+  leaves anything dark with a crisp edge: a mole, a beauty mark.
 - Smooth beard, stubble, brows or lashes: they are outside the skin mask and protected again
   when the photograph is rendered.
 - Invent skin texture. Restore skin texture borrows pore detail from the same face in the

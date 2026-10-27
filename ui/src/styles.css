@@ -539,3 +539,12 @@ button:focus-visible,
   padding: 0;
   text-decoration: underline;
 }
+/* "Connect Claude" / "Connect ChatGPT" (ADR-0108). */
+.connect-providers { margin: 10px 0 14px; }
+.connect-providers-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.connect-provider { font-weight: 600; padding: 8px 14px; border-radius: 6px; }
+.connect-provider-anthropic { background: #d97757; color: #fff; border: 1px solid #c4643f; }
+.connect-provider-openai { background: #10a37f; color: #fff; border: 1px solid #0d8a6b; }
+.connect-provider:disabled { opacity: 0.6; }
+.connect-providers-next, .connect-providers-hint { font-size: 12px; margin: 6px 0 0; }
+.connect-providers-next code { word-break: break-all; }

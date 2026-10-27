@@ -230,6 +230,14 @@ summary { cursor: pointer; padding: 12px 0; color: var(--muted); }
 /* The Lightroom develop panel. */
 .lr-adjustments { max-height: min(78vh, 900px); overflow-y: auto; }
 .lr-panel { display: grid; gap: 6px; }
+.color-match-panel { min-width: 0; }
+.color-match-panel > label, .color-match-panel fieldset, .color-match-panel fieldset > label { display: grid; gap: 8px; min-width: 0; }
+.color-match-panel fieldset { margin: 8px 0; padding: 12px; border: 1px solid var(--line); border-radius: 9px; }
+.color-match-panel fieldset > label { padding: 4px 0; font-size: 12px; }
+.color-match-panel input[type='range'] { width: 100%; min-height: 24px; margin: 0; }
+.color-match-panel select, .color-match-panel button { max-width: 100%; min-width: 0; box-sizing: border-box; }
+.color-match-panel select { width: 100%; }
+.color-match-panel button { white-space: normal; }
 .lr-quick { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
 .lr-quick select { flex: 1 1 120px; }
 .lr-quick input[type='range'] { flex: 1 1 80px; }
@@ -241,6 +249,8 @@ summary { cursor: pointer; padding: 12px 0; color: var(--muted); }
 .lr-slider-label small { color: var(--accent); }
 .lr-slider input[type='range'] { width: 100%; height: 4px; border-radius: 4px; }
 .lr-number { width: 56px; padding: 3px 5px !important; font-size: 11px; text-align: right; }
+.lr-validation { grid-column: 1 / -1; color: #f7aaaa; font-size: 12px; line-height: 1.4; }
+.lr-number[aria-invalid='true'] { border-color: #f7aaaa; }
 .lr-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
 .lr-tabs button { font-size: 11px; padding: 5px 9px; }
 .lr-tabs button[aria-selected='true'] { border-color: var(--accent); color: var(--accent); }
@@ -356,3 +366,26 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .licence-key { display: grid; gap: 6px; font-size: 12px; color: var(--muted); }
 .licence-key textarea { font-family: ui-monospace, Consolas, monospace; font-size: 12px; word-break: break-all; }
 .licence-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* Portrait finishing: reshape, liquify, background, makeup (ADR-0108). */
+.portrait-finish { display: grid; gap: 8px; }
+.portrait-finish [role="tabpanel"] { display: grid; gap: 6px; }
+.portrait-finish-colour { display: grid; gap: 2px; padding-bottom: 4px; border-bottom: 1px solid rgba(127, 127, 127, 0.2); }
+.portrait-finish input[type="color"] { width: 36px; height: 22px; padding: 0; margin-left: 8px; vertical-align: middle; }
+.portrait-finish-reset { justify-self: start; }
+.status-bar { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 8px 36px; background: #1e1c24f2; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+.status-bar.is-busy { border-top-color: #594768; }
+.status-bar ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; min-width: 0; flex: 1; }
+.status-item { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; }
+.status-kind { padding: 1px 8px; border-radius: 10px; background: #383040; color: #ddc9ff; font-size: 11px; }
+.status-label { color: var(--text); }
+.status-detail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 52ch; }
+.status-count, .status-time, .status-workers { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.status-item progress { width: 120px; height: 6px; }
+.status-idle { color: var(--muted); }
+@media (max-width: 720px) { .status-bar { padding: 8px 16px; flex-direction: column; } .status-detail { max-width: 100%; } }
+.color-reference-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(105px,1fr)); gap:.5rem; max-height:24rem; overflow:auto; }
+.color-reference-grid button { display:flex; flex-direction:column; align-items:center; gap:.35rem; min-width:0; overflow-wrap:anywhere; }
+.color-reference-grid img { object-fit:contain; border-radius:4px; }
+.color-reference-grid button[aria-pressed="true"] { outline:2px solid var(--accent,#4cbdad); outline-offset:-2px; }
+.automatic-finish-controls fieldset, .color-reference-library fieldset { display:grid; gap:.6rem; margin-block:.7rem; }

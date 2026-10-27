@@ -1,0 +1,470 @@
+{
+  "date": "2026-10-20",
+  "scope": "Hash-bound installed Evoto 8 Windows static evidence and independent AURA regional matching",
+  "completeParity": false,
+  "trainedModelsRecovered": false,
+  "pairedEvotoExportsEvaluated": false,
+  "targets": [
+    {
+      "path": "F:/evoto/Evoto.exe",
+      "bytes": 237784976,
+      "sha256": "7f020192f3b659ca4a1e4f8631b21879982bb21d97d26196a604ad70e2f3b2fa"
+    },
+    {
+      "path": "F:/evoto/Evoto-worker.exe",
+      "bytes": 230489488,
+      "sha256": "add7588f94aed190b97076f949709ba9622aa14f046b661783135d838d3d3bb2"
+    },
+    {
+      "path": "F:/evoto/Evoto Photo Editor.exe",
+      "bytes": 13312912,
+      "sha256": "3e569fdd7aa792c9e6f1025cfb8ae65545af4d6138961877068cd81e4dd61012"
+    }
+  ],
+  "rea": {
+    "skill": "reverse-engineer-anything",
+    "cliVersion": "6.7.0",
+    "observedEvidence": [
+      {
+        "method": "CLI inspect_pe_resources GUI",
+        "id": "ev_a19b95ce474b8bc4439edbbe31e8502b5755c901a04fc18339ae9dd420ab1b79"
+      },
+      {
+        "method": "CLI inspect_pe_resources worker",
+        "id": "ev_86de4e0b1b16df55bfb59568192d7aab90afe8d3092a16b8c61e9b493fae5bb3"
+      },
+      {
+        "method": "MCP inspect_pe_resources launcher",
+        "id": "ev_0312c9cfef3e2ad9e5906b5ea77df09c0e63bc1d5d14d2cbdea280049d3ba5b8"
+      }
+    ],
+    "failedAttempt": {
+      "method": "REA Ghidra function 0x141007ea0",
+      "result": "provider_timeout",
+      "timeoutMs": 330000
+    },
+    "fallback": "Independent bounded scanner plus direct Ghidra 12.1.4 headless targeted helper, new worker-8 project, no whole-program analysis"
+  },
+  "boundedStaticCoverage": {
+    "matchingAsciiStrings": 589,
+    "encodingCandidates": 425,
+    "candidateRanges": 268,
+    "unwindRanges": 289009,
+    "selectedRanges": 24,
+    "decompiledRanges": 24,
+    "validatedStringLinks": 88,
+    "maxSelectedRangeBytes": 16000,
+    "functions": [
+      {
+        "address": "0x141095650",
+        "label": "RawProcessor::_GetAutoWhiteBalance: hasProcessedAiData is false",
+        "disassembled": true,
+        "decompiled": true,
+        "instructions": 1616,
+        "candidate_feature_links": 4,
+        "validated_feature_links": 4,
+        "call_sites": 90,
+        "distinct_call_targets": 37,
+        "evidence_file": "targeted-decompilation.json"
+      },
+      {
+        "address": "0x141096ec0",
+        "label": "RawProcessor::_GetAutoWhiteBalance: hasProcessedAiData is false",
+        "disassembled": true,
+        "decompiled": true,
+        "instructions": 1652,
+        "candidate_feature_links": 9,
+        "validated_feature_links": 9,
+        "call_sites": 93,
+        "distinct_call_targets": 38,
+        "evidence_file": "targeted-decompilation.json"
+      },
+      {
+        "address": "0x144bb8000",
+        "label": "EffectFaceDermabrasionHLF::Render GetSkinMask failed.",
+        "disassembled": true,
+        "decompiled": true,
+        "instructions": 127,
+        "candidate_feature_links": 1,
+        "validated_feature_links": 1,
+        "call_sites": 9,
+        "distinct_call_targets": 9,
+        "evidence_file": "targeted-decompilation.json"
+      },
+      {
+        "address": "0x145e61810",
+        "label": "NoseFlawRemovalPipeline Failed to load G1 model from buffer",
+        "disassembled": true,
+        "decompiled": true,
+        "instructions": 459,
+        "candidate_feature_links": 6,
+        "validated_feature_links": 6,
+        "call_sites": 41,
+        "distinct_call_targets": 11,
+        "evidence_file": "targeted-decompilation.json"
+      },
+      {
+        "address": "0x145e60090",
+        "label": "NoseFlawRemovalPipeline::check_data_valid::Instance mask is not valid, skip face_id=%d",
+        "disassembled": true,
+        "decompiled": true,
+        "instructions": 574,
+        "candidate_feature_links": 4,
+        "validated_feature_links": 4,
+        "call_sites": 37,
+        "distinct_call_targets": 22,
+        "evidence_file": "targeted-decompilation.json"
+      },
+      {
+        "address": "0x141492c30",
+        "label": "Export CPU composition_face: makeupProtect image is empty",
+        "disassembled": true,
+        "decompiled": true,
+        "instructions": 1684,
+        "candidate_feature_links": 1,
+        "validated_feature_links": 1,
+        "call_sites": 145,
+        "distinct_call_targets": 70,
+        "evidence_file": "targeted-decompilation.json"
+      },
+      {
+        "address": "0x141494690",
+        "label": "CPU composition_face: makeupProtect mask is empty",
+        "disassembled": true,
+        "decompiled": true,
+        "instructions": 2146,
+        "candidate_feature_links": 1,
+        "validated_feature_links": 1,
+        "call_sites": 229,
+        "distinct_call_targets": 79,
+        "evidence_file": "targeted-decompilation.json"
+      },
+      {
+        "address": "0x141419960",
+        "label": "HAVE_FACE_PARSING_MASK_TEXTURE",
+        "disassembled": true,
+        "decompiled": true,
+        "instructions": 253,
+        "candidate_feature_links": 2,
+        "validated_feature_links": 2,
+        "call_sites": 14,
+        "distinct_call_targets": 8,
+        "evidence_file": "targeted-decompilation.json"
+      },
+      {
+        "address": "0x14138eca0",
+        "label": "EffectMatteRefinement::EnsureResultImage: removeBGEdge failed, keep old cache.",
+        "disassembled": true,
+        "decompiled": true,
+        "instructions": 558,
+        "candidate_feature_links": 2,
+        "validated_feature_links": 2,
+        "call_sites": 65,
+        "distinct_call_targets": 37,
+        "evidence_file": "targeted-decompilation.json"
+      },
+      {
+        "address": "0x144bbeba0",
+        "label": "SkinUnifyPipeline",
+        "disassembled": true,
+        "decompiled": true,
+        "instructions": 39,
+        "candidate_feature_links": 1,
+        "validated_feature_links": 1,
+        "call_sites": 2,
+        "distinct_call_targets": 2,
+        "evidence_file": "targeted-decompilation.json"
+      },
+      {
+        "address": "0x14134b7d0",
+        "label": "EffectMatteRefinementMix::Render: invalid result texture.",
+        "disassembled": true,
+        "decompiled": true,
+        "instructions": 499,
+        "candidate_feature_links": 2,
+        "validated_feature_links": 2,
+        "call_sites": 28,
+        "distinct_call_targets": 14,
+        "evidence_file": "targeted-decompilation.json"
+      },
+      {
+        "address": "0x141007ea0",
+        "label": "failed to load AutoWBPipeline model from file %s.",
+        "disassembled": true,
+        "decompiled": true,
+        "instructions": 330,
+        "candidate_feature_links": 1,
+        "validated_feature_links": 1,
+        "call_sites": 33,
+        "distinct_call_targets": 24,
+        "evidence_file": "targeted-decompilation.json"
+      },
+      {
+        "address": "0x141008450",
+        "label": "failed to load AutoWBPipeline_RAW model from file %s.",
+        "disassembled": true,
+        "decompiled": true,
+        "instructions": 310,
+        "candidate_feature_links": 1,
+        "validated_feature_links": 1,
+        "call_sites": 30,
+        "distinct_call_targets": 23,
+        "evidence_file": "targeted-decompilation.json"
+      },
+      {
+        "address": "0x145e17b20",
+        "label": "AdultFaceBlemishPipeline::Total Skin Mask data is invalid, return invalid input",
+        "disassembled": true,
+        "decompiled": true,
+        "instructions": 309,
+        "candidate_feature_links": 2,
+        "validated_feature_links": 2,
+        "call_sites": 12,
+        "distinct_call_targets": 8,
+        "evidence_file": "blemish-decompilation.json"
+      },
+      {
+        "address": "0x145e17fe0",
+        "label": "AdultFaceBlemishPipeline::Total Skin Mask data is invalid, return invalid input",
+        "disassembled": true,
+        "decompiled": true,
+        "instructions": 364,
+        "candidate_feature_links": 2,
+        "validated_feature_links": 2,
+        "call_sites": 15,
+        "distinct_call_targets": 11,
+        "evidence_file": "blemish-decompilation.json"
+      },
+      {
+        "address": "0x145e12eb0",
+        "label": "AdultFaceBlemishPipeline::initCache::Face(%d) Face Landmark data is invalid, skip",
+        "disassembled": true,
+        "decompiled": true,
+        "instructions": 1148,
+        "candidate_feature_links": 13,
+        "validated_feature_links": 13,
+        "call_sites": 62,
+        "distinct_call_targets": 26,
+        "evidence_file": "blemish-decompilation.json"
+      },
+      {
+        "address": "0x145e11a60",
+        "label": "AdultFaceBlemishPipeline::inferenceBlemish begin tid=%zu input=%p output=%p",
+        "disassembled": true,
+        "decompiled": true,
+        "instructions": 438,
+        "candidate_feature_links": 6,
+        "validated_feature_links": 6,
+        "call_sites": 24,
+        "distinct_call_targets": 12,
+        "evidence_file": "blemish-decompilation.json"
+      },
+      {
+        "address": "0x145e127d0",
+        "label": "AdultFaceBlemishPipeline::inferenceNevus begin tid=%zu",
+        "disassembled": true,
+        "decompiled": true,
+        "instructions": 415,
+        "candidate_feature_links": 6,
+        "validated_feature_links": 6,
+        "call_sites": 24,
+        "distinct_call_targets": 11,
+        "evidence_file": "blemish-decompilation.json"
+      },
+      {
+        "address": "0x145e121a0",
+        "label": "AdultFaceBlemishPipeline::inferenceFreckleMask begin tid=%zu",
+        "disassembled": true,
+        "decompiled": true,
+        "instructions": 367,
+        "candidate_feature_links": 6,
+        "validated_feature_links": 6,
+        "call_sites": 22,
+        "distinct_call_targets": 10,
+        "evidence_file": "blemish-decompilation.json"
+      },
+      {
+        "address": "0x145e112b0",
+        "label": "AdultFaceBlemishPipeline::inferenceAcneMask begin tid=%zu",
+        "disassembled": true,
+        "decompiled": true,
+        "instructions": 453,
+        "candidate_feature_links": 6,
+        "validated_feature_links": 6,
+        "call_sites": 26,
+        "distinct_call_targets": 11,
+        "evidence_file": "blemish-decompilation.json"
+      },
+      {
+        "address": "0x145e155c0",
+        "label": "AdultFaceBlemishPipeline::postProcessBlemish:: blemish_output valid.",
+        "disassembled": true,
+        "decompiled": true,
+        "instructions": 481,
+        "candidate_feature_links": 2,
+        "validated_feature_links": 2,
+        "call_sites": 24,
+        "distinct_call_targets": 17,
+        "evidence_file": "blemish-decompilation.json"
+      },
+      {
+        "address": "0x145e15e30",
+        "label": "AdultFaceBlemishPipeline::postProcessFreckleMask:: m_blemish_data_valid is false.",
+        "disassembled": true,
+        "decompiled": true,
+        "instructions": 800,
+        "candidate_feature_links": 4,
+        "validated_feature_links": 4,
+        "call_sites": 34,
+        "distinct_call_targets": 16,
+        "evidence_file": "blemish-decompilation.json"
+      },
+      {
+        "address": "0x145e14f60",
+        "label": "AdultFaceBlemishPipeline::postProcessAcneMask:: acne_mask_output valid.",
+        "disassembled": true,
+        "decompiled": true,
+        "instructions": 271,
+        "candidate_feature_links": 2,
+        "validated_feature_links": 2,
+        "call_sites": 21,
+        "distinct_call_targets": 11,
+        "evidence_file": "blemish-decompilation.json"
+      },
+      {
+        "address": "0x145e1ab80",
+        "label": "NewBornFaceBlemishPipelineV2::faceFeatureProtect::Face(%d) FaceParsingV2 data is invalid, skip",
+        "disassembled": true,
+        "decompiled": true,
+        "instructions": 986,
+        "candidate_feature_links": 4,
+        "validated_feature_links": 4,
+        "call_sites": 120,
+        "distinct_call_targets": 33,
+        "evidence_file": "blemish-decompilation.json"
+      }
+    ]
+  },
+  "observed": [
+    "Distinct diagnostic-linked white-balance model-loading paths for ordinary and RAW inputs",
+    "Adult blemish, nevus, freckle-mask and acne-mask inference wrappers with validation/postprocessing paths",
+    "Skin mask, face parsing, landmark, makeup protection and matte cache validity branches",
+    "620 strict JSON configurations: 618 carrier-decoded and two plain UTF-8",
+    "841 inspected PNG-like headers, 840 validated IHDR CRCs; not complete payload validation"
+  ],
+  "inferences": [
+    "Image output depends on task-specific learned inference plus semantic selection, protection and composition",
+    "Matching the panel labels alone cannot reproduce the trained task behaviour"
+  ],
+  "unresolved": [
+    "Trained networks, weights, tensor schemas and training data",
+    "Complete stage order, CPU/GPU equivalence and exact numerical colour transforms",
+    "Opaque resources/pixcook container contents",
+    "Exact image-quality parity on permissioned native-resolution photographic cohorts",
+    "Dense anatomy, per-person matching, generative expression/body and capture hardware parity"
+  ],
+  "resourceAudit": {
+    "script": "scripts/audit-evoto-packaging.py",
+    "resourceFiles": 1615,
+    "resourceBytes": 1920847274,
+    "configs": 620,
+    "parserTestsPassed": 5,
+    "payloadsWritten": false
+  },
+  "independentImplementation": {
+    "regions": [
+      "face_skin",
+      "body_skin",
+      "hair",
+      "clothes",
+      "background"
+    ],
+    "fieldsPerRegion": [
+      "amount",
+      "tone",
+      "color",
+      "whiteBalance"
+    ],
+    "strengthRange": [
+      0,
+      2
+    ],
+    "frozenSelectionResolution": [
+      256,
+      256
+    ],
+    "localParameterAxes": [
+      "exposure",
+      "contrast",
+      "highlights",
+      "shadows",
+      "whites",
+      "blacks",
+      "temperature",
+      "tint",
+      "saturation"
+    ],
+    "perPersonCorrespondence": false,
+    "proprietaryCodeOrAssetsInProduct": false
+  },
+  "validation": {
+    "uiTestsPassed": 851,
+    "uiFilesPassed": 100,
+    "nativeUnitPassed": 299,
+    "nativeUnitIgnored": 2,
+    "nativeIntegrationPassed": 4,
+    "nativeIntegrationIgnored": 1,
+    "strictWorkspaceClippy": "passed",
+    "contractsLocked": 83,
+    "desktopCases": [
+      {
+        "case": "Seven editor panels switch in rebuilt Windows desktop",
+        "result": "PASS"
+      },
+      {
+        "case": "GUI analysis discovers actual fitted background; absent classes reported unavailable",
+        "result": "PASS",
+        "before": 12.621656,
+        "after": 7.6503572,
+        "unavailable": 4
+      },
+      {
+        "case": "GUI regional strength survives panel switch and changes native rendered pixels at 75 percent",
+        "result": "PASS"
+      },
+      {
+        "case": "GUI zero strengths restore pixel-exact native baseline",
+        "result": "PASS"
+      },
+      {
+        "case": "Common Undo and Redo restore exact regional edit states",
+        "result": "PASS"
+      },
+      {
+        "case": "Original source and reference files remain byte-identical",
+        "result": "PASS",
+        "sha256": {
+          "C:\\Users\\Admin\\Documents\\project\\.work-checks\\rea-evoto-2026-10-20\\desktop-171421\\regional-source.png": "c131b1dd056a14061ca8208c4da3ff2e327a97159c5fa419ea49b630bfaec642",
+          "C:\\Users\\Admin\\Documents\\project\\.work-checks\\rea-evoto-2026-10-20\\desktop-171421\\regional-reference.png": "fe0f104fe68ad665ac68a6f835490c1fe7382d9982d6eb795b86f54134272241"
+        }
+      }
+    ],
+    "desktopArtifact": ".work-checks/rea-evoto-2026-10-20/desktop-171421/result.json",
+    "limitation": "Synthetic charts establish workflow and renderer invariants, not face detector or photographic quality.",
+    "formatting": "passed: workspace and desktop shell",
+    "bannedPatterns": "passed",
+    "diffCheck": "passed",
+    "finishingDesktopArtifact": ".work-checks/evoto-research-2026-10-20/desktop-171926/result.json",
+    "totalDesktopScenariosPassed": 13
+  },
+  "reproduction": [
+    "npx.cmd -y rea-agents@6.7.0 doctor --client codex --json",
+    "python scripts/evoto-static-trace.py --binary F:/evoto/Evoto-worker.exe --output <owned-analysis-dir>",
+    "Run scripts/ghidra/AuraTargetedTrace.java against the selected TSV ranges in a new worker-8 Ghidra project",
+    "python scripts/summarize-evoto-traces.py <owned-analysis-dir>",
+    "python scripts/audit-evoto-packaging.py --help",
+    "python -m unittest discover -s scripts/tests -p test_audit_evoto_packaging.py"
+  ],
+  "localEvidenceRoot": ".work-checks/rea-evoto-2026-10-20",
+  "localEvidenceNotProductAssets": true
+}

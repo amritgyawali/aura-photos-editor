@@ -113,6 +113,7 @@ pub fn plate(kind: Plate, w: u32, h: u32, colour: DeliveryColour, bit_depth: u8)
         data: samples,
         colour,
         render_hash: format!("{:0>64}", format!("{kind:?}").to_ascii_lowercase()),
+        recipe_json: None,
     }
 }
 

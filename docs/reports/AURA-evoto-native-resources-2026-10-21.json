@@ -1,0 +1,2711 @@
+[
+  {
+    "path": "F:/evoto/api-ms-win-core-file-l1-2-0.dll",
+    "bytes": 11928,
+    "status": "complete",
+    "evidenceId": "ev_eebad503e45db6120724483f32a2e991cd1726a55eb9cb792108807800e25c1b",
+    "sha256": "9b7895c39ee69f22a3adc24fe787cba664ad1213cea8bc3184ed937d5121e075",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/api-ms-win-core-file-l2-1-0.dll",
+    "bytes": 11720,
+    "status": "complete",
+    "evidenceId": "ev_9f0198341afce189279444510388c42782269ee26280af382e6a951bd4a36099",
+    "sha256": "9c8f443b3a42e9e1aaa110b12c85f99b3d42ce22849cc3072cf56e29ccdd8401",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/api-ms-win-core-localization-l1-2-0.dll",
+    "bytes": 14488,
+    "status": "complete",
+    "evidenceId": "ev_831d0e399bf73287e137a8336aec5cbd660bd183b2fa7763269fe4ee98690f5c",
+    "sha256": "8a4b5a175d575d1037a046156630df4ca5389b4919a9746e1a2f5d456ca50bd8",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/api-ms-win-core-processthreads-l1-1-1.dll",
+    "bytes": 21056,
+    "status": "complete",
+    "evidenceId": "ev_2e005378b45f18542b8a9f2f89425946c2c01af9670803e7ecfb8de2604b0c1a",
+    "sha256": "51a73fbfa2afe5e45962031618ec347aaa0857b11f3cf273f4c218354bfe70cb",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/api-ms-win-core-synch-l1-2-0.dll",
+    "bytes": 21032,
+    "status": "complete",
+    "evidenceId": "ev_943af85a9f1e4e1d08e53abeb58a9cf13bf38c128d8409a5200e8910b340a21a",
+    "sha256": "80fbae0acceb55364437bdd862d454db5acaa797ad0367931aef7677c7e84e7b",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/api-ms-win-core-timezone-l1-1-0.dll",
+    "bytes": 21032,
+    "status": "complete",
+    "evidenceId": "ev_e38dc93d7038ac3f067594880aa3523e6b9adb9d5a035f4529815580332dde57",
+    "sha256": "d7ab47157bff1b2347e7ae945517b4fc256425939ba7b6288ff85a51931568a7",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/api-ms-win-crt-convert-l1-1-0.dll",
+    "bytes": 24616,
+    "status": "complete",
+    "evidenceId": "ev_b12127c5630a54150fc2e911f43d070cfc66d890600b82390a55958c2eaf8ba7",
+    "sha256": "983f4d4c7b7330e7f5f091080c1e81905575ebccd97e11dff8a064979ec8d9b8",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/api-ms-win-crt-environment-l1-1-0.dll",
+    "bytes": 21032,
+    "status": "complete",
+    "evidenceId": "ev_eefd397a8f730a0d96338b90dd422f54a51a96c4e2b2ae1dce170974443be1ca",
+    "sha256": "67bbb287b2e9057bf8b412ad2faa266321ac28c6e6ba5f22169e2517a3ead248",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/api-ms-win-crt-filesystem-l1-1-0.dll",
+    "bytes": 22568,
+    "status": "complete",
+    "evidenceId": "ev_2e74a8a55f6aab10ec74e933f646dbc50ff57b790d04c3e2a173f78b03c9325e",
+    "sha256": "ab2158fe6b354fb429f57f374ca25105b44e97edcbdc1b752650d895dadd6fd1",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/api-ms-win-crt-heap-l1-1-0.dll",
+    "bytes": 21544,
+    "status": "complete",
+    "evidenceId": "ev_7528d2e76bae09a497605e00f880d9ae3695dbe2d09dbd4f93b7e0e9d6a54829",
+    "sha256": "2ee3d52640d84ac4f7f7ddfe748f51baa6fd0d492286c781251222420e85ca97",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/api-ms-win-crt-locale-l1-1-0.dll",
+    "bytes": 21032,
+    "status": "complete",
+    "evidenceId": "ev_b4872f70ab8bdabd7ad4311b88f042432a94acadb395f7bc6ce7bcd2b3ee4341",
+    "sha256": "c36f5c0ac5d91a8417866dd4d8c670c2192ba83364693e7438282fb8678c3d1e",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/api-ms-win-crt-math-l1-1-0.dll",
+    "bytes": 29528,
+    "status": "complete",
+    "evidenceId": "ev_9eedc6bd83179f86bb95b70e21a366daa41e86b13eea51a522e63de22e047970",
+    "sha256": "7c3336c3a50bf3b4c5492c0d085519c040878243e9f7d3ea9f6a2e35c8f1f374",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/api-ms-win-crt-private-l1-1-0.dll",
+    "bytes": 73048,
+    "status": "complete",
+    "evidenceId": "ev_92182293477519412addad1363c0ac0c917cbfcc2bc3ca6c32acd434ab482cb4",
+    "sha256": "e83b09c0e5acc8dc356c233908657380e756fad4f24748b8d33ac9b50992c11f",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/api-ms-win-crt-runtime-l1-1-0.dll",
+    "bytes": 12064,
+    "status": "complete",
+    "evidenceId": "ev_4c396f723150993c1a20d4b8ec681a9f06877ee9ef9b972b475dd96f5281e862",
+    "sha256": "b12679d33126d2dcb0cd3625fccf5c3afc40d95c1be36dc55f7471de94929d23",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/api-ms-win-crt-stdio-l1-1-0.dll",
+    "bytes": 26664,
+    "status": "complete",
+    "evidenceId": "ev_133ff2859839e296ecd2bfb3a457c037386252866a9618c91ca691e75c5f8a69",
+    "sha256": "e6a1ef1f7c1957c50a3d9c1d70c0f7b0d8badc7f279cd056eb179dc256bfefda",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/api-ms-win-crt-string-l1-1-0.dll",
+    "bytes": 26664,
+    "status": "complete",
+    "evidenceId": "ev_ef7b3e4fdacbbf30c6efc15ec003824d62839983c3cc4fa7844e342eb1f2f64d",
+    "sha256": "e71d517e6b7039437e3fc449d8ad12eeeca0d5c8ed1c500555344fd90ddc3207",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/api-ms-win-crt-time-l1-1-0.dll",
+    "bytes": 14352,
+    "status": "complete",
+    "evidenceId": "ev_b9f5c1ce09ff146098ccbe8687c61afecf0aa5adb72eb2fa76a05574db8f219f",
+    "sha256": "77f3c912052578780f06d6f63cd3feec925f9c20c5f0218dac9e9c0950644614",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/api-ms-win-crt-utility-l1-1-0.dll",
+    "bytes": 21032,
+    "status": "complete",
+    "evidenceId": "ev_4b71c86fb04f61a85adf44169a8f9cf0f9c871709a291ba04edce21dd305990f",
+    "sha256": "af1e1b84f066ba05da20847bffd874d80a810b5407f8c6647b3ff9e8f7d37863",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/audio/qtaudio_wasapi.dll",
+    "bytes": 91136,
+    "status": "complete",
+    "evidenceId": "ev_bf92569d7fc576e46a4e587314a84ece1dec232d3068af51ca64b79c1e1786f8",
+    "sha256": "c1bb625f97654378f506962bb63bfe5c7ee14fccdd39d180c227e04da828e779",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/audio/qtaudio_windows.dll",
+    "bytes": 56832,
+    "status": "complete",
+    "evidenceId": "ev_08a78aa16b7fc4b9213749e2b3e5a16fddad196d75cd4dba6bf9527c424a553f",
+    "sha256": "9090f1d846594cf1bcac2328190a51438c0af19f826642e098a0bad48bd2c455",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/avcodec-60.dll",
+    "bytes": 14855056,
+    "status": "complete",
+    "evidenceId": "ev_c808444f669576afd802aa0d1c8ad1f0c6ab18e11aab5f07ab92c6f7bf17fa00",
+    "sha256": "ff2f28609b6b17eef1883b8ecfb7fcfa7ae4bafeb083deaff6cd43a1b9944ad3",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/avfilter-9.dll",
+    "bytes": 4006800,
+    "status": "complete",
+    "evidenceId": "ev_bc96a6a398316bff3842a324f9e2c9745c3b96f2288084b9863e7356f98347f6",
+    "sha256": "c3f3128f7414b48275d5eded9e9dc92cff50d7da0827afd991330680df7439e2",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/avformat-60.dll",
+    "bytes": 2245520,
+    "status": "complete",
+    "evidenceId": "ev_560f31c799a91da461d68d4ed63c744536d7ce8f67b701f084e02848f7c8395a",
+    "sha256": "a9af3d21bb34ca65f6373a6e58ce2b207d826fb99e596e98dc12e28680171bc8",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/avutil-58.dll",
+    "bytes": 1137040,
+    "status": "complete",
+    "evidenceId": "ev_c7315e1a9a80dcb477f716777a02bc0c94d6a80d39042b4283dc3746f08ddd06",
+    "sha256": "6fcfe632b5783d5ef603738d93610c4c9ec1673e1ea81bea80de6031691938b7",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/bearer/qgenericbearer.dll",
+    "bytes": 46592,
+    "status": "complete",
+    "evidenceId": "ev_ea0a61f48d176b1eb74a9e3b83ef68ec9f04cd6c708e9520a93ec07c71a0261a",
+    "sha256": "374e0611ae37f72c1afb29cad199bb1e5b8f94716c02c437876ca556abe46dcf",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/chg.exe",
+    "bytes": 40848,
+    "status": "complete",
+    "evidenceId": "ev_26c6f6d141f4401da86a42ce284d1183c7a0ee6715f2ccdc55e8aa3dffbf30d7",
+    "sha256": "fab3a9b9a2780cbe8add27c4a5f937064dca8f73307a0079b87b9aaf50d11fd7",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/concrt140.dll",
+    "bytes": 309632,
+    "status": "complete",
+    "evidenceId": "ev_bfbb5558165e8d93e4f9a598441325b03fab85150e8be3cdb32cb4158e1892c3",
+    "sha256": "449e6073300d973d3d07f08896140ecdcc1c7fe8f58cff5aa7096cc124cf6393",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Cr_Core.dll",
+    "bytes": 938840,
+    "status": "complete",
+    "evidenceId": "ev_e7e7f30174b7764a80c07cf1658afe081eb74419e0bb756a62aa1491172ca744",
+    "sha256": "a2f2c58b78a3b59f64e92c22e9d5e4ba926a7653080c24ac32e40a518f6f5bad",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/CrAdapter/Cr_PTP_IP.dll",
+    "bytes": 153432,
+    "status": "complete",
+    "evidenceId": "ev_10e5b9d9b1954217bbcacd5d77d0032a48818f1738ff4ce0da959c9a374872ac",
+    "sha256": "00dc28d83d4a45f07eda53d4b245e3de3580363aec5db03c23a77f89bf45c3cb",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/CrAdapter/Cr_PTP_USB.dll",
+    "bytes": 96600,
+    "status": "complete",
+    "evidenceId": "ev_2d21c53a84f1dbdfd45e4e39668920140aa3fce9188a292e1adfe34e34fd0b5d",
+    "sha256": "cc04a1f715d046efe42c5f1489c05e2c2f86e03c67dcc1b5653c990a494e0562",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/CrAdapter/libssh2.dll",
+    "bytes": 2598400,
+    "status": "complete",
+    "evidenceId": "ev_42f1b7ade9afcb959c4bbca08d28de4966f1afaea38e4c90d4650285caabc999",
+    "sha256": "a7d4da4605a6c9eac5b2272707c9b2b5f60e995676d602ef9de6a238868441c0",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/CrAdapter/libusb-1.0.dll",
+    "bytes": 148480,
+    "status": "complete",
+    "evidenceId": "ev_d1ed097bcf304fcf0cbf338480c14469142f21885c535a1b5a44e7b23ce5ae1f",
+    "sha256": "4e2acd45486b9196e8850ca1bbbc71c424a0a7aeff3d3f28c4b5cc660616c885",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/crashpad_handler.exe",
+    "bytes": 1089936,
+    "status": "complete",
+    "evidenceId": "ev_289c71433670a1112cf3f67639592cd7226d64a9381ae0a06586b183e127aae2",
+    "sha256": "42ee8f2468cabd8bad576b416db33ec6ca6ad1a6a8a36d48d7d3207be6cda5bc",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/d3dcompiler_47.dll",
+    "bytes": 4740688,
+    "status": "complete",
+    "evidenceId": "ev_0076b3a67a0b36db80cb1ede011a42fddf8aa5859669c13f04dabcb8db403584",
+    "sha256": "59c828f9209c22b4ba73b85e419de4e405e068538959d36cfa2937def6d93954",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/dbghelp.dll",
+    "bytes": 1938072,
+    "status": "complete",
+    "evidenceId": "ev_d5091d2442a991640deae893c1db5d72350ee0069e8ec51440748c45dc43a292",
+    "sha256": "3d92df0984662298a09d988aff0bb7c3081a46bf48177b7af02d3552641f77e9",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/dbghelp_win10.dll",
+    "bytes": 1938072,
+    "status": "complete",
+    "evidenceId": "ev_17f8565ceafca7343d4ce18d04feb72aa5c7ab49203a79f7dec8d460949a19c3",
+    "sha256": "3d92df0984662298a09d988aff0bb7c3081a46bf48177b7af02d3552641f77e9",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/EDSDK.dll",
+    "bytes": 1521664,
+    "status": "complete",
+    "evidenceId": "ev_ccc7e45e005da1693a69cfc7ad75c0a669b9e80856f83643d8cf2dfb5b928201",
+    "sha256": "130bd2bfe5aebca6fc20f2fda17497bb8421c5724540bf8e5c51fb56d7a738c3",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 9,
+      "resources": 3
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/EdsImage.dll",
+    "bytes": 560640,
+    "status": "complete",
+    "evidenceId": "ev_d64f439be3b6dee7cb84b1685d0d3e314888bbbde8886fdd3743749749c8fc85",
+    "sha256": "5b433aa879f729e23bc16eee168de6ebdac7ae96e33dc351dedc255a5d5a6e20",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Evoto Photo Editor.exe",
+    "bytes": 13312912,
+    "status": "complete",
+    "evidenceId": "ev_56b0795c96abf1db3574c3a7762c70c8a15963e78651b2e88a0b6d5761ec509e",
+    "sha256": "3e569fdd7aa792c9e6f1025cfb8ae65545af4d6138961877068cd81e4dd61012",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 12,
+      "resources": 4
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Evoto-camera-link.exe",
+    "bytes": 26565520,
+    "status": "complete",
+    "evidenceId": "ev_1bc1ade8eaf84582f3981482e9c1c66c79a90eef8ba402544f6b970b0557e172",
+    "sha256": "b2617525312b5b15a573cba32f5cc2a1e5a5594ff213edea57804869e32dab0a",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 12,
+      "resources": 4
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Evoto-worker.exe",
+    "bytes": 230489488,
+    "status": "complete",
+    "evidenceId": "ev_8dbaf66fc34a1fb1627ffc92c20974826ddbefc7c3cb7acad7ed961d9bf81d9b",
+    "sha256": "add7588f94aed190b97076f949709ba9622aa14f046b661783135d838d3d3bb2",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 12,
+      "resources": 4
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Evoto.exe",
+    "bytes": 237784976,
+    "status": "complete",
+    "evidenceId": "ev_dc7e7d2b12d822f823b34433a38ce8d4fa3252232e377fef0a15a59c2f9be062",
+    "sha256": "7f020192f3b659ca4a1e4f8631b21879982bb21d97d26196a604ad70e2f3b2fa",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 12,
+      "resources": 4
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Evoto_Setup_7.3.5-185.exe",
+    "bytes": 2037597856,
+    "status": "budget-excluded",
+    "reason": "Historical 2GB installer; not opened, executed or confused with installed version"
+  },
+  {
+    "path": "F:/evoto/EvotoInstaller_Setup_1.0.0-408_stable.exe",
+    "bytes": 11862016,
+    "status": "complete",
+    "evidenceId": "ev_5ecdbb219a3df821ee1f7cb79eb5de6a346e488d501aca447f9efff50884f1bb",
+    "sha256": "c05f8bf7abd5a6176c6bc889f0eba3e4ae70a1dff376caeef2ea39327e22f951",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/FTLPTP.dll",
+    "bytes": 170976,
+    "status": "complete",
+    "evidenceId": "ev_78e128eed3af58b673932bb20fc0096995973bd3f1f1ba2d9ad8220385b503b9",
+    "sha256": "7d570ddf5469ff0a11a5fdc7e7ebec8c01190a826d67a0a13f54eceecb8aa4b0",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/FTLPTPIP.dll",
+    "bytes": 215960,
+    "status": "complete",
+    "evidenceId": "ev_0f8c55c835d43e586657bf5de132d7b179ec39b03ab6cd188063c46e04f802c4",
+    "sha256": "244fea95756d7296b35114aefeabcddf305181d86aaddf86d79ac0b623861afd",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/iconengines/qsvgicon.dll",
+    "bytes": 35328,
+    "status": "complete",
+    "evidenceId": "ev_e82063d11b68ebfa4d1556a8273df7e734fd96489cb4ae129cd4cfd8bc662b26",
+    "sha256": "eacb27fa4ea8cb3ac544f3b49f1fc27e2b582e45fe87dc8dbe4e933a9fc961fb",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/icudt74.dll",
+    "bytes": 30796688,
+    "status": "complete",
+    "evidenceId": "ev_4ff0e6a2509bc4ce733aa499e521aebf6f2a58112f9aad1fb0dd2c21b6eae6a5",
+    "sha256": "2dffde7208c87b02aec156f16d128bc101a15d39e101b9b3466aea18d14a9c29",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/icuin74.dll",
+    "bytes": 3115408,
+    "status": "complete",
+    "evidenceId": "ev_37d9b0e896fc8b4ae6a2b63cef912d8bb09c7ec670be7866d45560f4190d17bc",
+    "sha256": "53485290fb7f949120959d9389332b3dcd342c43302a3c29311647362d5c5395",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/icuuc74.dll",
+    "bytes": 2356624,
+    "status": "complete",
+    "evidenceId": "ev_41a6ae1b482d888a04dad21d065d4961382785f10182bd1424478b33836e2788",
+    "sha256": "b70ce8878df6251471d004fc3454d4b6d52b7aadb083971b11e0efbde01cc50a",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/imageformats/qgif.dll",
+    "bytes": 32256,
+    "status": "complete",
+    "evidenceId": "ev_2d782e89207f0e0a363b847564d68450620497904b247ff7e21b03342543b302",
+    "sha256": "9e7e30e831e7739e6f0467d922247340484984608139af540b21e65854c5c83b",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/imageformats/qicns.dll",
+    "bytes": 37888,
+    "status": "complete",
+    "evidenceId": "ev_6d015988eb1f7643435d486e45a1e04d259d1e6283290dadb6149149ff7d84e8",
+    "sha256": "48a7a0c8d84ae07449b479889fe1d12f63ee950d139880ca614138c2ecbe3154",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/imageformats/qico.dll",
+    "bytes": 31232,
+    "status": "complete",
+    "evidenceId": "ev_777e2a0ef4f7658898ba5f23b30dbac140db578427a83c52ed87a796fe80cd9b",
+    "sha256": "833965d9daca75ba7697b4ff85c253d7aff879ad38839436b9ad44eba5d7be33",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/imageformats/qjpeg.dll",
+    "bytes": 414208,
+    "status": "complete",
+    "evidenceId": "ev_c8f361bbe00d27304be9cb5796593bcd4281d307c38d61d5bf419177c3645bd3",
+    "sha256": "21da35e2bd2b0695c62e6e52e53c14a0e37cde2bd6e4a22d795cde54bc0cf8b3",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/imageformats/qsvg.dll",
+    "bytes": 25600,
+    "status": "complete",
+    "evidenceId": "ev_ab4f17d287d94f29ea92f9da7ea48ca26158e0d5d65a2217ae1715bc0fcada73",
+    "sha256": "bcfbed0c16636ce173dc49d7d2f7698c7ba51b2a97f8b6f7a38fc420141b7f1e",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/imageformats/qtga.dll",
+    "bytes": 24576,
+    "status": "complete",
+    "evidenceId": "ev_f0ab9a69303e6f53e4cfa497faebfeae60c6835ca19e01443e3f1657683dde58",
+    "sha256": "f93c5f2be552885c121453d6dbe1d6a00f0f214143ff49aaef3d9ba6f8661364",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/imageformats/qtiff.dll",
+    "bytes": 383488,
+    "status": "complete",
+    "evidenceId": "ev_b4b60cbdbdf1358c3c33fb99fd0c4a9a629e8fdc2051bb3798f5472049e9bad2",
+    "sha256": "e5afb6625596301db54c52bd12f4c8ae6a450d9b1fef59c5154075023ecc4a04",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/imageformats/qwbmp.dll",
+    "bytes": 23040,
+    "status": "complete",
+    "evidenceId": "ev_88bb7ce9f5b3f6549ddc91d008f7b34f6e03d5f2faf0a808ac5057a267d3dd3d",
+    "sha256": "ec083fc1ea53793240e7ab3cab8780b8688334203d61339d2b6508fb58e6001a",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/imageformats/qwebp.dll",
+    "bytes": 502272,
+    "status": "complete",
+    "evidenceId": "ev_0ff53019ec724e5a3fcd7ba7222e91870aeb4269732e88585aea52c5b6182029",
+    "sha256": "3dc623dbb40945a0b1942da8afe31ab17952fda9c1b2e52aeb30102b313e486a",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libcrypto-1_1-x64.dll",
+    "bytes": 3430288,
+    "status": "complete",
+    "evidenceId": "ev_53f78cd3f8829ef50f50e72d2aa89b1c396bb0b24cdcfa24dfd053c195505389",
+    "sha256": "5b23e3ae4dd7fa1b1c7b0592135c516705a54eab16c47cf7b41922a6bd53f486",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libcurl.dll",
+    "bytes": 421776,
+    "status": "complete",
+    "evidenceId": "ev_ce1088d7ab07bd877d2d727b3488a84d9bad36093899b74aba6fa5e4e386ba3f",
+    "sha256": "6366627251d03da2b715d2e217decb929dac1b5c74c375349b7109921c60ad8a",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libeay32.dll",
+    "bytes": 1384848,
+    "status": "complete",
+    "evidenceId": "ev_1b9b297c8f0c77b752ba802e64d5dd9fef7a8647bfd03f87665868889d525811",
+    "sha256": "6322486c7936aa118ca0832cd5fd27565b2aa74ac58791d2a107dd3e463c5efa",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libEGL.dll",
+    "bytes": 28560,
+    "status": "complete",
+    "evidenceId": "ev_8483201c6fcca73a1a57ac5b43750b80fd6ccc3d818665af54eb46010ad9f7ee",
+    "sha256": "15c3fdb7ff8f91afa922134a2990e653686f741508ab5183e6ae2ddea897a340",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libexif-12.dll",
+    "bytes": 232599,
+    "status": "complete",
+    "evidenceId": "ev_666a05178a5fcebad85aaa6c084e771010225db510ce76d1aea91a2858fc5bd4",
+    "sha256": "fc2a387e549ca5cf8295dba8935af97541c8af667f02c9a01ab4632c77815eff",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 0,
+      "resources": 0
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libgcc_s_seh-1.dll",
+    "bytes": 117427,
+    "status": "complete",
+    "evidenceId": "ev_b1dec2fcefcb5ef2361944a180fdbcbca7053a4a0cfef52f35e92b0eee8495b0",
+    "sha256": "4ba4820b9b3b7cae64b195ec4c003be566168979e9813bc0dbfb24bbf84a5e8f",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 0,
+      "resources": 0
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libgenericSdk.dll",
+    "bytes": 242052,
+    "status": "complete",
+    "evidenceId": "ev_4b57f6210bb0fb0b3dff4809eaa8e8395035a6e7b89ab0c556d2aa10afd3b0d7",
+    "sha256": "d4b57d172f69439e2329bed299c464e992e191ef55920ae424e868d42bc31bce",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 0,
+      "resources": 0
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libglapi.dll",
+    "bytes": 397712,
+    "status": "complete",
+    "evidenceId": "ev_4886d2619e578d7ee0d5c575917014312592b6e9aeca53caf772aad37ede9e72",
+    "sha256": "566ef5f56d9d213ccb4e8adb6953a42290afd9d7e85f1e8993c8e7fe4b8982fd",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libGLESv2.dll",
+    "bytes": 3387792,
+    "status": "complete",
+    "evidenceId": "ev_15051af0ba6efdbb3efd6619fbcb4612b17bfb87b3a4d4b90deafb74a08347a3",
+    "sha256": "b6819869a19b5332fe16373b79a122dc2291108331e9cedbc47747fbc1650722",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libgphoto2/canon.dll",
+    "bytes": 184376,
+    "status": "complete",
+    "evidenceId": "ev_83ae4f09400d7520c28cd9b1628a8376d66cc64ac9871ffabe3cd793a21d59c1",
+    "sha256": "b1b419eb40039b259cdb79c07d2d0a68a82d53d5b0c7d3a8ebe611e26c565d46",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 0,
+      "resources": 0
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libgphoto2/directory.dll",
+    "bytes": 37248,
+    "status": "complete",
+    "evidenceId": "ev_a77a4803caa425dd40a0c6991cd47176a373bfeca860665ce17bde50f1ace1bb",
+    "sha256": "10010ef8024971d17cb25b609949596c6d61e32d79e6bc06b0f1fba603c02668",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 0,
+      "resources": 0
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libgphoto2/ptp2.dll",
+    "bytes": 965512,
+    "status": "complete",
+    "evidenceId": "ev_239083fb5699ab0298b799fbbbc06fbec6cf89a475095d52796d844f1259541b",
+    "sha256": "1c7ac2e0c72bb6a912ee62ce4e00d423f78381e7412103f262751e145d70c3a9",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 0,
+      "resources": 0
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libgphoto2/sierra.dll",
+    "bytes": 125976,
+    "status": "complete",
+    "evidenceId": "ev_3c7157e2e214b4d89b71278cb0281db78c8e9a9897dbb92cf1c5e5820929f672",
+    "sha256": "02a5cb31e3f0dba2c087ece5e6f1ada02e189000789cbcef57773d70ed308344",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 0,
+      "resources": 0
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libgphoto2-6.dll",
+    "bytes": 167485,
+    "status": "complete",
+    "evidenceId": "ev_27b0e4c7a4f21c5508dcbace76a951076a459e62e145786bc9c935cf2a4e29d6",
+    "sha256": "f7f7e1d71db49fdc8396854f525abfd4b2dc98232f689a8be6dd85ff09d3d77f",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 0,
+      "resources": 0
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libgphoto2_port/disk.dll",
+    "bytes": 27464,
+    "status": "complete",
+    "evidenceId": "ev_9c51d60056c5ace079d9f9a77f6a0dc53ffb78a2c3796f4c1f26b04179c511f1",
+    "sha256": "b60eedbe6190967e0467abbe3bbb7117b21109a9c02a97caf4fe9b08bbc61f9d",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 0,
+      "resources": 0
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libgphoto2_port/ptpip.dll",
+    "bytes": 28536,
+    "status": "complete",
+    "evidenceId": "ev_a0bbc05b22b7b3bba34a659269859e748b708afcb4cb038715b23196fc43b29c",
+    "sha256": "be8c04ddf942aa0a187ccf44d1c79fb4ccbe6e08fdfc786838aa812645dcca5e",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 0,
+      "resources": 0
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libgphoto2_port/usb1.dll",
+    "bytes": 94392,
+    "status": "complete",
+    "evidenceId": "ev_08b2f89f600b9fdabf380b5b8cbe8de445d0422ef46b9bde477c344b508c7a8f",
+    "sha256": "ba5f27ea3691643b204e7eec29e175288c23034c51309b0cd63c14ab9726783d",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 0,
+      "resources": 0
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libgphoto2_port-12.dll",
+    "bytes": 73051,
+    "status": "complete",
+    "evidenceId": "ev_4e79d6687de2525bd15b4345d1bab052f9d69de5289473288ded0047d60ecbb2",
+    "sha256": "baef49c27ba4f3bb1037a82ff855cbbf4526195ea1b20fc2850fa8dc74b3e065",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 0,
+      "resources": 0
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libiconv-2.dll",
+    "bytes": 1117178,
+    "status": "complete",
+    "evidenceId": "ev_9afbb6f3e53429b890f4bc46ba1559d645b1ed58f501e9a2c1738acc968004a1",
+    "sha256": "55de11531dc0e566cb91f26e48d1301a161a4b8b24abed42304d711412368760",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libintl-8.dll",
+    "bytes": 140552,
+    "status": "complete",
+    "evidenceId": "ev_6f9a3c7421528e2bd4b02ead669fdb217f96439929ff5345ab198e778ec80ad6",
+    "sha256": "56a5148d00c2d9e58415be2d64eca922a58063fe26d9af1c87084aa383c9058e",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libjpeg-8.dll",
+    "bytes": 1071435,
+    "status": "complete",
+    "evidenceId": "ev_2c3f3ef61be9b534e0b68f6d1957c7607a0aa280f262d5178e193fd4859ff0c5",
+    "sha256": "74255432d7cb982178a28a54f8efc56e675163f608da388fd52cf7ccb5bd4071",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 0,
+      "resources": 0
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libltdl-7.dll",
+    "bytes": 72971,
+    "status": "complete",
+    "evidenceId": "ev_1b72b5223ec36f1ee4a3da3e101a335c2a4ff24574112ff7d342fba86a2dc98f",
+    "sha256": "76d498c4c1865e288d9dad31f0b6e001a9f3520a3ca6a2e38d06013c77af86d3",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 0,
+      "resources": 0
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/liblzma-5.dll",
+    "bytes": 183717,
+    "status": "complete",
+    "evidenceId": "ev_d9d3e8a6eadb89c01c318293b901a6da9bc8d5276e7ff0ab8be1b6abc8edffae",
+    "sha256": "95c9487cf57d18a4a11b797d410bccdd87cebead21cf79d49974f19d8fd88f44",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libssl-1_1-x64.dll",
+    "bytes": 694672,
+    "status": "complete",
+    "evidenceId": "ev_548a282a22b2c9926e13298789fd08d7d3d5c7ffd883c2c4e6897e10a2a58bb2",
+    "sha256": "f929723669b7d89c2a459f3f3aaacc18a2b0dcf745e25e8aeb0e65a9bf8dfede",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libstdc++-6.dll",
+    "bytes": 2266606,
+    "status": "complete",
+    "evidenceId": "ev_5a8242a5d40b0a826e0c79813c0a0ab418da34e733e49c5622370491566c5d37",
+    "sha256": "515c1cc0163eb5a5294bf18b4980019cb1c7e7279830048b4cc81db8a2736770",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 0,
+      "resources": 0
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libsystre-0.dll",
+    "bytes": 18240,
+    "status": "complete",
+    "evidenceId": "ev_562bc31ceaed69399341300718b7dbd5158c8bd2a8dd7592a5e8ecb0f59fbb1f",
+    "sha256": "04d1c1c17a298453446dafef953a99f77c0917997d900e0ae23874f0de05ec4d",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 0,
+      "resources": 0
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libtre-5.dll",
+    "bytes": 92313,
+    "status": "complete",
+    "evidenceId": "ev_fdbd7c8eced057c1004ba1f14e1829b315dcebfaad8c49527552c77e967b3faf",
+    "sha256": "ced3ed477102444ca5ea7835cbc096f949aff11f7588dc1f528446691f942b7b",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 0,
+      "resources": 0
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libusb-1.0.dll",
+    "bytes": 214745,
+    "status": "complete",
+    "evidenceId": "ev_f475d0e523f178c5ac150e29581a5a39849d8e84c9cbadc9e314c6ca9adf6dc3",
+    "sha256": "76055314e4e69641fb889e88b858bcc14b50aff06f197e5f8d5a112ba2e13ed7",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libwinpthread-1.dll",
+    "bytes": 60356,
+    "status": "complete",
+    "evidenceId": "ev_c8e210688dcca2dda00265106efa7609b8fcabd789b530467de117a99566d1d8",
+    "sha256": "2b18435ba46bc13c5261e88dbde7c0fe0dbf0fd18c6ccc2617e5731a4b462005",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/libxml2-2.dll",
+    "bytes": 1288885,
+    "status": "complete",
+    "evidenceId": "ev_794f2b1d82c211e1a71824035c9d1e22cdb6c5f667f2525b9ada26e839dfdfeb",
+    "sha256": "f0887b91544112334fb53512f1493e36dc35a280402bf07ae6fbe0800d881f3d",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 0,
+      "resources": 0
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/mediaservice/dsengine.dll",
+    "bytes": 294400,
+    "status": "complete",
+    "evidenceId": "ev_ad4d6e08e55724d829de8f686b3d107fc5a4b3a3efd1e6f6272424760fddc844",
+    "sha256": "728e07d69b2386ea7e6b3b7e4a69b64aab4adab23db192c421f9dd6a9844be15",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/mediaservice/qtmedia_audioengine.dll",
+    "bytes": 61440,
+    "status": "complete",
+    "evidenceId": "ev_310a9673e243838103aa86eb8329da2f7069f9003fa162ebacb4165f535e7d70",
+    "sha256": "536016fdf673433f6d515d6d377f37fb09b79c7b5f8d2776ab9680daf2e314d3",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/mediaservice/wmfengine.dll",
+    "bytes": 201728,
+    "status": "complete",
+    "evidenceId": "ev_7515dda3e1bbb40d1826957245c9686ec0b3fa5a6d70383bb6cc42368ef2f268",
+    "sha256": "ef3330bc87b9345489df6879395516fca22c1e4f9523be3d59d4570311bf2802",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/monitor_protocol.dll",
+    "bytes": 6981992,
+    "status": "complete",
+    "evidenceId": "ev_4ea503571dc52efc3d2a655278bb5008491fa4ac7ea6dad58d46229dfacc37be",
+    "sha256": "f9327d21b34005ed47c14552519aef07820626000ede5c89306dcc27405e5c94",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 0,
+      "resources": 0
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/monitor_protocol_pf.dll",
+    "bytes": 2912624,
+    "status": "complete",
+    "evidenceId": "ev_ab840733e156e61ed7501f6d5b77e235c07a4c1527711abdda1cc54d97c383dd",
+    "sha256": "1803762cbd4565ebf87e24534a6aab96cff3b29af33c39c209f7afd4a216567b",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/msvcp140.dll",
+    "bytes": 557728,
+    "status": "complete",
+    "evidenceId": "ev_6552699300345788753e13673a312607d47db5d5bed50cd58d3adff80a6337a7",
+    "sha256": "0f885b509a685d2bbfa652fed26b5fb31d88fbdab0a978c641d1c7b8aa460aa9",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/msvcp140_1.dll",
+    "bytes": 35952,
+    "status": "complete",
+    "evidenceId": "ev_97be89a36de8682915cd019224c543923337980012105d5402c00863058e5c19",
+    "sha256": "bfad5aef4c63a669e3c140655cdfdf395b6c979b400a447bd5dcb65ed8826c3d",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/msvcp140_2.dll",
+    "bytes": 280200,
+    "status": "complete",
+    "evidenceId": "ev_3dd9406526369db09c2368fae8c5ce974abc4c3a17b84358b74d74c4755c44b5",
+    "sha256": "3ea06f0ee098b4823cb79599df3780e7f23cce52c19aac31d2a0d47efe33a5e9",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/msvcp140_atomic_wait.dll",
+    "bytes": 50304,
+    "status": "complete",
+    "evidenceId": "ev_fac4da5c938e568f44fee029cedb3ff6ab85dd8cbf9180d41de5dee5995db803",
+    "sha256": "640b2aefced484d0368eea5bdd06addd0658a3a70a49256e560d6923b404a479",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/msvcp140_codecvt_ids.dll",
+    "bytes": 31872,
+    "status": "complete",
+    "evidenceId": "ev_7afe339191b81e96484a7c60f8e16707af8eef4357b22fd71381956490f3cdea",
+    "sha256": "f2069a52880ec885ee7f0511186100eb7fada0411a2b4948fafea7735b878a18",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/msvcr100.dll",
+    "bytes": 830616,
+    "status": "complete",
+    "evidenceId": "ev_a09d530ab53d6c7073c4d2419e7aa4941e615c35c56cfc897883d469896ee48c",
+    "sha256": "2b7ab898b2f64f4cd1ae651c93d7eb9556208fd8d8d40d425e856c83d86d2346",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/opengl32sw.dll",
+    "bytes": 20934032,
+    "status": "complete",
+    "evidenceId": "ev_c4a3a18f4429cba3f1513d0f7174f4d091252f6c341ef54e4c9509e4b6ea8a0d",
+    "sha256": "8d22233c8d8bc6e9e63aca59d2e1229bb937c4b256fb385b8f3b1c36a84b08ef",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 0,
+      "resources": 0
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/opengl32sw_w.dll",
+    "bytes": 33875344,
+    "status": "complete",
+    "evidenceId": "ev_3d35023c7a4d18bdb9a9a7eff36995f40187ff9c8511df2c55f50152daaa45f4",
+    "sha256": "1ab1781851fffefa31b59246f31d22c8e5e24b22fd7c8aa19ceacdd5bb3168f9",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/openh264.dll",
+    "bytes": 978520,
+    "status": "complete",
+    "evidenceId": "ev_c0ee3bd194c2a3b3b6b71fb0b33b938331a193589aa34d2f3b406cd8d6c04797",
+    "sha256": "2076cb5675ec6c1a4c70e7a2a322552f547b6eeed649d6dfcd9e02a543b24691",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/PageFileHelper.exe",
+    "bytes": 27536,
+    "status": "complete",
+    "evidenceId": "ev_dc6c00a2eeb7b49a304b81bfa8b6bdf499853923fa1636beb60348fcea5fcc61",
+    "sha256": "5c271af35f63dc1f1214425605c8f930522319114bd47310de7f79ad3c5c4d8b",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/PkgCheckTool.exe",
+    "bytes": 13341072,
+    "status": "complete",
+    "evidenceId": "ev_f2a81e947591660e8e3da9bd2ffd600e216a6a22404bd8069719633cee715414",
+    "sha256": "7ffecd8860c4fb0f8a2da8b9310c5cbd083c495d291bcab59665cd588911bf05",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/platforms/qwindows.dll",
+    "bytes": 1451520,
+    "status": "complete",
+    "evidenceId": "ev_014740f5876f78ba1191458d50e8dacd578517c5bd24156f092cd235cebd2fc2",
+    "sha256": "1ed690f21c12c7dd2978477e56db0b452716f136a88fbae6f387cff7925e5e5a",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/playlistformats/qtmultimedia_m3u.dll",
+    "bytes": 26624,
+    "status": "complete",
+    "evidenceId": "ev_eeab27a783b3e02175fa19097863310c48109332e9fd07e8e74caf16e622751f",
+    "sha256": "49ed905a820d7e0ae6b4b1992aaacb4712c5007f5b8d7589687e05766e400dff",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/position/qtposition_positionpoll.dll",
+    "bytes": 43520,
+    "status": "complete",
+    "evidenceId": "ev_6e9cb5bc0faa6543d6a69cfcd7097f1fb98ed808e6a65da65de9a79a757da2dd",
+    "sha256": "b431457fa9a04da60f47564537b7cf64fbd54f36a9081b31a54a41e05fe4ff91",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/position/qtposition_serialnmea.dll",
+    "bytes": 60416,
+    "status": "complete",
+    "evidenceId": "ev_e0a62b2c1218b024ba406ef9a0f8a591474f5330719ff1fd5afbfa3e208a5ed4",
+    "sha256": "3cb57f692fede2f7cbac72c9cfddc76f4f2ca9e45f8794619513e03315a84121",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/position/qtposition_winrt.dll",
+    "bytes": 50176,
+    "status": "complete",
+    "evidenceId": "ev_56cadc324e3ce5a7696055688e60bc7e2da6648ad1d87f74ccd22c3e96f28db7",
+    "sha256": "2ff505ac3c6dbad334d87bfdb85f7c1f09e7be0b6514c54bb6e33c0361870dc2",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/printsupport/windowsprintersupport.dll",
+    "bytes": 48128,
+    "status": "complete",
+    "evidenceId": "ev_858a0342e20916d75b52fc8fa1776b932bc550b50f0b6c9609204b9d7f8f4234",
+    "sha256": "0de29e843002595fc08e3b956bb07bfeb961b0ff8b4bfc47c7befcc307b7f75e",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/procdump64.exe",
+    "bytes": 424856,
+    "status": "complete",
+    "evidenceId": "ev_df9d704454e21f21c858d871c7623962821489ca1db11defa816472b1304cff4",
+    "sha256": "5b165b01f9a1395cae79e0f85b7a1c10dc089340cf4e7be48813ac2f8686ed61",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/pthreadVC2.dll",
+    "bytes": 93584,
+    "status": "complete",
+    "evidenceId": "ev_1cf169267652af15af60829cdbfe593b970dc5880ff2e5f4648c812f0f172915",
+    "sha256": "118bd4b7d92d6ab5f059632ae6e7a9928da6b666192702edf247854c7b9266f6",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Qt5Core.dll",
+    "bytes": 6052240,
+    "status": "complete",
+    "evidenceId": "ev_01398562dad757c2c8d01cea30ab6431ffa7d984544036cd0b182ab59e7635fb",
+    "sha256": "9867f25132d78a98df56ba7792826185a714f74ecaa90f48152511dcb717aab7",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Qt5Gui.dll",
+    "bytes": 6784400,
+    "status": "complete",
+    "evidenceId": "ev_9e1b0f1b0df8f3e0a5238072637808d7e4e61f18291be4e8d01637c0c3ef7d8f",
+    "sha256": "332094e2273cca1f01bf3853456e91a6ca4361eba3c0af25c9abffbc09ac2816",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Qt5Multimedia.dll",
+    "bytes": 749456,
+    "status": "complete",
+    "evidenceId": "ev_5aa8db3705e8016bbc054d6d0479161580ea2d7604904a9331742c1caef909b5",
+    "sha256": "497f86aa3a4979f5818d65c0271718f58154a0560a7c3569ade604cbcecf0ce8",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Qt5Network.dll",
+    "bytes": 1436560,
+    "status": "complete",
+    "evidenceId": "ev_ec332a734e671cd6b39df76d647d150d60efe0c6c2e919d2aae24552efb13844",
+    "sha256": "e814854183f12b2d157651d5e6c17d943205ee00f75b7e63ab85d0a5eb7da630",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Qt5Positioning.dll",
+    "bytes": 319888,
+    "status": "complete",
+    "evidenceId": "ev_a85cdb637b9fd4831b401abac75045db4ff89a245e53f51efa88d9f5f91db876",
+    "sha256": "5810b17cd22f22a76770e100cbd00cb0593087eee325ff503d8797ab6198fee8",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Qt5PrintSupport.dll",
+    "bytes": 321936,
+    "status": "complete",
+    "evidenceId": "ev_b60cef67fd44015b421891dd52af236c8be951bf603c92cfb7816ab671c0cbce",
+    "sha256": "a6cab2fe72164aaad2bb9d24180e5f65c9ad1110f236689bd20a0c5d9f173c38",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Qt5Qml.dll",
+    "bytes": 3606928,
+    "status": "complete",
+    "evidenceId": "ev_22157b38e11ee825189b7c3cc879e1e4a50639be4c95bda21a574320332b1661",
+    "sha256": "2b8ce2499dc7d48d32db81fef2454257a9f9ee26e07a0721b1ffaf39e6da1457",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Qt5QmlModels.dll",
+    "bytes": 457104,
+    "status": "complete",
+    "evidenceId": "ev_b5fea3fc81c1fc36d743869932fc261ce11f294e5b7a660c20774adb918b5770",
+    "sha256": "61eff6ddd328f8b42a04f19f0a16c8d6046034a4416583c57689e07a57545d55",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Qt5Quick.dll",
+    "bytes": 4284304,
+    "status": "complete",
+    "evidenceId": "ev_88445ea46a4c5dd3ce5c07f44d2899a09e5dec5ea02eb5f8058d5ec9afb948ae",
+    "sha256": "4150063843780558900771a7fa74ec1b37bcf85fc29c0c64c9f2b3ccb72f4f7b",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Qt5QuickWidgets.dll",
+    "bytes": 91024,
+    "status": "complete",
+    "evidenceId": "ev_841993bb6c985c796c39fedd7b746b7d186265b71556c8a25f03d1cd927516ed",
+    "sha256": "4e14f885e1d2922fd7068f29be7cef49da3eb2901e173784f78654e834bbcfaf",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Qt5SerialPort.dll",
+    "bytes": 81296,
+    "status": "complete",
+    "evidenceId": "ev_b3b294188e63a42db4355d314d39ee6cad3b11de99a5f36d914bf5dda403f4ea",
+    "sha256": "e1f140aa548632319b77fa6f0015a8d5205ec34a93fc8fd09339657b339d07ef",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Qt5Sql.dll",
+    "bytes": 213392,
+    "status": "complete",
+    "evidenceId": "ev_ade5d4244c9c468cbe7f5f9a3c0e915bc679f6166df322bda68ad53748bd85a7",
+    "sha256": "ece3e276396225ef4313451cb02b68399a35b1a791d2fc215a78a7f828807616",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Qt5Svg.dll",
+    "bytes": 335248,
+    "status": "complete",
+    "evidenceId": "ev_dfccf507143dfedb7b1f318827ac4cd30b047c03998b875b231d65741b301166",
+    "sha256": "e64aec8f0b961e1c6b962cc8efe1c05fc279ba4a12362280aecf6bf40e62d3e7",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Qt5Test.dll",
+    "bytes": 248720,
+    "status": "complete",
+    "evidenceId": "ev_a5c78b70bfd8b587233370a3f7338beb050b2d1c8fc7edfc3b7fe5eeb6af7ad1",
+    "sha256": "509e23f6e45baaaaeaa33fcba39c424dfdcd91b0d4cc597eb10337472ff51c6d",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Qt5WebChannel.dll",
+    "bytes": 138128,
+    "status": "complete",
+    "evidenceId": "ev_26b16c7870408514ed005a6e3673bb52be0b3ff73ff879a3a0710130d6408deb",
+    "sha256": "6d1e6a92c77d459da4fde211f4d6a238f0572ded880ecf15c0c645bbacb6d65b",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Qt5WebEngine.dll",
+    "bytes": 400272,
+    "status": "complete",
+    "evidenceId": "ev_4d99981c7aefd71a555bb4d0a5a64ec43f4d6c68ffb4755916f0ca4a4698dd5c",
+    "sha256": "588287ff9b1a8dbe2c694ddb982d82574353caf284582a398159df16e15b62b7",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Qt5WebEngineCore.dll",
+    "bytes": 115721616,
+    "status": "complete",
+    "evidenceId": "ev_d954699d435089e935f06dc5f859eb0f860da35563e44d30886c704be12f853b",
+    "sha256": "da1757948be4232aecfd309142c1080714156375ccab2dc2b937ced1c397d7c3",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 96,
+      "resources": 46
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Qt5WebEngineWidgets.dll",
+    "bytes": 253840,
+    "status": "complete",
+    "evidenceId": "ev_09565909f0e3cca47b2c189bed155fc037bd06a6b097eda80138dc3336024c70",
+    "sha256": "6f32aa1a4e49dbfc0412b871dcbfef44957866ddd891c5b3f2ff1faf6f1d77be",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Qt5WebSockets.dll",
+    "bytes": 163216,
+    "status": "complete",
+    "evidenceId": "ev_ddff580d1f46e83eb334c59a6e455d08bfef3bb212ada01253a0983eeeaba8cf",
+    "sha256": "ab5fb4f5f72b60ccefaf6951f881955fe151a3030155da9b90928f0cdd99a389",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Qt5Widgets.dll",
+    "bytes": 5621136,
+    "status": "complete",
+    "evidenceId": "ev_39f71d30f2bd9f055087285e70934a72af1c4ede8f50db15f3eeda7d6bec92ac",
+    "sha256": "da049c0149617e92510df8f8cb37c7bd7db62a9f658152d270107eca5b633106",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Qt5Win.dll",
+    "bytes": 18527776,
+    "status": "complete",
+    "evidenceId": "ev_100d320b53dd760327d6f572bbffcba1d419b168d44f1a11a32512367eb0760c",
+    "sha256": "9c9e6d822561c6c41b90e6994b3e8857cf1d66dbfb1e0c4c799c7c89b4e92da1",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 9,
+      "resources": 3
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Qt5WinExtras.dll",
+    "bytes": 240528,
+    "status": "complete",
+    "evidenceId": "ev_26ad0fc26c0fd89fa730f030eaed002c97d44245733a6bd42d802bbf88fd90cf",
+    "sha256": "63663a445a7afca61541068924ffe9b9c1bee88672c4af10efbf0b73bd5a5c07",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Qt5Xml.dll",
+    "bytes": 218000,
+    "status": "complete",
+    "evidenceId": "ev_9494b3c3b8542e0e91c31c013f2101441523004e1d8778777c73327406feb94f",
+    "sha256": "a68e1ea6f6025b826ff4f7bf4ebee8b63ae02beb187df2dcc24833be1180d2c9",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/QtWebEngineProcess.exe",
+    "bytes": 618152,
+    "status": "complete",
+    "evidenceId": "ev_32419ca08905eb555530d5af70df37b7bf8e79a86126a7c1616ce817581ded0a",
+    "sha256": "8b83459e43825d3db210c78c16ffb7f6e9765ce8b3753f69121cea44bac0e32d",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/quazip1-qt5.dll",
+    "bytes": 227216,
+    "status": "complete",
+    "evidenceId": "ev_0c5f9a7b3bd99611180af5721a219eeac6a802512ce14f66753ad0ff552861ad",
+    "sha256": "d6ebe381fc98796d780ee39fe662944b9f0f5c85455848ea365c61e75e55fad0",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/sentry.dll",
+    "bytes": 720272,
+    "status": "complete",
+    "evidenceId": "ev_810548e0eb15952f6b42fc7cf399cb112f1fcc9e955a9582c2350daaf745aa74",
+    "sha256": "06ef2b1ec66d066f5253e899cc61c5f6de255a0bd3670b7adbf74cd46ef0adab",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/sqldrivers/qsqlite.dll",
+    "bytes": 1083392,
+    "status": "complete",
+    "evidenceId": "ev_3895e287c59e20bbba33ac0780bffdb817338243d0901c141a8bf28f40ec617e",
+    "sha256": "284de280aa7526e49de192f4d3c47f3ac9f2cb52910b16c4d22730d8389be377",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 0,
+      "resources": 0
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/sqldrivers/qsqlite_new.bak",
+    "bytes": 1083392,
+    "status": "complete",
+    "evidenceId": "ev_f0c8a827ab91face90262287a9696387076a98ecd0543d12f755b8ed36ff006a",
+    "sha256": "284de280aa7526e49de192f4d3c47f3ac9f2cb52910b16c4d22730d8389be377",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 0,
+      "resources": 0
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/sqldrivers/qsqlite_old.bak",
+    "bytes": 1405440,
+    "status": "complete",
+    "evidenceId": "ev_23fde396122f621419a71281083e5b4039fddd15e3c0c9bbb7e0a5aa9c5f3773",
+    "sha256": "8dea1b59dc14f1f03ceaede85c3b20d812bb0a1b9a65a07505e422071741f7ba",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/sqldrivers/qsqlodbc.dll",
+    "bytes": 91648,
+    "status": "complete",
+    "evidenceId": "ev_f2bfe2e53bc3a321243c713be45a7aff41dddc79453234ae41ee95eb44ccd324",
+    "sha256": "a781df47479003f372ec342d29f6abf118bb43d2086f8d7c00edf1d85b34ecda",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/ssleay32.dll",
+    "bytes": 348560,
+    "status": "complete",
+    "evidenceId": "ev_7339a8dd16f6da0063f1553c17f191057bd2c013a967ff2f801416973ec2e279",
+    "sha256": "b17f6a4784abb29ae3cd9fee9cd8f32a3fe0e7ace66d610e3e5a9dd9a226ede0",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/styles/qwindowsvistastyle.dll",
+    "bytes": 137216,
+    "status": "complete",
+    "evidenceId": "ev_4b43be2050694cb33c597262fe820ee9b5608748c9989b8c966cadaa25fbf2ec",
+    "sha256": "a043a95f3c268a2f82f21ae0c7de247e7849046b5fe0447bfce5fd8741574a2f",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/swresample-4.dll",
+    "bytes": 137616,
+    "status": "complete",
+    "evidenceId": "ev_2b1202b4d030fa3f019956c8ab35cd8423aabcf96eaeb5c52cfa8fe5fc56ef6f",
+    "sha256": "04d2239e7358d4f304f2c44e84f6d3ede01f412ca5f97c0aac52cc96c0ee1a3d",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/swscale-7.dll",
+    "bytes": 584592,
+    "status": "complete",
+    "evidenceId": "ev_abfa3581bd94680da17a330a118525fff2938a5b1b5e191e40fcf1541c24d2aa",
+    "sha256": "496370f4b41451cd8e7e226a86e17049b066374abcc28bcd97150be0146b9d2a",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/TsCameraSDK.dll",
+    "bytes": 211968,
+    "status": "complete",
+    "evidenceId": "ev_a06ddd82408b3463653ca9dc360aef0e7115f81c23bc11e25642147678fbf183",
+    "sha256": "94a360e71b7d05763b64aa3010162db6aeeaec0dbb3caacc370fc9b2a6530141",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/TsCanoSDK.dll",
+    "bytes": 72192,
+    "status": "complete",
+    "evidenceId": "ev_932627f269a1301df9cb2d67442b68c1d4ecd9f4968462d6be5696577c1e8764",
+    "sha256": "2f3f1a4586502c922036ea0cb66c4641568dbdd3a32a3b4f1c1e180e72d31508",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/TsFujiSdk.dll",
+    "bytes": 53760,
+    "status": "complete",
+    "evidenceId": "ev_7cb405a1d53ef53ab7955dd48a650eb72bc7cc01c53d873d01a26b02a3372317",
+    "sha256": "64c6c81ea691d31b2baecd2545868106d4e371c89eaa3726202d8acbf40e74e7",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/tsphonenumber.dll",
+    "bytes": 385536,
+    "status": "complete",
+    "evidenceId": "ev_f3684300727e1cac1ba0868ffa58440655c593a7942c45180b8bf10f0927ec05",
+    "sha256": "aed28c25f877a0540f1025cc8ce748ed3d82336f74d1bcca1fae16a54fc26dda",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/TsSonySDK.dll",
+    "bytes": 219648,
+    "status": "complete",
+    "evidenceId": "ev_c52b491a8a44ad6d2cb5e4a787cadff0869b0624db00eb46a13d4b2d54abb7cd",
+    "sha256": "e988062eeebb2e4e5d5edf3800852876cd37a3cd4a73f493c967fe4677aeb9fb",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/ucrtbase.dll",
+    "bytes": 1023128,
+    "status": "complete",
+    "evidenceId": "ev_12800c8b13abaeb629583e57b02378cd153430dc4c7ac57aaf72696b6928af52",
+    "sha256": "7ee229626b22799faa28cd7c22d4ff2ad0603c17e5f5ee9086fa7cf6483331fb",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/Uninstall Evoto.exe",
+    "bytes": 346904,
+    "status": "complete",
+    "evidenceId": "ev_3c20a9247f104515c508ab06c475efb8d92a3db370b79d77d6de3e86391982ac",
+    "sha256": "cc15e09c7934c93252f6c20659c4c45ef428ae43581de29a187e3fe0dce21245",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 20,
+      "resources": 8
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/vc_redist.x64.exe",
+    "bytes": 14883216,
+    "status": "complete",
+    "evidenceId": "ev_46985c950e61610c8c1fe58cce4e209c9d52d1a54378c4744247def862eb24d2",
+    "sha256": "7d469b1638e1476b50609db140b17dad9ea7aaa60c75c5143a076194da770057",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 15,
+      "resources": 5
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/vcruntime140.dll",
+    "bytes": 124544,
+    "status": "complete",
+    "evidenceId": "ev_a43d76715547eaac5eff6226e3ea21d0cde368eab10e29aaac2087464280830a",
+    "sha256": "d5e4d9a3e835fa679450145d6a7d94e36573a509317111904d9b3712c30d9066",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/vcruntime140_1.dll",
+    "bytes": 49792,
+    "status": "complete",
+    "evidenceId": "ev_1d97d353903467e3f9e58c25f6c7eed26677f3602c9be804e7cf8913338c8d6b",
+    "sha256": "1f2d41c4aa5db0bc33ebf7b66d72943a817d7ce6cbe880502a9403823633093f",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/vcruntime140_threads.dll",
+    "bytes": 38528,
+    "status": "complete",
+    "evidenceId": "ev_caed5ace9765df5fca46e82a7ff0394a5ef7da2356f5011f1218d4b7776adc3e",
+    "sha256": "219915cf20822f34d5e7c1fdd4e21ae7f3396881096c51036225fb8f84b47afa",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 3,
+      "resources": 1
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/XAPI.dll",
+    "bytes": 465264,
+    "status": "complete",
+    "evidenceId": "ev_d5735da3385db8546f2d586d89d794816673dc10ec560f2a144f4d022d2c4686",
+    "sha256": "f31c3a2ec7d03bbc37f0c7877da7619552e943d4601a48b0cf9762a80bd073d8",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 6,
+      "resources": 2
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  },
+  {
+    "path": "F:/evoto/zlib1.dll",
+    "bytes": 120302,
+    "status": "complete",
+    "evidenceId": "ev_64a279e6f314c99b091eed91fda3dc6290f790fbc4848e99ab66c8a4ab3eb231",
+    "sha256": "4b08bebfac59f1c453668d1742df29fdbe1be195d3d73ab7a8851b9a52d2acfe",
+    "coverage": {
+      "status": "complete",
+      "examined_entries": 0,
+      "resources": 0
+    },
+    "limitations": [
+      "Static PE32/PE32+ type/name/language resource inventory; payloads other than RT_GROUP_ICON remain opaque.",
+      "Icon candidates are resource-table relationships. Language fallback, image decoding and actual shell/window loading are not observed.",
+      "Exact shared byte ranges are retained; non-identical overlapping resource structures or payloads are rejected."
+    ]
+  }
+]

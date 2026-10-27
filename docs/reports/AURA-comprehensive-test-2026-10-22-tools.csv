@@ -1,0 +1,597 @@
+﻿group,id,name,route,syntheticPixelEffect,realPhotoPixelEffect,exactUndoRedo,staleWriteRejected,evidence,evotoPerfection
+colour,spatial_neutral_bridge,Two-neutral spatial bridge,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,tonal_neutral_bridge,Two-neutral tonal bridge,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,chroma_reject,Sampled colour-vector rejection,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,palette_axis,Measured palette-axis projection,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,decorrelation_stretch,Covariance decorrelation stretch,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,principal_chroma_suppress,Dominant chroma-axis suppression,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,soft_gamut,Soft gamut-ray compression,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,luma_chroma_compress,Brightness-weighted chroma compression,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,chroma_cusp,Radial chroma cusp compression,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,neutral_exclusion,Near-neutral chroma exclusion,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,histogram_equalize,Selected luminance equalization,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,clipped_equalize,Clipped-histogram equalization,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,log_equalize,Log-luminance equalization,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,rank_gaussian,Rank logistic normalization,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,bimodal_separate,Bimodal tone separation,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,percentile_remap,Percentile landmark remapping,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,photographic_map,Log-average photographic mapping,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,asinh_map,Asinh dynamic-range mapping,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,log_toe_shoulder,Logarithmic toe and shoulder,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,local_log_contrast,Local log-contrast equalization,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,retinex_ratio,Selected Retinex ratio,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,chroma_edge_protect,Edge-protected colour enrichment,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,chroma_winsorize,Chroma outlier Winsorization,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,opponent_contrast,Local opponent-colour contrast,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,sampled_replace,Sample-bound chroma replacement,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,anisotropic_diffusion,Edge-stopped diffusion,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,total_variation,Total variation repair,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,non_local_means,Patch similarity denoising,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,vector_medoid,Vector medoid cleanup,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,trimmed_mean,Trimmed neighborhood repair,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,adaptive_wiener,Adaptive Wiener restoration,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,haar_denoise,Haar residual thresholding,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,haar_detail,Haar detail gain,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,laplacian_detail,Laplacian band contrast,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,kuwahara,Variance-region smoothing,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,tensor_flow,Structure-guided strand smoothing,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,block_deblock,Block seam repair,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,aperture_bokeh,Disc aperture bokeh,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,starburst,Diffraction star filter,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,rotation_blur,Rotational motion integration,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,trajectory_blur,Drawn-path motion integration,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,harmonic_fill,Harmonic selection fill,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,poisson_donor,Gradient-domain donor repair,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,channel_register,Local channel registration,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,morphology_clean,Bright/dark structure cleanup,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,local_rank_contrast,Local rank contrast,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,mosquito_suppress,Edge-adjacent noise repair,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,edge_directed_smooth,Directional edge interpolation,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,donor_bilateral,Donor-guided low-frequency repair,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,texture_quilt,Measured texture patch quilting,passed,changed,changed,True,True,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,polygon_marquee,Polygon marquee,passed,changed,changed,True,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,rounded_marquee,Rounded rectangle marquee,passed,changed,changed,True,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,sector_marquee,Angular sector marquee,passed,changed,changed,True,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,sample_colour,Sampled global colour,passed,changed,changed,True,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,colour_wand,Contiguous colour wand,passed,changed,changed,True,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,sample_luminance,Sampled luminance band,passed,changed,changed,True,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,saturation_range,Saturation range,passed,changed,changed,True,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,texture_range,Texture range,passed,changed,changed,True,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,image_edges,Image edge selection,passed,changed,changed,True,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,guided_smooth,Image-guided mask smoothing,passed,changed,changed,True,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,edge_grow,Edge-constrained growth,passed,changed,changed,True,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,interior_falloff,Interior distance falloff,passed,changed,changed,True,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,negative_space,Enclosed negative-space selection,passed,changed,changed,True,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,skeleton,Selection centreline,passed,changed,changed,True,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,split_regions,Split disconnected regions into masks,passed,changed,changed,True,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,append_stack,Append whole component stack,passed,changed,changed,True,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,replace_selection,Replace destination selection,passed,changed,changed,True,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,sync_adjustments,Synchronize local adjustments,passed,changed,changed,True,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,align_centroid,Align selection centroids,passed,changed,changed,True,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,fit_bounds,Fit selection to bounds,passed,changed,changed,True,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,perspective_selection,Four-corner perspective placement,passed,changed,changed,True,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,auto_threshold,Automatic coverage threshold,passed,changed,changed,True,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,chroma_key,Sampled chroma-key exclusion,passed,changed,changed,True,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,voronoi_partition,Seed partition of selection,passed,changed,changed,True,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,filter_regions,Filter regions by shape and area,passed,changed,changed,True,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+workflow,review-1,Multi-photo recipe checkpoint,passed,read-only or workflow; see evidence,not tested in this scenario,False,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+workflow,review-2,Checkpoint drift comparison,passed,read-only or workflow; see evidence,not tested in this scenario,False,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+workflow,review-3,Section-selective checkpoint restoration,passed,read-only or workflow; see evidence,not tested in this scenario,False,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+workflow,review-4,Conflict-aware rollback preview,passed,read-only or workflow; see evidence,not tested in this scenario,False,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+workflow,review-5,Relative edit transfer,passed,read-only or workflow; see evidence,not tested in this scenario,False,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+workflow,review-6,Batch change manifest,passed,read-only or workflow; see evidence,not tested in this scenario,False,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+workflow,review-7,Baseline-aware three-way transfer,passed,read-only or workflow; see evidence,not tested in this scenario,False,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+workflow,review-8,Batch saved-revision verification,passed,read-only or workflow; see evidence,not tested in this scenario,False,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+workflow,review-9,Edit fingerprint cohorts,passed,read-only or workflow; see evidence,not tested in this scenario,False,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+workflow,review-10,Cross-photo settings-section matrix,passed,read-only or workflow; see evidence,not tested in this scenario,False,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+workflow,review-11,Durable ordered review queue,passed,read-only or workflow; see evidence,not tested in this scenario,False,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+workflow,review-12,Revision-bound custom checklist signoff,passed,read-only or workflow; see evidence,not tested in this scenario,False,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+workflow,review-13,Approval drift tracking,passed,read-only or workflow; see evidence,not tested in this scenario,False,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+workflow,review-14,Photo-coordinate correction issues,passed,read-only or workflow; see evidence,not tested in this scenario,False,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+workflow,review-15,Correction prerequisite gating,passed,read-only or workflow; see evidence,not tested in this scenario,False,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+workflow,review-16,Batch correction propagation,passed,read-only or workflow; see evidence,not tested in this scenario,False,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+workflow,review-17,Local reviewer workload assignment,passed,read-only or workflow; see evidence,not tested in this scenario,False,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+workflow,review-18,Due-date review scheduling,passed,read-only or workflow; see evidence,not tested in this scenario,False,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+workflow,review-19,Saved-revision pair preference,passed,read-only or workflow; see evidence,not tested in this scenario,False,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+workflow,review-20,Unresolved comparison review,passed,read-only or workflow; see evidence,not tested in this scenario,False,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+workflow,review-21,Saved compound review filters,passed,read-only or workflow; see evidence,not tested in this scenario,False,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+workflow,review-22,Checklist-gated handoff manifest,passed,read-only or workflow; see evidence,not tested in this scenario,False,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+workflow,review-23,Portable review metadata export,passed,read-only or workflow; see evidence,not tested in this scenario,False,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+workflow,review-24,Validated review metadata import,passed,read-only or workflow; see evidence,not tested in this scenario,False,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+workflow,review-25,Durable workflow activity history,passed,read-only or workflow; see evidence,not tested in this scenario,False,False,AURA-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,median_anchor,Median exposure anchor,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,interquartile_contrast,Interquartile contrast fit,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,lower_tail_lift,Lower-tail luminance lift,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,upper_tail_shoulder,Upper-tail soft shoulder,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,luminance_skew_correct,Luminance skew correction,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,rms_exposure,RMS exposure normalization,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,harmonic_exposure,Harmonic exposure normalization,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,entropy_zone_contrast,Entropy-weighted zone contrast,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,minkowski_illuminant,Sixth-moment illuminant balance,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,gray_edge_illuminant,Gray-edge illuminant balance,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,trimmed_illuminant,Trimmed illuminant balance,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,log_ratio_illuminant,Log-ratio illuminant balance,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,chroma_mode_neutral,Dominant chroma-mode neutralization,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,tonal_cast_equalize,Tonal colour-cast equalization,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,mahalanobis_chroma_clip,Covariance colour outlier clipping,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,chroma_radius_equalize,Chroma-radius equalization,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,hue_geodesic_pull,Sample-guided hue arc pull,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,palette_reflection,Measured palette-axis reflection,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,colorfulness_normalize,Median colourfulness normalization,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,highlight_hue_restore,Highlight neighbourhood colour recovery,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,local_chroma_coherence,Variance-aware chroma coherence,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,local_illumination_flatten,Local illumination flattening,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,local_log_ratio_denoise,Local log-ratio colour cleanup,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,chroma_hue_diffusion,Circular hue diffusion,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,hue_sector_compress,Target-hue colour compression,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,guided_linear,Guided linear smoothing,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,domain_transform,Recursive domain smoothing,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,richardson_lucy,Iterative deconvolution,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,shock_sharpen,Shock edge sharpening,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,curvature_flow,Curvature smoothing,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,opening_reconstruct,Bright component reconstruction,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,closing_reconstruct,Dark component reconstruction,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,toggle_mapping,Morphological toggle contrast,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,contraharmonic_mean,Contraharmonic cleanup,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,geometric_mean,Geometric noise smoothing,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,huber_location,Huber robust smoothing,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,tukey_location,Tukey outlier rejection,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,local_plane_residual,Plane residual detail,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,chroma_guided_regression,Luminance-guided chroma repair,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,anscombe_denoise,Poisson variance smoothing,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,side_window_mean,Side-window smoothing,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,median_of_means,Median-of-means repair,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,bilateral_sharpen,Range-separated detail,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,airy_diffraction,Radial diffraction halo,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,annular_bokeh,Annular aperture blur,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,tilt_shift_integration,Focus-plane motion blur,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,zoom_integration,Radial zoom integration,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,radial_chromatic,Radial channel correction,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,perspective_plane,Local projective plane,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+spatial,thin_plate_warp,Compact radial warp,passed,changed,changed,True,True,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,hue_arc,Circular hue arc,passed,changed,changed,True,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,opponent_chroma,Opponent colourfulness,passed,changed,changed,True,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,temperature_balance,Red–blue balance,passed,changed,changed,True,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,channel_clipping,Channel clipping fraction,passed,changed,changed,True,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,neutral_axis,Neutral-axis proximity,passed,changed,changed,True,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,local_contrast_polarity,Local contrast polarity,passed,changed,changed,True,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,local_entropy,Local tonal entropy,passed,changed,changed,True,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,laplacian_detail,Laplacian detail,passed,changed,changed,True,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,edge_orientation,Oriented luminance edges,passed,changed,changed,True,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,tensor_coherence,Structure tensor coherence,passed,changed,changed,True,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,harris_corners,Harris corner response,passed,changed,changed,True,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,local_rank,Local luminance rank,passed,changed,changed,True,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,chromatic_boundary,Chromatic boundaries,passed,changed,changed,True,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,specular_residual,Neutral bright residual,passed,changed,changed,True,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,shadow_chroma_deviation,Shadow chroma deviation,passed,changed,changed,True,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,superellipse_marquee,Superellipse marquee,passed,changed,changed,True,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,bezier_ribbon,Cubic Bézier ribbon,passed,changed,changed,True,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,star_marquee,Concave star marquee,passed,changed,changed,True,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,seed_field,Continuous foreground/background seed field,passed,changed,changed,True,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,bilateral_symmetry,Bilateral overlap,passed,changed,changed,True,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,periodic_selection,Periodic selection tiles,passed,changed,changed,True,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,polar_selection,Polar coverage unwrap,passed,changed,changed,True,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,coverage_quantiles,Coverage quantile equalization,passed,changed,changed,True,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,harmonic_patch,Harmonic coverage patch repair,passed,changed,changed,True,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+selection,region_axis_strip,Principal-axis region strip,passed,changed,changed,True,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+inspection,light-centroid,Centre of light,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+inspection,detail-centroid,Centre of detail,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+inspection,quadrant-light,Quadrant light balance,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+inspection,border-light-energy,Border light energy,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+inspection,thirds-edge-mass,Thirds line detail mass,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+inspection,mirror-residual,Mirror asymmetry,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+inspection,bright-components,Bright region connectivity,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+inspection,radial-light-profile,Radial light profile,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+inspection,laplacian-crossings,Curvature sign transitions,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+inspection,edge-effective-width,Horizontal edge support,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+inspection,edge-overshoot,Edge overshoot residual,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+inspection,luma-autocorrelation,Horizontal signal autocorrelation,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+inspection,diagonal-phase,Diagonal parity residual,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+inspection,residual-correlation,Directional residual correlation,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+inspection,haar-energy,Decimated Haar energy,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+inspection,edge-spread,Edge position covariance,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+inspection,border-edge-arrivals,Boundary edge activity,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+inspection,channel-information,Channel information dependence,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+inspection,palette-cube,Working RGB palette cube,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+inspection,hue-energy,Circular hue energy,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+inspection,chroma-light-joint,Chroma and light distribution,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+inspection,neutral-cast-trend,Neutral cast by luminance,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+inspection,chroma-covariance,Chroma covariance,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+inspection,tonal-moments,Tonal asymmetry and tails,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+inspection,level-gap-runs,Missing level runs,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-next-hundred-capabilities-2026-10-21,unverified; no numeric perfection score
+colour,sigmoid_contrast,Normalized sigmoid contrast,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,exponential_shoulder,Exponential highlight rolloff,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,hermite_tone,Monotone Hermite contrast,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,schlick_bias,Rational light bias,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,solarize_luma,Luminance solarization,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,zone_exposure,Stop-zone exposure lift,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,black_floor,Linear black-floor subtraction,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,dark_channel_dehaze,Selected dark-channel haze removal,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,local_wiener_tone,Variance-guided luminance cleanup,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,local_midrange,Local extrema tone contraction,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,chroma_shear,Opponent-plane colour shear,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,chroma_spiral,Radius-dependent hue spiral,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,tonal_hue_twist,Luminance-dependent hue twist,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,duotone_gradient,Complementary duotone gradient,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,channel_crossfeed,Cyclic channel crossfeed,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,selective_density,Subtractive colour density,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,bradford_adaptation,Bradford cone-response adaptation,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,channel_ratio_limit,RGB channel-ratio limiter,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,median_despill,Median-channel spill suppression,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,harmonic_hue_snap,Three-axis hue harmony,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,chroma_luma_detrend,Colour-luminance regression removal,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,guided_chroma,Luminance-guided colour cleanup,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,median_chroma,Weighted median colour repair,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,channel_rank_align,Channel-distribution alignment,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,bilateral_chroma,Range-aware bilateral colour cleanup,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,adaptive_median_impulse,Adaptive impulse median,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,sigma_range_mean,Sigma-gated colour smoothing,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,spatial_weighted_median,Distance-weighted colour median,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,luminance_winsor,Luminance percentile limiter,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,chroma_bilateral,Chroma range smoothing,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,chroma_covariance,Chroma covariance denoising,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,rgb_covariance,Colour covariance denoising,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,entropy_detail,Entropy-weighted detail,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,rms_contrast,Local RMS contrast,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,log_retinex,Log-illumination correction,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,periodic_notch,Oriented periodic notch,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,cross_median,Cross-footprint median,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,hessian_ridge,Curvature ridge detail,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,coherence_detail,Coherent structure detail,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,directional_median,Least-dispersion line median,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,quadratic_residual,Curved-surface residual detail,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,lanczos_shift,Windowed-sinc selection shift,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,elliptical_aperture,Elliptical aperture integration,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,hexagonal_aperture,Hexagonal aperture integration,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,cat_eye_aperture,Cat-eye aperture integration,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,highlight_streak,One-sided highlight streak,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,bilateral_tone_compress,Range-aware base compression,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,dark_channel_haze,Selected dark-channel haze repair,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,connected_impulse,Connected spot repair,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,chroma_median,Luminance-preserving chroma median,passed,changed,changed,True,True,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,lab_sample_distance,CIE Lab sampled distance,passed,changed,changed,True,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,mahalanobis_colour,Covariance colour distance,passed,changed,changed,True,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,geodesic_colour,Geodesic colour propagation,passed,changed,changed,True,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,local_otsu,Local Otsu threshold,passed,changed,changed,True,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,sauvola_threshold,Sauvola adaptive threshold,passed,changed,changed,True,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,gabor_response,Gabor frequency response,passed,changed,changed,True,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,directional_ridge,Directional bright ridges,passed,changed,changed,True,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,local_skewness,Local tonal skewness,passed,changed,changed,True,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,local_kurtosis,Local tonal kurtosis,passed,changed,changed,True,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,colour_line_residual,Colour-line residual,passed,changed,changed,True,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,coverage_opening,Grayscale morphological opening,passed,changed,changed,True,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,coverage_closing,Grayscale morphological closing,passed,changed,changed,True,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,morphological_reconstruction,Opening by reconstruction,passed,changed,changed,True,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,grayscale_area_opening,Grayscale area opening,passed,changed,changed,True,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,border_connected,Keep border-connected regions,passed,changed,changed,True,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,geodesic_rings,Seed geodesic distance bands,passed,changed,changed,True,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,hole_bearing_regions,Keep regions enclosing holes,passed,changed,changed,True,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,regional_maxima,Regional coverage maxima,passed,changed,changed,True,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,spiral_marquee,Archimedean spiral ribbon,passed,changed,changed,True,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,barycentric_triangle,Barycentric triangle gradient,passed,changed,changed,True,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,coverage_shear,Affine selection shear,passed,changed,changed,True,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,coverage_twirl,Radial selection twirl,passed,changed,changed,True,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,coverage_spherize,Spherical selection remap,passed,changed,changed,True,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,coverage_displace,Image-gradient displacement,passed,changed,changed,True,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,signed_distance_smooth,Signed-distance edge smoothing,passed,changed,changed,True,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,robust-tone-quantiles,Luminance quantile landmarks,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,median-deviation,Robust luminance dispersion,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,luminance-inequality,Light energy inequality,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,hue-concentration,Circular hue concentration,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,tone-hue-drift,Hue drift through light levels,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,highlight-headroom,Channel highlight headroom,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,chroma-tail,Absolute chroma tails,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,exposure-locations,Light averaging models,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,local-colour-jumps,Local colour transitions,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,highlight-rolloff,Upper quantile spacing,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,gamut-excursion-energy,Working range excursion energy,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,colour-variogram,Colour spatial variogram,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,structure-coherence,Regional structure coherence,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,hessian-signature,Surface curvature classes,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,gradient-tailedness,Gradient tail weight,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,edge-polarity,Signed edge transitions,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,normalized-total-variation,Relative total variation,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,dct-energy,Cosine frequency energy,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,chroma-edge-alignment,Chroma and light edge alignment,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,residual-asymmetry,Fine residual polarity,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,local-bit-entropy,Regional tone entropy,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,illumination-plane,Linear lighting trend,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,illumination-curvature,Quadratic lighting trend,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,edge-euler,Edge topology,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,edge-box-dimension,Edge occupancy scaling,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,spatial_chroma_plane,Measured spatial cast removal,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,radial_log_illumination,Measured radial illumination correction,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,gaussian_palette_transport,Gaussian patch palette transport,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,palette_simplex,Three-anchor palette constraint,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,hue_density_equalize,Measured circular hue redistribution,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,chroma_copula_map,Chroma marginal copula remapping,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,hue_radius_balance,Hue-dependent colourfulness balance,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,kmeans_palette_recolor,Cluster-residual palette recolouring,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,channel_regression_recover,Measured channel-response reconstruction,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,kubelka_munk_mix,Kubelka-Munk pigment mixing,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,pca_monochrome,Variance-preserving principal monochrome,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,fisher_monochrome,Two-patch discriminant monochrome,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,isoluminant_edge_light,Isoluminant colour-edge lighting,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,luminance_error_diffusion,Selected error-diffusion tones,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,amplitude_dotscreen,Area-modulated photographic dots,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,iso_luma_contours,Stop-domain luminance contours,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,exposure_fusion,Analytical exposure fusion,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,perceptual_lightness_lift,Constant-Lab-chroma lightness lift,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,uv_cast_translate,Uniform-chromaticity cast translation,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,chroma_group_lasso,Robust group-lasso chroma cleanup,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,geometric_median_neutral,Geometric-median cast balance,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,aitchison_tint,Compositional-geodesic colour tint,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,energy_conserving_lightness,Fixed-energy lightness redistribution,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,dichromatic_specular,Dichromatic reflection subtraction,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+colour,mirror_hue_fold,Mirrored palette hue folding,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,local_dct_shrink,Local cosine shrinkage,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,cdf53_shrink,Biorthogonal lifting cleanup,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,geometric_median,Geometric colour median,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,mean_shift_colour,Iterative colour mode,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,hodges_lehmann,Pairwise robust colour location,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,geodesic_range,Geodesic colour averaging,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,patch_low_rank,Spatial patch low-rank repair,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,mahalanobis_range,Covariance-distance smoothing,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,lee_speckle,Multiplicative Lee restoration,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,frost_speckle,Frost spatial damping,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,gamma_map_speckle,Gamma-MAP speckle restoration,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,biharmonic_stencil,Fourth-order surface repair,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,fractional_laplacian,Fractional spatial detail,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,parabolic_background,Parabolic background separation,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,directional_scratch,Oriented scratch repair,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,phase_only_detail,Quadrature phase detail,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,spectral_residual_detail,Spectral surprise detail,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,hampel_impulse,MAD impulse repair,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,circular_hue_smooth,Circular hue smoothing,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,chroma_magnitude_median,Chroma strength median,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,white_patch_adapt,Local white-patch adaptation,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,gray_edge_adapt,Local gray-edge adaptation,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,local_skewness_balance,Luminance skewness balance,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,local_kurtosis_detail,Tail-weighted detail,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+spatial,minmod_edge_limiter,Monotonic edge limiter,passed,changed,changed,True,True,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,median_absolute_deviation,Robust median deviation,passed,changed,changed,True,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,binary_pattern_transitions,Local binary-pattern transitions,passed,changed,changed,True,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,patch_autocorrelation,Directional patch autocorrelation,passed,changed,changed,True,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,patch_semivariance,Directional semivariance,passed,changed,changed,True,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,log_chroma_distance,Log-chromaticity sample distance,passed,changed,changed,True,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,edge_nonmaximum,Gradient nonmaximum suppression,passed,changed,changed,True,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,edge_hysteresis,Connected hysteresis edges,passed,changed,changed,True,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,local_moran,Local Moran spatial association,passed,changed,changed,True,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,template_patch_correlation,Sampled patch correlation,passed,changed,changed,True,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,local_hue_dispersion,Circular hue dispersion,passed,changed,changed,True,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,colour_prototype_partition,Colour prototype partition,passed,changed,changed,True,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,selection_articulations,Connectivity articulation cells,passed,changed,changed,True,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,selection_k_core,Selection graph core,passed,changed,changed,True,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,coverage_watershed,Seeded coverage watershed,passed,changed,changed,True,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,coverage_anisotropic_diffusion,Anisotropic coverage diffusion,passed,changed,changed,True,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,coverage_curvature_flow,Coverage curvature flow,passed,changed,changed,True,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,region_inscribed_disk,Region maximum inscribed disk,passed,changed,changed,True,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,directional_run_width,Directional selected run width,passed,changed,changed,True,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,thin_plate_coverage_warp,Thin-plate landmark deformation,passed,changed,changed,True,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,mean_value_cage_warp,Mean-value cage deformation,passed,changed,changed,True,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,triangulated_cage_warp,Triangulated cage deformation,passed,changed,changed,True,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,mobius_coverage_warp,Conformal Mobius deformation,passed,changed,changed,True,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,path_normal_unwrap,Path-normal coverage unwrap,passed,changed,changed,True,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,coverage_seam_carve,Coverage-aware seam compression,passed,changed,changed,True,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+selection,lissajous_ribbon,Lissajous ribbon construction,passed,changed,changed,True,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,log-ratio-neutrality,Log channel-ratio distribution,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,white-patch-illuminant,White-patch chromaticity,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,gray-edge-illuminant,Gray-edge chromaticity,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,opponent-colourfulness,Opponent colourfulness proxy,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,hue-gap-coverage,Hue occupancy and largest gap,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,local-hue-winding,Local hue discontinuity,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,chroma-light-information,Chroma-light mutual information,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,patch-chroma-dispersion,Regional colour dispersion,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,tukey-tail-support,Robust luminance outliers,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,channel-tail-dependence,Channel highlight dependence,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,patch-mean-variance-fit,Regional mean-variance fit,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,clipping-component-support,Connected clipping support,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,edge-clipping-overlap,Clipping-weighted edge fraction,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,robust-strip-drift,Robust strip lighting profile,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,thumbnail-alias-sensitivity,Thumbnail phase sensitivity,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,ordinal-texture-entropy,Ordinal texture entropy,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,sample-texture-entropy,Sequence sample entropy,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,quantized-run-lengths,Quantized texture runs,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,cooccurrence-texture,Neighbour co-occurrence texture,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,bright-mass-lacunarity,Bright mass lacunarity,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,harris-corner-response,Regional corner response,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,local-plane-residual,Local illumination fit residual,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,line-spectral-flatness,Line spectral flatness,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,neighbour-moran-index,Neighbour Moran index,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+inspection,robust-neighbour-roughness,Robust local roughness,passed,read-only or workflow; see evidence,read-only or workflow; see evidence,False,False,AURA-advanced-capabilities-2026-10-22,unverified; no numeric perfection score
+selection-management,duplicate,duplicate,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+selection-management,invert,invert,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+selection-management,union,union,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+selection-management,intersection,intersection,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+selection-management,subtraction,subtraction,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+selection-management,freeze,freeze,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+selection-management,feather,feather,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+selection-management,expand,expand,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+selection-management,contract,contract,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+selection-management,edge_contrast,edge_contrast,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+selection-management,remove_islands,remove_islands,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+selection-management,fill_holes,fill_holes,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+selection-management,edit_linear,edit_linear,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+selection-management,edit_radial,edit_radial,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+selection-management,edit_brush,edit_brush,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+selection-management,edit_luminance,edit_luminance,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+selection-management,component_mode,component_mode,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+selection-management,reorder_component,reorder_component,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,True,False,core-final,unverified; no numeric perfection score
+selection-management,extract_component,extract_component,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+selection-management,copy_component,copy_component,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+selection-management,transform_selection,transform_selection,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+selection-management,border_selection,border_selection,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+selection-management,keep_largest,keep_largest,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+selection-management,keep_connected,keep_connected,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+selection-management,median_cleanup,median_cleanup,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+selection-management,exclusive_union,exclusive_union,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+selection-management,convex_hull,convex_hull,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+semantic-selection,subject,subject,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,True,False,core-final,unverified; no numeric perfection score
+semantic-selection,background,background,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,True,False,core-final,unverified; no numeric perfection score
+semantic-selection,sky,sky,passed,not tested in this scenario,no selection; safe refusal: No sky found: no open sky at the top of the frame.,False,False,core-final,unverified; no numeric perfection score
+semantic-selection,face_skin,face_skin,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,True,False,core-final,unverified; no numeric perfection score
+semantic-selection,body_skin,body_skin,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,True,False,core-final,unverified; no numeric perfection score
+semantic-selection,hair,hair,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,True,False,core-final,unverified; no numeric perfection score
+semantic-selection,clothes,clothes,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,True,False,core-final,unverified; no numeric perfection score
+semantic-selection,eyes,eyes,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,True,False,core-final,unverified; no numeric perfection score
+semantic-selection,iris,iris,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,True,False,core-final,unverified; no numeric perfection score
+semantic-selection,sclera,sclera,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,True,False,core-final,unverified; no numeric perfection score
+semantic-selection,eyebrows,eyebrows,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,True,False,core-final,unverified; no numeric perfection score
+semantic-selection,lips,lips,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,True,False,core-final,unverified; no numeric perfection score
+semantic-selection,teeth,teeth,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,True,False,core-final,unverified; no numeric perfection score
+semantic-selection,facial_hair,facial_hair,passed,not tested in this scenario,empty coverage on this fixture; selection effect not demonstrated,True,False,core-final,unverified; no numeric perfection score
+local-parameter,exposure,exposure,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+local-parameter,contrast,contrast,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+local-parameter,highlights,highlights,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+local-parameter,shadows,shadows,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+local-parameter,whites,whites,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+local-parameter,blacks,blacks,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+local-parameter,temperature,temperature,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+local-parameter,tint,tint,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+local-parameter,saturation,saturation,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+local-parameter,clarity,clarity,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+local-parameter,texture,texture,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,heal,heal,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,clone,clone,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,auto_blemish,auto_blemish,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,frequency,frequency,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,micro_dodge_burn,micro_dodge_burn,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,dodge,dodge,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,burn,burn,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,skin_color,skin_color,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,color_match,color_match,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,mattify,mattify,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,under_eye,under_eye,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,True,False,core-final,unverified; no numeric perfection score
+retouch,wrinkle,wrinkle,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,teeth,teeth,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,eye_clean,eye_clean,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,eye_detail,eye_detail,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,red_eye,red_eye,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,fabric,fabric,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,fabric_moire,fabric_moire,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,fabric_stain,fabric_stain,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,shadow_balance,shadow_balance,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,background_blur,background_blur,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,highlight_glow,highlight_glow,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,motion_blur,motion_blur,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,zoom_blur,zoom_blur,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,color_despill,color_despill,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,highlight_compress,highlight_compress,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,color_saturation,color_saturation,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,backdrop,backdrop,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,glare,glare,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,makeup,makeup,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,colorize,colorize,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,background_color,background_color,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,reshape,reshape,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,skin_smooth,skin_smooth,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,skin_uniformity,skin_uniformity,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,portrait_dodge_burn,portrait_dodge_burn,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,patch_heal,patch_heal,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,frequency_heal,frequency_heal,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,True,False,core-final,unverified; no numeric perfection score
+retouch,texture_graft,texture_graft,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,acne_clear,acne_clear,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,stretch_marks,stretch_marks,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+retouch,defringe,defringe,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,True,False,core-final,unverified; no numeric perfection score
+material,directional_smooth,directional_smooth,passed,not tested in this scenario,changed,True,True,core-final,unverified; no numeric perfection score
+material,silver_hair,silver_hair,passed,not tested in this scenario,changed,True,True,core-final,unverified; no numeric perfection score
+material,fabric_bands,fabric_bands,passed,not tested in this scenario,changed,True,True,core-final,unverified; no numeric perfection score
+material,luma_moire,luma_moire,passed,not tested in this scenario,changed,True,True,core-final,unverified; no numeric perfection score
+material,deband,deband,passed,not tested in this scenario,changed,True,True,core-final,unverified; no numeric perfection score
+material,chroma_median,chroma_median,passed,not tested in this scenario,changed,True,True,core-final,unverified; no numeric perfection score
+material,impulse_repair,impulse_repair,passed,not tested in this scenario,changed,True,True,core-final,unverified; no numeric perfection score
+material,line_scratch,line_scratch,passed,not tested in this scenario,changed,True,True,core-final,unverified; no numeric perfection score
+material,destripe,destripe,passed,not tested in this scenario,changed,True,True,core-final,unverified; no numeric perfection score
+material,checkerboard,checkerboard,passed,not tested in this scenario,changed,True,True,core-final,unverified; no numeric perfection score
+material,ringing,ringing,passed,not tested in this scenario,changed,True,True,core-final,unverified; no numeric perfection score
+material,specular_chroma,specular_chroma,passed,not tested in this scenario,changed,True,True,core-final,unverified; no numeric perfection score
+material,chroma_mottle,chroma_mottle,passed,not tested in this scenario,changed,True,True,core-final,unverified; no numeric perfection score
+material,illumination_plane,illumination_plane,passed,not tested in this scenario,changed,True,True,core-final,unverified; no numeric perfection score
+material,channel_detail,channel_detail,passed,not tested in this scenario,changed,True,True,core-final,unverified; no numeric perfection score
+studio-colour,levels-rgb,levels-rgb,passed,not tested in this scenario,changed,True,True,core-final,unverified; no numeric perfection score
+studio-colour,levels-red,levels-red,passed,not tested in this scenario,changed,True,True,core-final,unverified; no numeric perfection score
+studio-colour,levels-green,levels-green,passed,not tested in this scenario,changed,True,True,core-final,unverified; no numeric perfection score
+studio-colour,levels-blue,levels-blue,passed,not tested in this scenario,changed,True,True,core-final,unverified; no numeric perfection score
+studio-colour,luminosity-levels,luminosity-levels,passed,not tested in this scenario,changed,True,True,core-final,unverified; no numeric perfection score
+studio-colour,selective-relative,selective-relative,passed,not tested in this scenario,changed,True,True,core-final,unverified; no numeric perfection score
+studio-colour,selective-absolute,selective-absolute,passed,not tested in this scenario,changed,True,True,core-final,unverified; no numeric perfection score
+studio-colour,local-curve,local-curve,passed,not tested in this scenario,changed,True,True,core-final,unverified; no numeric perfection score
+studio-colour,local-hsl,local-hsl,passed,not tested in this scenario,changed,True,True,core-final,unverified; no numeric perfection score
+studio-colour,local-grade,local-grade,passed,not tested in this scenario,changed,True,True,core-final,unverified; no numeric perfection score
+studio-colour,local-sharpen,local-sharpen,passed,not tested in this scenario,changed,True,True,core-final,unverified; no numeric perfection score
+studio-colour,local-dehaze,local-dehaze,passed,not tested in this scenario,changed,True,True,core-final,unverified; no numeric perfection score
+studio-colour,local-vibrance,local-vibrance,passed,not tested in this scenario,changed,True,True,core-final,unverified; no numeric perfection score
+colour-measurement,auto,auto,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,False,False,core-final,unverified; no numeric perfection score
+colour-measurement,black,black,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,False,False,core-final,unverified; no numeric perfection score
+colour-measurement,white,white,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,False,False,core-final,unverified; no numeric perfection score
+colour-measurement,hsl,hsl,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,False,False,core-final,unverified; no numeric perfection score
+parameter,global.exposure,global.exposure,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,global.temperature,global.temperature,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,global.tint,global.tint,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,global.contrast,global.contrast,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,global.highlights,global.highlights,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,global.shadows,global.shadows,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,global.whites,global.whites,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,global.blacks,global.blacks,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,global.texture,global.texture,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,global.clarity,global.clarity,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,global.dehaze,global.dehaze,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,global.vibrance,global.vibrance,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,global.saturation,global.saturation,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,global.hsl.red.h,global.hsl.red.h,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,global.hsl.orange.s,global.hsl.orange.s,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,global.hsl.blue.l,global.hsl.blue.l,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,global.curve.points,global.curve.points,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,global.channel_curves.red.points,global.channel_curves.red.points,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,global.parametric.lights,global.parametric.lights,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,global.sharpen.amount,global.sharpen.amount,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,global.noise.luminance,global.noise.luminance,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,global.noise.colour,global.noise.colour,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,global.effects.vignette.amount,global.effects.vignette.amount,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,global.effects.grain.amount,global.effects.grain.amount,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,global.calibration.red_hue,global.calibration.red_hue,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,global.colour_grade.shadows.saturation,global.colour_grade.shadows.saturation,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,bw,bw,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,geometry.rotate,geometry.rotate,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,geometry.crop,geometry.crop,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+parameter,lens.distortion,lens.distortion,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,True,False,core-final,unverified; no numeric perfection score
+parameter,lens.ca,lens.ca,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,True,False,core-final,unverified; no numeric perfection score
+parameter,lens.vignette,lens.vignette,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+inspection,rgb-parade,RGB parade,passed,not tested in this scenario,read-only or workflow; see evidence,False,False,core-final,unverified; no numeric perfection score
+inspection,luma-waveform,Luminance waveform,passed,not tested in this scenario,read-only or workflow; see evidence,False,False,core-final,unverified; no numeric perfection score
+inspection,chroma-vectorscope,Chroma vectorscope,passed,not tested in this scenario,read-only or workflow; see evidence,False,False,core-final,unverified; no numeric perfection score
+inspection,exposure-map,Exposure zone map,passed,not tested in this scenario,read-only or workflow; see evidence,False,False,core-final,unverified; no numeric perfection score
+inspection,range-map,Working range excursions,passed,not tested in this scenario,read-only or workflow; see evidence,False,False,core-final,unverified; no numeric perfection score
+inspection,focus-map,Spatial edge detail,passed,not tested in this scenario,read-only or workflow; see evidence,False,False,core-final,unverified; no numeric perfection score
+inspection,noise-map,Flat-area residual,passed,not tested in this scenario,read-only or workflow; see evidence,False,False,core-final,unverified; no numeric perfection score
+inspection,neutral-cast,Near-neutral colour balance,passed,not tested in this scenario,read-only or workflow; see evidence,False,False,core-final,unverified; no numeric perfection score
+inspection,local-contrast,Local contrast map,passed,not tested in this scenario,read-only or workflow; see evidence,False,False,core-final,unverified; no numeric perfection score
+inspection,dynamic-range,Rendered tonal range,passed,not tested in this scenario,read-only or workflow; see evidence,False,False,core-final,unverified; no numeric perfection score
+inspection,exposure-zones,Exposure zone distribution,passed,not tested in this scenario,read-only or workflow; see evidence,False,False,core-final,unverified; no numeric perfection score
+inspection,srgb-occupancy,sRGB working gamut occupancy,passed,not tested in this scenario,read-only or workflow; see evidence,False,False,core-final,unverified; no numeric perfection score
+inspection,stripe-profile,Row and column banding profile,passed,not tested in this scenario,read-only or workflow; see evidence,False,False,core-final,unverified; no numeric perfection score
+inspection,block-period,Eight-pixel block boundary profile,passed,not tested in this scenario,read-only or workflow; see evidence,False,False,core-final,unverified; no numeric perfection score
+inspection,edge-directions,Edge direction balance,passed,not tested in this scenario,read-only or workflow; see evidence,False,False,core-final,unverified; no numeric perfection score
+inspection,illumination-map,Relative illumination map,passed,not tested in this scenario,read-only or workflow; see evidence,False,False,core-final,unverified; no numeric perfection score
+inspection,edge-registration,Neutral-edge channel alignment,passed,not tested in this scenario,read-only or workflow; see evidence,False,False,core-final,unverified; no numeric perfection score
+inspection,channel-correlation,Channel correlation,passed,not tested in this scenario,read-only or workflow; see evidence,False,False,core-final,unverified; no numeric perfection score
+inspection,detail-scales,Detail scale spectrum,passed,not tested in this scenario,read-only or workflow; see evidence,False,False,core-final,unverified; no numeric perfection score
+inspection,highlight-chroma,Highlight chroma retention,passed,not tested in this scenario,read-only or workflow; see evidence,False,False,core-final,unverified; no numeric perfection score
+export,jpeg,jpeg,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,False,False,core-final,unverified; no numeric perfection score
+export,png,png,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,False,False,core-final,unverified; no numeric perfection score
+export,tiff,tiff,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,False,False,core-final,unverified; no numeric perfection score
+reference-matching,prepare-and-apply-reference,prepare-and-apply-reference,passed,not tested in this scenario,changed,True,False,core-final,unverified; no numeric perfection score
+reference-library,create_group-Qualification A,create_group-Qualification A,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,False,False,core-final,unverified; no numeric perfection score
+reference-library,create_group-Qualification B,create_group-Qualification B,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,False,False,core-final,unverified; no numeric perfection score
+reference-library,rename_group,rename_group,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,False,False,core-final,unverified; no numeric perfection score
+reference-library,reorder_groups,reorder_groups,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,False,False,core-final,unverified; no numeric perfection score
+reference-library,move,move,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,False,False,core-final,unverified; no numeric perfection score
+reference-library,reorder_references,reorder_references,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,False,False,core-final,unverified; no numeric perfection score
+reference-library,favorite,favorite,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,False,False,core-final,unverified; no numeric perfection score
+reference-library,defaults,defaults,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,False,False,core-final,unverified; no numeric perfection score
+reference-library,reset_defaults,reset_defaults,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,False,False,core-final,unverified; no numeric perfection score
+reference-library,export,export,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,False,False,core-final,unverified; no numeric perfection score
+reference-library,import,import,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,False,False,core-final,unverified; no numeric perfection score
+reference-library,delete_group,delete_group,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,False,False,core-final,unverified; no numeric perfection score
+reference-library,stale-revision,stale-revision,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,False,True,core-final,unverified; no numeric perfection score
+reference-library,remove,remove,passed,not tested in this scenario,unchanged; conditional or neutral on this fixture,False,False,core-final,unverified; no numeric perfection score

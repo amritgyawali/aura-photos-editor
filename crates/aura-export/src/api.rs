@@ -28,7 +28,7 @@ use aura_core::contract::delivery::{
 };
 use aura_core::{AuraResult, ProjectId};
 
-use crate::errors::{destination_bad, job_refused};
+use crate::errors::{destination_bad, job_refused, render_failed};
 use crate::manifest;
 use crate::metadata;
 use crate::naming;
@@ -46,6 +46,34 @@ pub struct ExportPass<'a> {
     source: &'a dyn Source,
     app_version: String,
     workers: usize,
+    progress: Option<Sink<'a>>,
+}
+
+/// A progress callback, kept beside the pass.
+#[derive(Clone, Copy)]
+struct Sink<'a>(&'a (dyn Fn(Progress<'_>) + Sync));
+
+impl std::fmt::Debug for Sink<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("progress callback")
+    }
+}
+
+/// Where a pass has got, reported after every frame is written and read back or left out.
+#[derive(Debug, Clone, Copy)]
+pub struct Progress<'p> {
+    /// Frames finished, written or left out.
+    pub done: usize,
+    /// Frames in the job.
+    pub total: usize,
+    /// Files written so far, and how many of them read back the same.
+    pub written: usize,
+    pub verified: u32,
+    /// The file just finished, relative to the destination, or empty when it was left out
+    /// or when nothing has finished yet.
+    pub path: &'p std::path::Path,
+    /// Frames being rendered and encoded now: the first and last, counting from one.
+    pub rendering: Option<(usize, usize)>,
 }
 
 /// A frame after stage one of the pass: encoded and ready to write, or left out with a reason.
@@ -87,51 +115,8 @@ impl<'a> ExportPass<'a> {
             source,
             app_version: app_version.into(),
             workers: 1,
+            progress: None,
         }
-    }
-
-    /// Stage one of every frame in `chunk`, `workers` at a time, in the chunk's order.
-    fn prepare_all(
-        &self,
-        project: ProjectId,
-        chunk: &[&naming::PlannedName],
-        job: &ExportJob,
-        watermark: Option<&crate::watermark::Watermark>,
-    ) -> Vec<AuraResult<Prepared>> {
-        if self.workers <= 1 || chunk.len() <= 1 {
-            return chunk
-                .iter()
-                .map(|planned| self.prepare(project, job, planned, watermark))
-                .collect();
-        }
-        let next = std::sync::atomic::AtomicUsize::new(0);
-        let mut done: Vec<(usize, AuraResult<Prepared>)> = std::thread::scope(|scope| {
-            let handles: Vec<_> = (0..self.workers.min(chunk.len()))
-                .map(|_| {
-                    scope.spawn(|| {
-                        let mut mine = Vec::new();
-                        loop {
-                            let index = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                            let Some(planned) = chunk.get(index) else {
-                                break;
-                            };
-                            mine.push((index, self.prepare(project, job, planned, watermark)));
-                        }
-                        mine
-                    })
-                })
-                .collect();
-            handles
-                .into_iter()
-                .flat_map(|handle| {
-                    handle
-                        .join()
-                        .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
-                })
-                .collect()
-        });
-        done.sort_by_key(|(index, _)| *index);
-        done.into_iter().map(|(_, prepared)| prepared).collect()
     }
 
     /// Stage one of one frame: its pixels, resized, sharpened, marked and encoded. Nothing is
@@ -227,6 +212,13 @@ impl<'a> ExportPass<'a> {
         })
     }
 
+    /// Say where the pass has got after every frame, for a progress display.
+    #[must_use]
+    pub fn with_progress(mut self, progress: &'a (dyn Fn(Progress<'_>) + Sync)) -> Self {
+        self.progress = Some(Sink(progress));
+        self
+    }
+
     /// Render and encode up to `workers` frames at once. Files are still written, read back
     /// and recorded one at a time in the plan's order, so names, the manifest and the point a
     /// failing destination stops the job are the same as with one worker.
@@ -295,14 +287,47 @@ impl<'a> ExportPass<'a> {
             std::collections::BTreeMap::new();
         let mut sidecars = 0_u32;
 
-        let mut planned_frames = plan.iter().peekable();
-        while planned_frames.peek().is_some() {
-            let chunk: Vec<_> = planned_frames
-                .by_ref()
-                .take(self.workers.saturating_mul(2))
-                .collect();
-            let prepared = self.prepare_all(project, &chunk, job, watermark);
-            for (planned, prepared) in chunk.into_iter().zip(prepared) {
+        // Frames are rendered and encoded ahead of the writer, a window of them at a time,
+        // while each finished one is written, synced and read back in the job's order.
+        let frames: Vec<&naming::PlannedName> = plan.iter().collect();
+        let window = self.workers.saturating_mul(2).max(1);
+        let ahead = crate::ahead::Ahead::new(frames.len(), window);
+        std::thread::scope(|scope| -> AuraResult<()> {
+            if self.workers > 1 {
+                for _ in 0..self.workers.min(frames.len()) {
+                    scope.spawn(|| {
+                        ahead.work(
+                            |index| {
+                                frames.get(index).map_or_else(
+                                    || Err(render_failed("frame outside the plan")),
+                                    |planned| self.prepare(project, job, planned, watermark),
+                                )
+                            },
+                            || Err(render_failed("rendering this frame stopped unexpectedly")),
+                        );
+                    });
+                }
+            }
+            let _stop = crate::ahead::StopOnDrop(&ahead);
+            for (index, planned) in frames.iter().copied().enumerate() {
+                if let Some(Sink(report)) = self.progress {
+                    let first = files.len() + skipped.len() + 1;
+                    report(Progress {
+                        done: first - 1,
+                        total: plan.len(),
+                        written: files.len(),
+                        verified: verified_count,
+                        path: std::path::Path::new(""),
+                        rendering: Some((first, (first + window - 1).min(plan.len()))),
+                    });
+                }
+                let prepared = if self.workers > 1 {
+                    ahead
+                        .take(index)
+                        .unwrap_or_else(|| Err(render_failed("rendering stopped")))
+                } else {
+                    self.prepare(project, job, planned, watermark)
+                };
                 let Some(set) = job.sets.iter().find(|s| s.name == planned.set) else {
                     continue;
                 };
@@ -314,6 +339,16 @@ impl<'a> ExportPass<'a> {
                     } => (sharpened, bytes, reasons),
                     Prepared::Skipped(why) => {
                         skipped.push((planned.image, why));
+                        if let Some(Sink(report)) = self.progress {
+                            report(Progress {
+                                done: files.len() + skipped.len(),
+                                total: plan.len(),
+                                written: files.len(),
+                                verified: verified_count,
+                                path: std::path::Path::new(""),
+                                rendering: None,
+                            });
+                        }
                         continue;
                     }
                 };
@@ -321,11 +356,16 @@ impl<'a> ExportPass<'a> {
                 // 4e. Write, read back, hash. A failure here stops the job.
                 let path = root.join(&planned.rel_path);
                 let written = write_and_verify(&path, &bytes, job.verify)?;
-                reasons.push(DeliveryReason::plain(if written.verified {
-                    DeliveryCode::WrittenAndVerified
-                } else {
-                    DeliveryCode::WrittenUnverified
-                }));
+                // Keep delivery facts ahead of optional processing disclosures: the bounded
+                // reason list is also the store's source for verified sidecar counts.
+                reasons.insert(
+                    0,
+                    DeliveryReason::plain(if written.verified {
+                        DeliveryCode::WrittenAndVerified
+                    } else {
+                        DeliveryCode::WrittenUnverified
+                    }),
+                );
                 if written.verified {
                     verified_count += 1;
                 }
@@ -334,11 +374,15 @@ impl<'a> ExportPass<'a> {
                 // 4f. The sidecar, when the set asked for one.
                 let frame = self.field.frame(planned.image);
                 if set.sidecar {
-                    if let Some(recipe) = &frame.recipe_json {
+                    if let Some(recipe) = sharpened
+                        .recipe_json
+                        .as_deref()
+                        .or(frame.recipe_json.as_deref())
+                    {
                         let sidecar_path =
                             path.with_extension(aura_core::contract::delivery::SIDECAR_EXT);
                         write_and_verify(&sidecar_path, recipe.as_bytes(), job.verify)?;
-                        reasons.push(DeliveryReason::plain(DeliveryCode::SidecarWritten));
+                        reasons.insert(0, DeliveryReason::plain(DeliveryCode::SidecarWritten));
                         sidecars += 1;
                     }
                 }
@@ -369,9 +413,19 @@ impl<'a> ExportPass<'a> {
                 self.store.write_file(&job_id, &file)?;
                 *per_set.entry(planned.set.clone()).or_insert(0) += 1;
                 files.push(file);
+                if let Some(Sink(report)) = self.progress {
+                    report(Progress {
+                        done: files.len() + skipped.len(),
+                        total: plan.len(),
+                        written: files.len(),
+                        verified: verified_count,
+                        path: &planned.rel_path,
+                        rendering: None,
+                    });
+                }
             }
-        }
-
+            Ok(())
+        })?;
         for (name, count) in &per_set {
             self.store.set_written(&job_id, name, *count)?;
         }

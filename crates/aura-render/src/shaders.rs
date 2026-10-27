@@ -1,7 +1,7 @@
 //! The WGSL sources, compiled into the binary and checked against the reference.
 //!
-//! This build links no `wgpu` (ADR-0029 section 4), so nothing here is *executed*. It is
-//! still load-bearing: `crates/aura-render/tests/shader_parity.rs` asserts that every stage
+//! The qualified output shader is executed through wgpu (ADR-0122); other stage shaders
+//! remain specifications. `crates/aura-render/tests/shader_parity.rs` asserts that every stage
 //! in `graph::ORDER` has an entry point, that every entry point names a stage, and that the
 //! constants the two paths share - middle grey, the curve gamma, the tone band centres and
 //! widths, the Bayer matrix, the luminance coefficients - appear in the WGSL with the same

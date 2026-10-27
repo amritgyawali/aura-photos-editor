@@ -28,16 +28,24 @@ These are permanent. They are not defaults, not preferences, and not settings hi
 advanced panel. Section 11 of `docs/plan/CLAUDE.md` has forbidden them since phase 01, and every
 phase since has inherited the list:
 
+> **Amended by ADR-0108 (2026-10-11).** At the owner's direction the Studio now has *manual*
+> face and body reshaping, liquify, background replacement and feature colour (eyes, hair,
+> lips, makeup), as Evoto does. They exist only as a photographer's explicit choice: **no
+> automatic pass may ever apply them**, and `crates/aura-app/tests/no_automatic_reshape.rs`
+> fails the build if one tries. The rows below marked *automatic* remain absolute for
+> everything AURA does on its own; skin-tone change, tattoo and permanent-feature removal, face
+> or eye swapping and inferring anything about a person remain out of scope for manual tools too.
+
 | Never | Why |
 |---|---|
-| **Body reshaping** - slimming, waist narrowing, limb lengthening, jaw or nose reshaping | A photograph of a reshaped person is a photograph of somebody who was not there. |
+| **Body reshaping** - slimming, waist narrowing, limb lengthening, jaw or nose reshaping (*automatic*; manual tools exist since ADR-0108) | A photograph of a reshaped person is a photograph of somebody who was not there. |
 | **Skin lightening or darkening toward a target** | There is no correct skin colour. A product with an ideal-skin constant is a product that lightens dark skin while believing it is correcting a cast. |
 | **Face swapping or eye swapping between frames** | A composite portrait delivered as a photograph is a lie about a moment. |
 | **Adding people, objects or expressions that were not there** | Same reason. |
 | **Removing permanent features** - moles, freckles, birthmarks, scars, dimples | Those are identity, not defects. Phase 20 protects them; this phase inherits the protect set unchanged. |
 | **Removing or altering tattoos** | The only *absolute* protection in the product. It cannot be switched off by a setting, a preset, an override or an API call. |
 | **Whitening teeth or eyes cosmetically** | Bounded corrections toward a measured natural range are in scope. Cosmetic whitening is not, and section 4 is what keeps the two apart. |
-| **Enlarging, reshaping or recolouring eyes** | Eye colour is identity. Eye size is anatomy. |
+| **Enlarging, reshaping or recolouring eyes** (*automatic*; manual tools exist since ADR-0108) | Eye colour is identity. Eye size is anatomy. |
 | **Inferring anything about a person** - gender, ethnicity, religion, age, attractiveness | Phase 06's rule, and the shapes have nowhere to put such a value. |
 
 **These are enforced in code, not remembered.** There is no field in

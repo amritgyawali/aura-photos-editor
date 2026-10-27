@@ -38,7 +38,8 @@ trap 'rm -rf "$tmp"' EXIT
 grep -A 3 '^#\[tauri::command\]' "$shell" \
   | grep -oE '(async )?fn [a-z0-9_]+' \
   | sed -E 's/(async )?fn //' \
-  | sort -u > "$tmp/defined"
+  | sort > "$tmp/defined.all"
+uniq "$tmp/defined.all" > "$tmp/defined"
 
 # 2. The registrations, from inside `generate_handler![ ... ]`.
 awk '
@@ -57,7 +58,8 @@ awk '
       if (parts[i] != "") print parts[i]
     }
   }
-' "$shell" | sort -u > "$tmp/registered"
+' "$shell" | sort > "$tmp/registered.all"
+uniq "$tmp/registered.all" > "$tmp/registered"
 
 # 3. The client's own command strings.
 #
@@ -80,6 +82,14 @@ registered=$(wc -l < "$tmp/registered")
 invoked=$(wc -l < "$tmp/invoked")
 
 fail=0
+for category in defined registered; do
+  duplicate=$(uniq -d "$tmp/$category.all")
+  if [ -n "$duplicate" ]; then
+    echo "duplicate commands $category - command names must be unique:"
+    echo "$duplicate" | sed 's/^/  /'
+    fail=1
+  fi
+done
 report() {
   local left="$1" right="$2" message="$3"
   local missing

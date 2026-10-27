@@ -24,7 +24,8 @@ export function parseRetouchPresets(value: string | null): Preset[] {
       || (s.sensitivity != null && (!Number.isFinite(s.sensitivity) || s.sensitivity < 0 || s.sensitivity > 1))
       || (s.repairPasses != null && (!Number.isInteger(s.repairPasses) || s.repairPasses < 1 || s.repairPasses > 4 || !['acne_clear','frequency_heal'].includes(s.tool)))
       || (s.targetColor != null && (!Array.isArray(s.targetColor) || s.targetColor.length !== 3 || !s.targetColor.every(v => Number.isFinite(v) && v >= 0 && v <= 1)))
-      || (['colorize','background_color'].includes(s.tool) && s.targetColor == null)
+      || (['colorize','background_color','color_despill'].includes(s.tool) && s.targetColor == null)
+      || (s.tool === 'color_despill' && s.targetColor && Math.max(...s.targetColor) - Math.min(...s.targetColor) < .02)
       || (s.skin && (!Number.isFinite(s.skin.tolerance) || s.skin.tolerance < .015 || s.skin.tolerance > .3
         || !Number.isFinite(s.skin.edgeProtection) || s.skin.edgeProtection < 0 || s.skin.edgeProtection > 1))) {
       throw new Error('Saved retouch presets contain invalid settings.');

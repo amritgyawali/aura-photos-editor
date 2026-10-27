@@ -1,18 +1,12 @@
 //! Explicit selected color effects. No smoothing or geometric change is performed.
 // The buffers and 3x3 color matrix are dimension-checked by the render entry point.
 #![allow(clippy::indexing_slicing)]
-use aura_raw::colour::working_space::{linear_srgb_to_working_f32, working_luminance_f32};
+use aura_raw::colour::working_space::working_luminance_f32;
 
-/// Convert a display sRGB choice once per operation, before the pixel loop.
+/// Convert a display sRGB choice once per operation, before the pixel loop. The value is the
+/// one the output transform renders back to that colour, as for any display-referred pixel.
 pub(crate) fn to_working(target: [f32; 3]) -> [f32; 3] {
-    let linear = target.map(|v| {
-        if v <= 0.04045 {
-            v / 12.92
-        } else {
-            ((v + 0.055) / 1.055).powf(2.4)
-        }
-    });
-    linear_srgb_to_working_f32(linear)
+    crate::output::display_srgb_to_working(target)
 }
 
 /// Source, target and output are linear Rec.2020.
@@ -69,13 +63,22 @@ mod tests {
 
     #[test]
     fn solid_fill_converts_srgb_and_does_not_depend_on_source_texture() {
+        use crate::contract::render::OutputColour::Srgb;
         assert_eq!(transform([0.1, 0.4, 0.7], [0.0; 3], false), [0.0; 3]);
-        let white = transform([0.1, 0.4, 0.7], [1.0; 3], false);
-        let display = aura_raw::colour::working_space::working_to_linear_srgb(white.map(f64::from));
-        assert!(
-            display.iter().all(|v| (*v - 1.0).abs() < 0.000_001),
-            "{display:?}"
-        );
+        // A chosen colour is the colour that is delivered: through the output transform, not
+        // only up to it, which is where a bright choice used to come out duller than chosen.
+        for chosen in [[1.0; 3], [0.84, 0.9, 0.92], [0.5, 0.2, 0.7]] {
+            let working = transform([0.1, 0.4, 0.7], chosen, false);
+            let display =
+                crate::output::map_one(working, crate::output::working_to_output(Srgb), Srgb);
+            assert!(
+                display
+                    .iter()
+                    .zip(chosen)
+                    .all(|(out, want)| (out - want).abs() < 0.001),
+                "{chosen:?} was delivered as {display:?}"
+            );
+        }
         assert_eq!(
             transform([0.1; 3], [1.0, 0.0, 0.0], false),
             transform([0.8; 3], [1.0, 0.0, 0.0], false)

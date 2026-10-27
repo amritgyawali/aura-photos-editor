@@ -202,17 +202,113 @@ pub fn radius(side: f32, fraction: f32) -> usize {
 /// how many cores there are - so invariant 4 holds without a seed.
 #[must_use]
 pub fn blur(values: &[f32], width: usize, height: usize, radius: usize) -> Vec<f32> {
-    let mut buffer = values.to_vec();
+    blur_owned(values.to_vec(), width, height, radius)
+}
+
+/// [`blur`], over a buffer the caller no longer needs: it is blurred where it is rather than
+/// copied first.
+///
+/// A box filter along rows and one along columns act on different indices, so they commute:
+/// three passes along every row and then three down every column is the same filter as
+/// alternating them. Done that way, a row stays in the first-level cache for all three of its
+/// passes and a strip of columns in the second-level cache for all three of its, and the frame
+/// crosses main memory twice rather than twelve times - which is what a blur over a face at
+/// full resolution is limited by. The running sums are the same `f64` sums; only the order of
+/// the passes differs, which moves a result by a rounding at most, the same on every machine.
+#[must_use]
+pub fn blur_owned(mut buffer: Vec<f32>, width: usize, height: usize, radius: usize) -> Vec<f32> {
+    use rayon::prelude::*;
+    /// Columns one task carries down the frame: a strip of a tall face fits the second-level
+    /// cache, and a frame of any width still makes dozens of tasks.
+    const STRIP: usize = 32;
     buffer.resize(width * height, 0.0);
     if width == 0 || height == 0 || radius == 0 {
         return buffer;
     }
-    let mut scratch = vec![0.0f32; width * height];
-    for _ in 0..BOX_PASSES {
-        box_pass_h(&buffer, &mut scratch, width, radius);
-        box_pass_v(&scratch, &mut buffer, width, height, radius);
+    buffer.par_chunks_exact_mut(width).for_each_init(
+        || (vec![0.0f32; width], vec![0.0f32; width]),
+        |(here, there), row| {
+            here.copy_from_slice(row);
+            for _ in 0..BOX_PASSES {
+                box_row(here, there, radius);
+                std::mem::swap(here, there);
+            }
+            row.copy_from_slice(here);
+        },
+    );
+    // Every strip owns its own piece of every row.
+    let mut strips: Vec<Vec<&mut [f32]>> = (0..width.div_ceil(STRIP))
+        .map(|_| Vec::with_capacity(height))
+        .collect();
+    for row in buffer.chunks_exact_mut(width) {
+        for (pieces, piece) in strips.iter_mut().zip(row.chunks_mut(STRIP)) {
+            pieces.push(piece);
+        }
     }
+    strips.into_par_iter().for_each(|mut rows| {
+        let span = rows.first().map_or(0, |row| row.len());
+        let mut here: Vec<f32> = Vec::with_capacity(span * height);
+        for row in &rows {
+            here.extend_from_slice(row);
+        }
+        let mut there = vec![0.0f32; here.len()];
+        for _ in 0..BOX_PASSES {
+            box_columns(&here, &mut there, span, height, radius);
+            std::mem::swap(&mut here, &mut there);
+        }
+        for (row, values) in rows.iter_mut().zip(here.chunks_exact(span)) {
+            row.copy_from_slice(values);
+        }
+    });
     buffer
+}
+
+/// One box pass along one row: every window's mean, from a running sum in `f64`, clipped at
+/// the ends and averaged over the samples it holds.
+fn box_row(src: &[f32], dst: &mut [f32], radius: usize) {
+    let width = src.len();
+    let mut sum: f64 = src.iter().take(radius + 1).map(|v| f64::from(*v)).sum();
+    for (x, slot) in dst.iter_mut().enumerate() {
+        let lo = x.saturating_sub(radius);
+        let hi = (x + radius).min(width - 1);
+        *slot = (sum / (hi - lo + 1) as f64) as f32;
+        if x >= radius {
+            sum -= src.get(x - radius).map_or(0.0, |v| f64::from(*v));
+        }
+        if let Some(v) = src.get(x + radius + 1) {
+            sum += f64::from(*v);
+        }
+    }
+}
+
+/// One box pass down every column of a strip `span` columns wide, row-major, one running sum
+/// per column carried the whole height.
+fn box_columns(src: &[f32], dst: &mut [f32], span: usize, height: usize, radius: usize) {
+    let row = |y: usize| src.get(y * span..(y + 1) * span).unwrap_or(&[]);
+    let mut sums = vec![0.0f64; span];
+    for y in 0..(radius + 1).min(height) {
+        for (sum, v) in sums.iter_mut().zip(row(y)) {
+            *sum += f64::from(*v);
+        }
+    }
+    for (y, line) in dst.chunks_exact_mut(span).enumerate() {
+        let lo = y.saturating_sub(radius);
+        let hi = (y + radius).min(height - 1);
+        let count = (hi - lo + 1) as f64;
+        for (slot, sum) in line.iter_mut().zip(sums.iter()) {
+            *slot = (sum / count) as f32;
+        }
+        if y >= radius {
+            for (sum, v) in sums.iter_mut().zip(row(y - radius)) {
+                *sum -= f64::from(*v);
+            }
+        }
+        if y + radius + 1 < height {
+            for (sum, v) in sums.iter_mut().zip(row(y + radius + 1)) {
+                *sum += f64::from(*v);
+            }
+        }
+    }
 }
 
 /// One box pass each way: the mean of the `(2r+1)` square window around every sample,
@@ -255,14 +351,115 @@ fn box_pass_h(src: &[f32], dst: &mut [f32], width: usize, radius: usize) {
 
 /// One vertical pass. The frame is cut into bands of rows whose height depends only on the
 /// radius; each band starts its running column sums afresh and slides them down, so memory is
-/// read in order and the bands run in parallel.
+/// read in order. When a radius is so wide that there are only a few bands, each band is cut
+/// again into strips of columns, every strip its own task writing its own pieces of the rows:
+/// a band as tall as a face is then not summed by one core. Each column's sums are the same
+/// additions in the same order however it is cut, so the result does not depend on the
+/// strips or the cores.
+/// The columns `x0..x1` of one row, empty when the row is shorter.
+fn span(row: &[f32], x0: usize, x1: usize) -> &[f32] {
+    row.get(x0..x1).unwrap_or(&[])
+}
+
 fn box_pass_v(src: &[f32], dst: &mut [f32], width: usize, height: usize, radius: usize) {
     use rayon::prelude::*;
+    /// Columns one task sums when bands alone are too few: whole cache lines, and a dozen
+    /// tasks across a face-sized band.
+    const STRIP: usize = 128;
     let band = (radius * 4).max(64);
     let rows: Vec<&[f32]> = src.chunks_exact(width).collect();
+    let strip = if height.div_ceil(band) >= 2 * rayon::current_num_threads() {
+        width
+    } else {
+        STRIP.min(width)
+    };
     dst.par_chunks_mut(width * band)
         .enumerate()
         .for_each(|(index, out)| {
+            let first = index * band;
+            // Every strip owns its own piece of every row of the band.
+            let mut columns: Vec<Vec<&mut [f32]>> =
+                (0..width.div_ceil(strip)).map(|_| Vec::new()).collect();
+            for line in out.chunks_exact_mut(width) {
+                for (pieces, piece) in columns.iter_mut().zip(line.chunks_mut(strip)) {
+                    pieces.push(piece);
+                }
+            }
+            columns
+                .into_par_iter()
+                .enumerate()
+                .for_each(|(number, mut lines)| {
+                    let x0 = number * strip;
+                    let x1 = (x0 + strip).min(width);
+                    let mut sums = vec![0.0f64; x1 - x0];
+                    for row in rows
+                        .iter()
+                        .take((first + radius + 1).min(height))
+                        .skip(first.saturating_sub(radius))
+                    {
+                        for (sum, v) in sums.iter_mut().zip(span(row, x0, x1)) {
+                            *sum += f64::from(*v);
+                        }
+                    }
+                    for (offset, line) in lines.iter_mut().enumerate() {
+                        let y = first + offset;
+                        let lo = y.saturating_sub(radius);
+                        let hi = (y + radius).min(height - 1);
+                        let count = (hi - lo + 1) as f64;
+                        for (slot, sum) in line.iter_mut().zip(sums.iter()) {
+                            *slot = (sum / count) as f32;
+                        }
+                        if y >= radius {
+                            if let Some(leaving) = rows.get(y - radius) {
+                                for (sum, v) in sums.iter_mut().zip(span(leaving, x0, x1)) {
+                                    *sum -= f64::from(*v);
+                                }
+                            }
+                        }
+                        if let Some(entering) = rows.get(y + radius + 1) {
+                            for (sum, v) in sums.iter_mut().zip(span(entering, x0, x1)) {
+                                *sum += f64::from(*v);
+                            }
+                        }
+                    }
+                });
+        });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Three passes along the rows and then three down the columns is the alternating filter,
+    /// to within a rounding, on frames narrower and wider than a strip and at every radius.
+    #[test]
+    fn rows_then_columns_is_the_alternating_blur() {
+        for (w, h) in [(1, 7), (31, 40), (33, 65), (97, 130), (300, 41)] {
+            let values: Vec<f32> = (0..w * h)
+                .map(|i| ((i * 7919 + 13) % 1009) as f32 / 1009.0 + (i % 3) as f32 * 0.25)
+                .collect();
+            for radius in [1, 2, 9, 40, 400] {
+                let mut alternating = values.clone();
+                let mut scratch = vec![0.0f32; w * h];
+                for _ in 0..BOX_PASSES {
+                    box_pass_h(&alternating, &mut scratch, w, radius);
+                    box_pass_v(&scratch, &mut alternating, w, h, radius);
+                }
+                let fused = blur(&values, w, h, radius);
+                for (a, b) in fused.iter().zip(&alternating) {
+                    assert!((a - b).abs() <= 2e-6, "{w}x{h} r {radius}: {a} vs {b}");
+                }
+            }
+        }
+    }
+
+    /// The vertical pass as it was before the bands were cut into strips: one task a band.
+    #[allow(clippy::indexing_slicing)]
+    fn banded_reference(src: &[f32], width: usize, height: usize, radius: usize) -> Vec<f32> {
+        let band = (radius * 4).max(64);
+        let rows: Vec<&[f32]> = src.chunks_exact(width).collect();
+        let mut dst = vec![0.0f32; width * height];
+        for (index, out) in dst.chunks_mut(width * band).enumerate() {
             let first = index * band;
             let mut sums = vec![0.0f64; width];
             for row in rows
@@ -276,17 +473,13 @@ fn box_pass_v(src: &[f32], dst: &mut [f32], width: usize, height: usize, radius:
             }
             for (offset, line) in out.chunks_exact_mut(width).enumerate() {
                 let y = first + offset;
-                let lo = y.saturating_sub(radius);
-                let hi = (y + radius).min(height - 1);
-                let count = (hi - lo + 1) as f64;
+                let count = ((y + radius).min(height - 1) - y.saturating_sub(radius) + 1) as f64;
                 for (slot, sum) in line.iter_mut().zip(sums.iter()) {
                     *slot = (sum / count) as f32;
                 }
                 if y >= radius {
-                    if let Some(leaving) = rows.get(y - radius) {
-                        for (sum, v) in sums.iter_mut().zip(leaving.iter()) {
-                            *sum -= f64::from(*v);
-                        }
+                    for (sum, v) in sums.iter_mut().zip(rows[y - radius]) {
+                        *sum -= f64::from(*v);
                     }
                 }
                 if let Some(entering) = rows.get(y + radius + 1) {
@@ -295,12 +488,30 @@ fn box_pass_v(src: &[f32], dst: &mut [f32], width: usize, height: usize, radius:
                     }
                 }
             }
-        });
-}
+        }
+        dst
+    }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+    /// Cutting bands into column strips changes which core sums a column, never the sums.
+    #[test]
+    fn column_strips_give_exactly_the_banded_result() {
+        for (w, h) in [(1, 9), (127, 300), (128, 70), (129, 65), (411, 523)] {
+            let values: Vec<f32> = (0..w * h)
+                .map(|i| ((i * 7919 + 13) % 1009) as f32 / 1009.0 * 1e-3 + (i % 5) as f32)
+                .collect();
+            for radius in [1, 3, 17, 64, 240] {
+                let mut fast = vec![0.0f32; w * h];
+                box_pass_v(&values, &mut fast, w, h, radius);
+                let slow = banded_reference(&values, w, h, radius);
+                assert!(
+                    fast.iter()
+                        .zip(&slow)
+                        .all(|(a, b)| a.to_bits() == b.to_bits()),
+                    "{w}x{h} radius {radius}"
+                );
+            }
+        }
+    }
 
     /// The running-sum passes give the same windows as summing every sample of each one.
     #[test]
@@ -436,5 +647,34 @@ mod tests {
     #[test]
     fn an_empty_region_is_an_empty_answer() {
         assert!(separate(&[], 0, 0).is_empty());
+    }
+
+    #[test]
+    #[ignore = "timing, by hand"]
+    #[allow(clippy::disallowed_methods, clippy::print_stdout)]
+    fn pass_timing() {
+        let (w, h) = (1400_usize, 1600_usize);
+        let values: Vec<f32> = (0..w * h)
+            .map(|i| ((i * 7919) % 1009) as f32 / 1009.0)
+            .collect();
+        let mut out = vec![0.0f32; w * h];
+        for radius in [5_usize, 18, 60, 216, 432] {
+            let t = std::time::Instant::now();
+            for _ in 0..10 {
+                box_pass_h(&values, &mut out, w, radius);
+            }
+            let horizontal = t.elapsed() / 10;
+            let t = std::time::Instant::now();
+            for _ in 0..10 {
+                box_pass_v(&values, &mut out, w, h, radius);
+            }
+            let vertical = t.elapsed() / 10;
+            let t = std::time::Instant::now();
+            for _ in 0..10 {
+                let _ = blur(&values, w, h, radius);
+            }
+            let blurred = t.elapsed() / 10;
+            println!("r {radius}: h {horizontal:?} v {vertical:?} blur {blurred:?}");
+        }
     }
 }

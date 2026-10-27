@@ -4,6 +4,23 @@ import { freshRetouch } from '../../ipc/nativeRetouch';
 import { RetouchPresets, parseRetouchPresets } from './RetouchPresets';
 
 beforeEach(() => localStorage.clear());
+it('keeps saturation settings while excluding the image-specific sampled color selection', () => {
+  const settings={...freshRetouch(),tool:'color_saturation',warmth:-.4,tint:.6,
+    selection:{color:{sample:[.7,.3],tolerance:15,softness:10,lightness:.5}}};
+  const [preset]=parseRetouchPresets(JSON.stringify({version:1,items:[{name:'Muted fabric',settings}]}));
+  expect(preset?.settings).toMatchObject({tool:'color_saturation',warmth:-.4,tint:.6});
+  expect(preset?.settings).not.toHaveProperty('selection');
+});
+it.each(['motion_blur','zoom_blur','color_despill','highlight_compress'] as const)('round-trips %s settings without the old photo centre', tool => {
+  const settings = {...freshRetouch(),tool,radius:.035,warmth:-.5,tone:.25,texture:1.6,targetColor:[0,1,0],source:[.3,.4]};
+  const [preset] = parseRetouchPresets(JSON.stringify({version:1,items:[{name:'Optical tool',settings}]}));
+  expect(preset?.settings).toMatchObject({tool,radius:.035,warmth:-.5,tone:.25,texture:1.6,targetColor:[0,1,0]});
+  expect(preset?.settings).not.toHaveProperty('source');
+});
+it.each([null,[.5,.5,.5],[0,0,0],[1,1,1]])('rejects a spill preset without a usable hue: %s', targetColor => {
+  const settings = {...freshRetouch(),tool:'color_despill',targetColor};
+  expect(()=>parseRetouchPresets(JSON.stringify({version:1,items:[{name:'Invalid hue',settings}]}))).toThrow('invalid');
+});
 it('saves a chosen hair color without carrying the old photo selection', () => {
   const settings = {...freshRetouch(),tool:'colorize',targetColor:[.3,.2,.8]};
   const [preset] = parseRetouchPresets(JSON.stringify({version:1,items:[{name:'Violet hair',settings}]}));

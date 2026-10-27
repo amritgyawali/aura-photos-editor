@@ -3,6 +3,9 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { InstagramStyle } from './InstagramStyle';
 import { referenceStyle, type ReferenceAnalysis } from './referenceStyle';
 import { pickPhotoFolder } from '../../ipc/client';
+import { pickColorReference } from '../../ipc/colorMatch';
+
+vi.mock('../../ipc/colorMatch', () => ({ pickColorReference: vi.fn() }));
 
 vi.mock('./referenceStyle', () => ({ referenceStyle: { analyse: vi.fn() } }));
 vi.mock('../../ipc/client', () => ({ inTauri: () => true, asIpcError: (e: Error) => ({ message: e.message }),
@@ -15,6 +18,17 @@ beforeEach(() => {
   vi.mocked(referenceStyle.analyse).mockResolvedValue(analysis);
 });
 
+it('accepts one edited photo on the main Match a look screen', async () => {
+  vi.mocked(pickColorReference).mockResolvedValue('D:/edited-reference.tiff');
+  vi.mocked(referenceStyle.analyse).mockResolvedValue({ ...analysis, measured: 1 });
+  const events = props();
+  render(<InstagramStyle {...events} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Upload edited reference photo' }));
+  await waitFor(() => expect(events.onChange).toHaveBeenCalledWith({ analysis: { ...analysis, measured: 1 }, strength: 0.8 }));
+  expect(referenceStyle.analyse).toHaveBeenCalledWith('', 'D:/edited-reference.tiff', expect.any(String), false);
+  expect(pickPhotoFolder).not.toHaveBeenCalled();
+});
+
 it('learns a look from a folder of reference photos, with a label and nothing downloaded', async () => {
   vi.mocked(pickPhotoFolder).mockResolvedValue('D:/saved references');
   const events = props();
@@ -23,6 +37,33 @@ it('learns a look from a folder of reference photos, with a label and nothing do
   fireEvent.click(screen.getByRole('button', { name: 'Choose reference photos' }));
   await waitFor(() => expect(events.onChange).toHaveBeenCalledWith({ analysis, strength: 0.8 }));
   expect(referenceStyle.analyse).toHaveBeenCalledWith('Asha', 'D:/saved references', expect.any(String), false);
+});
+
+it('calibrates an original and edited pair in selection order', async () => {
+  vi.mocked(pickColorReference).mockResolvedValueOnce('D:/original.png').mockResolvedValueOnce('D:/edited.tiff');
+  const calibrated = { ...analysis, measured: 1, calibration: { trainingSamples: 8000, validationSamples: 2000, meanError: 0.3, p95Error: 0.9, occupiedColorCells: 24 } };
+  vi.mocked(referenceStyle.analyse).mockResolvedValue(calibrated);
+  const events = props();
+  render(<InstagramStyle {...events} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Use original + edited pair' }));
+  await waitFor(() => expect(referenceStyle.analyse).toHaveBeenCalledWith('', 'D:/edited.tiff', expect.any(String), false, 'D:/original.png'));
+  await waitFor(() => expect(events.onChange).toHaveBeenCalledWith({ analysis: calibrated, strength: 0.8 }));
+  expect(pickPhotoFolder).not.toHaveBeenCalled();
+});
+
+it('keeps the reference if the original or edited picker is cancelled', async () => {
+  vi.mocked(pickColorReference).mockResolvedValueOnce('D:/original.png').mockResolvedValueOnce(null);
+  const events = props();
+  render(<InstagramStyle {...events} selection={{ analysis, strength: 0.8 }} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Use original + edited pair' }));
+  await screen.findByText('Stopped. Your previous style is unchanged.');
+  expect(referenceStyle.analyse).not.toHaveBeenCalled();
+  expect(events.onChange).not.toHaveBeenCalled();
+});
+
+it('explains when a shared calibrated grade is ready', () => {
+  render(<InstagramStyle {...props()} selection={{ analysis: { ...analysis, calibration: { trainingSamples: 8000, validationSamples: 2000, meanError: 0.3, p95Error: 0.9, occupiedColorCells: 24 } }, strength: 0.8 }} />);
+  expect(screen.getByText(/Color transformation learned from your original and edited reference/)).toBeTruthy();
 });
 
 it('reads an Instagram data export by its own layout', async () => {

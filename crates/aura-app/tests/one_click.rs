@@ -299,6 +299,53 @@ fn one_press_delivers_files_with_the_refusals_it_met_written_down() {
     assert!(destination.join("aura-run.json").is_file());
     assert_eq!(final_row.ai_edited, 0);
     assert_eq!(final_row.local_edited, 2);
+    let failures: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(destination.join("photo-edit-failures.json")).expect("failure ledger"),
+    )
+    .expect("failure JSON");
+    assert_eq!(failures, serde_json::json!([]));
+
+    // Existing valid recipes must not masquerade as a successful new edit if the
+    // requested look fails. This exercises the worker through the real delivery gate.
+    let failed_destination = dir.path().join("failed-look-out");
+    let failed = one_click_finish(
+        &state,
+        OneClickFinishInput {
+            project_id: project.id.clone(),
+            destination: failed_destination.display().to_string(),
+            ingest_job_id: None,
+            keep_everything: true,
+            look: Some(aura_app::contract::ipc::AutomaticLookInput {
+                profile_id: Some("missing-profile-for-regression".into()),
+                profile_strength: 100,
+                reference_id: None,
+                reference_strength: 0,
+            }),
+        },
+    )
+    .expect("start failing edit");
+    let deadline = Instant::now() + Duration::from_secs(120);
+    loop {
+        let row = one_click_status(&failed.job_id).expect("failed status");
+        if row.status != "running" {
+            assert_eq!(row.status, "failed", "{row:?}");
+            assert_eq!(row.written, 0, "old recipes must not be delivered");
+            assert_eq!(row.failed_edits, 2);
+            break;
+        }
+        assert!(Instant::now() < deadline);
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let withheld: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(failed_destination.join("photo-edit-failures.json"))
+            .expect("withheld ledger"),
+    )
+    .expect("withheld JSON");
+    let withheld = withheld.as_array().expect("withheld ledger is an array");
+    assert_eq!(withheld.len(), 2);
+    assert!(withheld
+        .iter()
+        .all(|v| v["disposition"] == "withheld_from_delivery"));
     let _waiting = state.register_import("waiting-import");
     let pending = one_click_finish(
         &state,

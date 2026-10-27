@@ -12,8 +12,9 @@ your setting and no automatic pass changes it again.
 
 | Lightroom | AURA | Automatic |
 |---|---|---|
-| **Basic**: white balance (temp, tint), exposure, contrast, highlights, shadows, whites, blacks | Develop → Basic. Recipe `global.*` | Yes: exposure, highlights, shadows and contrast are measured per photo; the rest come from the chosen profile |
-| Basic: texture, clarity, dehaze, vibrance, saturation | Develop → Basic | Yes, from the profile |
+| **Basic**: white balance (temp, tint), exposure, contrast, highlights, shadows, whites, blacks | Develop → Basic. Recipe `global.*` | Yes: exposure, highlights, shadows and contrast are measured per photo; Shadows and Highlights are also sized from the photo's regions (ADR-0126); the rest come from the chosen profile |
+| Highlights and Shadows act locally, like Lightroom's since Process Version 2012 | Each pixel takes the gain of its region from an edge-aware base, so texture is kept and clipped regions stay white (ADR-0126) | - |
+| Basic: texture, clarity, dehaze, vibrance, saturation | Develop → Basic. Clarity is edge-aware (no halos); Dehaze is a dark-channel haze model that clears the distance more than the foreground (ADR-0126) | Yes, from the profile |
 | Auto (Basic panel) | **Auto** button, and every one-click edit | Yes |
 | Profile browser / creative profiles | 21 edit profiles on the start screen and in Develop → Presets | Yes, the chosen profile |
 | Presets, preset amount slider | Develop → Presets with a 0-150 % strength | Yes |
@@ -26,6 +27,8 @@ your setting and no automatic pass changes it again.
 | **Detail**: sharpening (amount, radius, detail, masking), noise reduction (luminance, detail, colour) | Develop → Detail | From profiles; high-ISO denoise tiers in the advanced workflow |
 | AI Denoise | Restoration (phase 22) in the advanced workflow | Yes, where measured noise warrants it |
 | **Lens Corrections**: profile, chromatic aberration, vignetting | Develop → Lens Corrections | Geometry pass in the advanced workflow |
+| Lens Corrections: Remove Chromatic Aberration | Lens settings (`lens.ca`, `ca_red`, `ca_blue`) | **Yes**: measured from the photograph's own edges and confirmed on the corrected pixels, in Auto enhance and the advanced workflow (ADR-0125) |
+| Lens Corrections: Defringe (purple and green amount) | Retouch → Defringe (purple and green strength, reach) | **Yes** for purple rims along bright edges; green is left to you (ADR-0125) |
 | **Transform**: Upright, perspective | Geometry (phase 23): horizon and vertical correction | Yes, in the advanced workflow |
 | Crop & straighten, aspect presets | Develop → Transform & Crop (Original, 1:1, 4:5, 3:2, 16:9, 9:16) | Crops are proposed by the geometry pass |
 | **Effects**: post-crop vignette (amount, midpoint, roundness, feather, highlights) | Develop → Effects (`global.effects.vignette`) | From profiles, highlight priority |

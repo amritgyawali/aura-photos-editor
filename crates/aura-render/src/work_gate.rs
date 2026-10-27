@@ -8,11 +8,17 @@
 //! One permit is the old behaviour - one pass at a time - and is what a small machine gets. A
 //! larger machine gets a few, because a wedding of a thousand photographs processed one at a
 //! time leaves all but one of its cores idle for hours.
+//!
+//! [`WorkGate::acquire`] is reentrant on one thread: a pass that already holds a place and starts
+//! a render of its own - a colour match capturing its edited preview - is already counted, and
+//! waiting for a second place would wait for itself forever on a one-permit machine. The memory
+//! bound is unchanged, because the nested work runs inside the place its caller holds.
 
 use std::sync::{Condvar, Mutex, PoisonError};
+use std::thread::ThreadId;
 
 /// The most permits [`WorkGate::for_this_machine`] grants without being told to.
-pub const DEFAULT_MAX_PERMITS: usize = 3;
+pub const DEFAULT_MAX_PERMITS: usize = 4;
 /// The most permits `AURA_IMAGE_WORKERS` may ask for.
 pub const MAX_PERMITS: usize = 8;
 
@@ -21,6 +27,8 @@ pub const MAX_PERMITS: usize = 8;
 pub struct WorkGate {
     permits: usize,
     busy: Mutex<usize>,
+    /// The threads holding a counted place, one entry per place.
+    holders: Mutex<Vec<ThreadId>>,
     freed: Condvar,
 }
 
@@ -29,6 +37,9 @@ pub struct WorkGate {
 #[must_use = "the permit is released as soon as it is dropped"]
 pub struct WorkPermit<'a> {
     gate: &'a WorkGate,
+    /// The thread whose counted place this is; `None` for a place taken inside one that thread
+    /// already holds, which releases nothing.
+    holder: Option<ThreadId>,
 }
 
 impl WorkGate {
@@ -38,6 +49,7 @@ impl WorkGate {
         Self {
             permits: permits.clamp(1, MAX_PERMITS),
             busy: Mutex::new(0),
+            holders: Mutex::new(Vec::new()),
             freed: Condvar::new(),
         }
     }
@@ -59,8 +71,27 @@ impl WorkGate {
         self.permits
     }
 
-    /// Wait for a place and take it.
+    /// How many passes are running now.
+    #[must_use]
+    pub fn busy(&self) -> usize {
+        *self.busy.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// Wait for a place and take it - or, when this thread already holds one, take that one again
+    /// without waiting.
     pub fn acquire(&self) -> WorkPermit<'_> {
+        let me = std::thread::current().id();
+        if self
+            .holders
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .contains(&me)
+        {
+            return WorkPermit {
+                gate: self,
+                holder: None,
+            };
+        }
         let mut busy = self.busy.lock().unwrap_or_else(PoisonError::into_inner);
         while *busy >= self.permits {
             busy = self
@@ -69,7 +100,19 @@ impl WorkGate {
                 .unwrap_or_else(PoisonError::into_inner);
         }
         *busy += 1;
-        WorkPermit { gate: self }
+        self.counted()
+    }
+
+    fn counted(&self) -> WorkPermit<'_> {
+        let me = std::thread::current().id();
+        self.holders
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(me);
+        WorkPermit {
+            gate: self,
+            holder: Some(me),
+        }
     }
 
     /// Take a place only if one is free now.
@@ -79,7 +122,7 @@ impl WorkGate {
             return None;
         }
         *busy += 1;
-        Some(WorkPermit { gate: self })
+        Some(self.counted())
     }
 }
 
@@ -91,6 +134,19 @@ impl Default for WorkGate {
 
 impl Drop for WorkPermit<'_> {
     fn drop(&mut self) {
+        let Some(holder) = self.holder else {
+            return;
+        };
+        {
+            let mut holders = self
+                .gate
+                .holders
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
+            if let Some(at) = holders.iter().position(|&id| id == holder) {
+                holders.swap_remove(at);
+            }
+        }
         let mut busy = self
             .gate
             .busy
@@ -154,11 +210,31 @@ mod tests {
     }
 
     #[test]
+    fn a_pass_holding_the_only_place_can_start_a_render_of_its_own() {
+        let gate = Arc::new(WorkGate::new(1));
+        let outer = gate.acquire();
+        // Waiting here would wait for this thread itself, forever.
+        let inner = gate.acquire();
+        assert_eq!(gate.busy(), 1, "the nested pass runs in its caller's place");
+        drop(inner);
+        assert_eq!(gate.busy(), 1, "the caller still holds its place");
+        // Another thread still waits for the place.
+        let other = {
+            let gate = gate.clone();
+            std::thread::spawn(move || gate.try_acquire().is_some())
+        };
+        assert!(!other.join().unwrap());
+        drop(outer);
+        assert_eq!(gate.busy(), 0);
+        assert!(gate.try_acquire().is_some());
+    }
+
+    #[test]
     fn small_machines_keep_one_pass_at_a_time() {
         assert_eq!(permits_for(4), 1);
         assert_eq!(permits_for(8), 2);
-        assert_eq!(permits_for(12), 3);
-        assert_eq!(permits_for(64), 3);
+        assert_eq!(permits_for(12), 4);
+        assert_eq!(permits_for(64), 4);
         assert_eq!(WorkGate::new(0).permits(), 1);
         assert_eq!(WorkGate::new(99).permits(), MAX_PERMITS);
     }

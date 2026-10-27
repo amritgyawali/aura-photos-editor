@@ -185,14 +185,13 @@ impl Stage {
             // estimate of it: the chroma pass runs at r <= 4 and the luminance pass at
             // r <= 3, plus one pixel for the Sobel.
             Self::NoiseReduction => 16,
-            // r = 16.
-            Self::Clarity => 48,
             // Twelve for both, arrived at from different radii: texture blurs at r = 4, and
             // sharpening at r <= 3 plus one pixel for the Sobel. They share an arm because
             // the numbers are equal, not because the stages are.
             Self::Texture | Self::Sharpen => 12,
-            // r = 8 on the dark channel.
-            Self::Dehaze => 24,
+            // Clarity, Dehaze and the local Shadows and Highlights read only the pixel they
+            // write and a frame-wide edge-aware base measured once before the first tile, the
+            // way sharpening's normaliser is. Their reach is the pixel itself. ADR-0126.
             Self::LensDistortion | Self::LensCa | Self::Geometry => 8,
             _ => 0,
         }
@@ -435,16 +434,10 @@ pub fn plan(recipe: &Recipe, purpose: RenderPurpose, input: InputKind, caps: Cap
         SkipReason::NotRequested,
         None
     );
-    push!(
-        Stage::Dehaze,
-        g.dehaze != 0 && !skip_heavy,
-        if g.dehaze != 0 {
-            SkipReason::InteractivePath
-        } else {
-            SkipReason::NotRequested
-        },
-        None,
-    );
+    // Dehaze reads the same small frame-wide base as Clarity and Shadows/Highlights (ADR-0126),
+    // so it is no heavier than they are and runs on the interactive path too: a slider that only
+    // showed its effect once the full-quality render arrived looked like a slider that did nothing.
+    push!(Stage::Dehaze, g.dehaze != 0, SkipReason::NotRequested, None,);
     push!(
         Stage::Vibrance,
         g.vibrance != 0 || g.saturation != 0,
@@ -689,7 +682,20 @@ pub fn stage_for(path: &str) -> Option<Stage> {
         "geometry.rotate" | "geometry.crop" => Some(Stage::Geometry),
         "image.camera" | "image.profile" => Some(Stage::CameraMatrix),
         _ => {
-            if path.starts_with("cleanup") {
+            if path.starts_with("studio_color_v1")
+                || path.starts_with("extra.studio_color_v1")
+                || path.starts_with("material_lab_v1")
+                || path.starts_with("extra.material_lab_v1")
+                || path.starts_with("color_lab_v1")
+                || path.starts_with("extra.color_lab_v1")
+                || path.starts_with("spatial_lab_v1")
+                || path.starts_with("extra.spatial_lab_v1")
+                || path.starts_with("calibrated_look_v1")
+                || path.starts_with("extra.calibrated_look_v1")
+                || path.starts_with("reference_grade_v1")
+            {
+                Some(Stage::Sharpen)
+            } else if path.starts_with("cleanup") {
                 Some(Stage::Cleanup)
             } else if path.starts_with("global.hsl") {
                 Some(Stage::Hsl)
@@ -760,14 +766,23 @@ pub fn render_hash(
 ///
 /// `aura-render/1.0.0+profiles.1`. The profile version is part of the engine rather than a
 /// fifth input, because from a caller's point of view a changed colour matrix *is* a
-/// different renderer.
+/// different renderer. So is a changed reading of a display-referred file: the same JPEG
+/// under the same recipe is a different picture, and a cached preview of it is stale.
 #[must_use]
 pub fn engine_string() -> String {
     format!(
-        "{}+profiles.{}+portrait.{}",
+        "{}+profiles.{}+portrait.{}+display.{}+local.{}+raw.{}+clear.{}+matte.{}+undereye.{}+boundary.{}+skin.{}+labs.selected-v5+calibrated.2+hsl.2+faceless.1+background-repair.2+glare.3+people-gate.1",
         ENGINE,
         crate::profiles::PROFILES_VER,
-        aura_portrait::PARSE_VER
+        aura_portrait::PARSE_VER,
+        crate::output::DISPLAY_INPUT_VER,
+        crate::edge_aware::LOCAL_VER,
+        aura_raw::full::DEMOSAIC_VER,
+        crate::retouch_clear::VERSION,
+        crate::retouch_matte::VERSION,
+        crate::retouch_undereye::VERSION,
+        crate::retouch_boundary::VERSION,
+        crate::retouch_skin::REFERENCE_VERSION
     )
 }
 
@@ -863,27 +878,30 @@ mod tests {
     fn the_interactive_path_skips_heavy_stages_and_the_export_path_never_does() {
         let mut recipe = fixtures::reference();
         recipe.global.dehaze = 40;
+        recipe.restoration.deblur = 50;
+        let caps = Capabilities {
+            restoration: true,
+            ..Capabilities::default()
+        };
         let interactive = plan(
             &recipe,
             RenderPurpose::Interactive,
             InputKind::Working,
-            Capabilities::default(),
+            caps,
         );
-        assert!(!interactive.stages.contains(&Stage::Dehaze));
+        // Restoration is heavy and waits for the full render; dehaze reads the small frame base
+        // and is shown while the slider moves.
+        assert!(!interactive.stages.contains(&Stage::Restoration));
+        assert!(interactive.stages.contains(&Stage::Dehaze));
         assert!(interactive
             .notes
             .iter()
             .any(|n| n.reason == SkipReason::InteractivePath));
 
         for purpose in [RenderPurpose::Export, RenderPurpose::Analysis] {
-            let full = plan(
-                &recipe,
-                purpose,
-                InputKind::Working,
-                Capabilities::default(),
-            );
+            let full = plan(&recipe, purpose, InputKind::Working, caps);
             assert!(
-                full.stages.contains(&Stage::Dehaze),
+                full.stages.contains(&Stage::Dehaze) && full.stages.contains(&Stage::Restoration),
                 "{purpose:?} must not skip"
             );
         }
@@ -1004,7 +1022,23 @@ mod tests {
         assert!(engine.contains(&format!("+profiles.{}+", crate::profiles::PROFILES_VER)));
         // The portrait parse decides the pixels of every masked or retouched render, so its
         // version is part of the engine as the profile table's is.
-        assert!(engine.ends_with(&format!("+portrait.{}", aura_portrait::PARSE_VER)));
+        assert!(engine.contains(&format!("+portrait.{}+", aura_portrait::PARSE_VER)));
+        // And so is how a display-referred file is read: it decides every JPEG's pixels.
+        assert!(engine.contains(&format!("+display.{}+", crate::output::DISPLAY_INPUT_VER)));
+        // And so are the edge-aware base layers: they decide every pixel that Shadows,
+        // Highlights, Clarity or Dehaze touches. ADR-0126.
+        assert!(engine.contains(&format!("+local.{}", crate::edge_aware::LOCAL_VER)));
+        // Full-size reconstruction changes pixels too, even though the model proxy is fixed.
+        assert!(engine.contains(&format!("+raw.{}", aura_raw::full::DEMOSAIC_VER)));
+        assert!(engine.contains(&format!("+skin.{}", crate::retouch_skin::REFERENCE_VERSION)));
+        assert!(engine.contains("+labs.selected-v5+"));
+        // The calibrated look and the background repair are stages whose pixels it decides too.
+        assert!(engine.contains("+calibrated.2+"));
+        assert!(engine.contains("+hsl.2+faceless.1+"));
+        assert!(engine.contains("+background-repair.2+"));
+        assert!(engine.ends_with("+glare.3+people-gate.1"));
+        assert!(engine.contains(&format!("+clear.{}+", crate::retouch_clear::VERSION)));
+        assert!(engine.contains(&format!("+undereye.{}+", crate::retouch_undereye::VERSION)));
     }
 
     #[test]

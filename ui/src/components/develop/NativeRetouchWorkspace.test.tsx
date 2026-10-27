@@ -4,8 +4,10 @@ import { NativeRetouchWorkspace } from './NativeRetouchWorkspace';
 import { nativeRetouch, freshRetouch } from '../../ipc/nativeRetouch';
 import { api, develop } from '../../ipc/client';
 import { forgetPreviews } from '../../state/previewCache';
+vi.mock('./AutomaticFinishControls', () => ({ AutomaticFinishControls: () => null }));
+import { useEffectRequest } from '../../state/effectRequest';
 
-vi.mock('../../ipc/nativeRetouch',async()=>({...await vi.importActual('../../ipc/nativeRetouch'),nativeRetouch:{autoPortrait:vi.fn(),autoRetouch:vi.fn(),edit:vi.fn(),preview:vi.fn(),draftPreview:vi.fn(),selectionPreview:vi.fn(),savedSelection:vi.fn()}}));
+vi.mock('../../ipc/nativeRetouch',async()=>({...await vi.importActual('../../ipc/nativeRetouch'),nativeRetouch:{findGlare:vi.fn(),autoPortrait:vi.fn(),autoRetouch:vi.fn(),edit:vi.fn(),preview:vi.fn(),draftPreview:vi.fn(),selectionPreview:vi.fn(),savedSelection:vi.fn()}}));
 vi.mock('../../ipc/client',()=>({api:{listImages:vi.fn()},asIpcError:(e:Error)=>({message:e.message}),develop:{imageRecipe:vi.fn(),imageHistory:vi.fn(),historyStep:vi.fn()}}));
 beforeEach(()=>{
   vi.resetAllMocks();forgetPreviews();vi.mocked(nativeRetouch.edit).mockResolvedValue([]);
@@ -16,6 +18,184 @@ beforeEach(()=>{
   localStorage.clear();
 });
 function open(){return render(<NativeRetouchWorkspace projectId="project" photoId="photo" onClose={vi.fn()} onBusyChange={vi.fn()}/>);}
+it('opens the glare feature with local glare softening selected and saves the actual operation', async () => {
+  render(<NativeRetouchWorkspace projectId="project" photoId="photo" feature="glare" onClose={vi.fn()} onBusyChange={vi.fn()} />);
+  await screen.findByAltText('Retouched photograph');
+  expect((screen.getByLabelText('Tool') as HTMLSelectElement).value).toBe('glare');
+  expect(screen.getByText(/fully opaque glare/)).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Apply retouch' }));
+  await waitFor(() => expect(nativeRetouch.edit).toHaveBeenCalledWith('project', 'photo', 'append', [expect.objectContaining({ tool: 'glare', amount: .85, feather: .3 })]));
+});
+it('finds lens reflections and saves one glare operation per lens in a single step', async () => {
+  vi.mocked(nativeRetouch.findGlare).mockResolvedValue({faces:1,message:'Found 2 lens reflections on 1 face. Compare before and after, then adjust or undo.',
+    regions:[{region:[.4,.3,.05,.03],confidence:.9,face:0},{region:[.6,.3,.05,.03],confidence:.7,face:0}]});
+  render(<NativeRetouchWorkspace projectId="project" photoId="photo" feature="glare" onClose={vi.fn()} onBusyChange={vi.fn()} />);
+  await screen.findByAltText('Retouched photograph');
+  fireEvent.click(screen.getByRole('button', { name: 'Find and remove reflections' }));
+  await waitFor(() => expect(nativeRetouch.edit).toHaveBeenCalledWith('project', 'photo', 'append', [
+    expect.objectContaining({ tool: 'glare', region: [.4,.3,.05,.03], amount: .85, feather: .3 }),
+    expect.objectContaining({ tool: 'glare', region: [.6,.3,.05,.03] }),
+  ]));
+  expect(await screen.findByText(/Found 2 lens reflections/)).toBeTruthy();
+});
+it('reports when no lens reflection is found and saves nothing', async () => {
+  vi.mocked(nativeRetouch.findGlare).mockResolvedValue({faces:1,regions:[],message:'No lens reflection stood out on 1 face. If you see one, place an ellipse over it by hand.'});
+  render(<NativeRetouchWorkspace projectId="project" photoId="photo" feature="glare" onClose={vi.fn()} onBusyChange={vi.fn()} />);
+  await screen.findByAltText('Retouched photograph');
+  fireEvent.click(screen.getByRole('button', { name: 'Find and remove reflections' }));
+  expect(await screen.findByText(/No lens reflection stood out/)).toBeTruthy();
+  expect(nativeRetouch.edit).not.toHaveBeenCalledWith('project', 'photo', 'append', expect.anything());
+});
+it('saves local saturation and vibrance with a sampled color range and brightness intersection', async () => {
+  open(); await screen.findByAltText('Retouched photograph');
+  fireEvent.change(screen.getByLabelText('Tool'),{target:{value:'color_saturation'}});
+  fireEvent.change(screen.getByLabelText('Local saturation'),{target:{value:'-40'}});
+  fireEvent.change(screen.getByLabelText('Local vibrance'),{target:{value:'60'}});
+  fireEvent.click(screen.getByLabelText('Limit by sampled color'));
+  fireEvent.change(screen.getByLabelText('Color sample X (%)'),{target:{value:'70'}});
+  fireEvent.change(screen.getByLabelText('Color sample Y (%)'),{target:{value:'30'}});
+  fireEvent.change(screen.getByLabelText('Color tolerance'),{target:{value:'20'}});
+  fireEvent.change(screen.getByLabelText('Color range falloff'),{target:{value:'12'}});
+  fireEvent.change(screen.getByLabelText('Color lightness sensitivity'),{target:{value:'25'}});
+  fireEvent.click(screen.getByLabelText('Limit by brightness'));
+  fireEvent.click(screen.getByRole('button',{name:'Apply retouch'}));
+  await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','append',[
+    expect.objectContaining({tool:'color_saturation',warmth:-.4,tint:.6,selection:{
+      color:{sample:[.7,.3],tolerance:20,softness:12,lightness:.25},luminance:{low:-2,high:2,softness:.5},
+    }}),
+  ]));
+});
+it('samples a color without replacing the zoom centre and cancels picking when the range is removed', async () => {
+  open(); await screen.findByAltText('Retouched photograph');
+  fireEvent.change(screen.getByLabelText('Tool'),{target:{value:'zoom_blur'}});
+  fireEvent.change(screen.getByLabelText('Zoom center X (%)'),{target:{value:'20'}});
+  fireEvent.click(screen.getByLabelText('Limit by sampled color'));
+  fireEvent.click(screen.getByRole('button',{name:'Pick selection color on photo'}));
+  expect(screen.getByRole('button',{name:'Pick zoom center on photo'}).getAttribute('aria-pressed')).toBe('false');
+  const surface=screen.getByLabelText('Retouch image interaction');
+  vi.spyOn(surface,'getBoundingClientRect').mockReturnValue({left:0,top:0,width:100,height:100} as DOMRect);
+  const event=new Event('pointerdown',{bubbles:true,cancelable:true});
+  Object.assign(event,{pointerId:1,button:0,clientX:70,clientY:30,pointerType:'mouse',pressure:1});
+  fireEvent(surface,event);
+  expect((screen.getByLabelText('Color sample X (%)') as HTMLInputElement).value).toBe('70');
+  expect((screen.getByLabelText('Zoom center X (%)') as HTMLInputElement).value).toBe('20');
+  fireEvent.click(screen.getByRole('button',{name:'Pick selection color on photo'}));
+  fireEvent.click(screen.getByLabelText('Limit by sampled color'));
+  expect(surface.style.cursor).toBe('crosshair');
+});
+it('blocks invalid sampled range parameters before preview or save', async () => {
+  open(); await screen.findByAltText('Retouched photograph');
+  fireEvent.click(screen.getByLabelText('Limit by sampled color'));
+  for(const [label,value] of [['Color sample X (%)','101'],['Color tolerance','-1'],['Color range falloff','101']]) {
+    const input=screen.getByLabelText(label!);
+    const previous=(input as HTMLInputElement).value;
+    fireEvent.change(input,{target:{value}});
+    expect((screen.getByRole('button',{name:'Apply retouch'}) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button',{name:'Preview selection mask'}) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(input,{target:{value:previous}});
+  }
+  expect((screen.getByRole('button',{name:'Apply retouch'}) as HTMLButtonElement).disabled).toBe(false);
+});
+it('saves motion travel and angle in native units', async () => {
+  open(); await screen.findByAltText('Retouched photograph');
+  fireEvent.change(screen.getByLabelText('Tool'), {target:{value:'motion_blur'}});
+  fireEvent.change(screen.getByLabelText('Motion travel'), {target:{value:'4'}});
+  fireEvent.change(screen.getByLabelText('Motion angle'), {target:{value:'-90'}});
+  fireEvent.click(screen.getByRole('button',{name:'Apply retouch'}));
+  await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','append',[
+    expect.objectContaining({tool:'motion_blur',radius:.04,warmth:-.5}),
+  ]));
+});
+it('picks the zoom centre on the photo after leaving pan and saved coverage views', async () => {
+  vi.mocked(nativeRetouch.edit).mockResolvedValue([{...freshRetouch(),id:'saved',tool:'zoom_blur'}]);
+  open(); await screen.findByAltText('Retouched photograph');
+  fireEvent.click(screen.getByRole('button',{name:/1\. Radial zoom blur/}));
+  fireEvent.click(screen.getByRole('button',{name:'Hand (H)'}));
+  fireEvent.click(screen.getByRole('button',{name:'Show retouched areas'}));
+  await screen.findByAltText('Saved retouch coverage');
+  fireEvent.click(screen.getByRole('button',{name:'Pick zoom center on photo'}));
+  const surface = screen.getByLabelText('Retouch image interaction');
+  vi.spyOn(surface, 'getBoundingClientRect').mockReturnValue({left:0,top:0,width:100,height:100} as DOMRect);
+  const event = new Event('pointerdown', {bubbles:true,cancelable:true});
+  Object.assign(event, {pointerId:1,button:0,clientX:30,clientY:40,pointerType:'mouse',pressure:1});
+  fireEvent(surface,event);
+  expect((screen.getByLabelText('Zoom center X (%)') as HTMLInputElement).value).toBe('30');
+  expect((screen.getByLabelText('Zoom center Y (%)') as HTMLInputElement).value).toBe('40');
+  expect(screen.queryByAltText('Saved retouch coverage')).toBeNull();
+  expect(screen.getByRole('button',{name:'Pick zoom center on photo'}).getAttribute('aria-pressed')).toBe('false');
+});
+it('validates the zoom centre and saves its coordinates separately from travel', async () => {
+  open(); await screen.findByAltText('Retouched photograph');
+  fireEvent.change(screen.getByLabelText('Tool'), {target:{value:'zoom_blur'}});
+  fireEvent.change(screen.getByLabelText('Zoom travel'), {target:{value:'35'}});
+  fireEvent.change(screen.getByLabelText('Zoom center X (%)'), {target:{value:'110'}});
+  expect((screen.getByRole('button',{name:'Apply retouch'}) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(screen.getByRole('button',{name:'Center zoom on image'}));
+  expect((screen.getByLabelText('Zoom center X (%)') as HTMLInputElement).value).toBe('50');
+  fireEvent.change(screen.getByLabelText('Zoom center X (%)'), {target:{value:'30'}});
+  fireEvent.change(screen.getByLabelText('Zoom center Y (%)'), {target:{value:'40'}});
+  fireEvent.click(screen.getByRole('button',{name:'Apply retouch'}));
+  await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','append',[
+    expect.objectContaining({tool:'zoom_blur',radius:.035,source:[.3,.4]}),
+  ]));
+});
+it('refuses a neutral spill colour and saves a chosen hue and selectivity', async () => {
+  open(); await screen.findByAltText('Retouched photograph');
+  fireEvent.change(screen.getByLabelText('Tool'), {target:{value:'color_despill'}});
+  fireEvent.change(screen.getByLabelText('Target color'), {target:{value:'#808080'}});
+  expect(screen.getByRole('alert').textContent).toContain('Choose a colored spill sample');
+  expect((screen.getByRole('button',{name:'Apply retouch'}) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.change(screen.getByLabelText('Target color'), {target:{value:'#00ff00'}});
+  fireEvent.change(screen.getByLabelText('Spill hue selectivity'), {target:{value:'.7'}});
+  fireEvent.click(screen.getByRole('button',{name:'Apply retouch'}));
+  await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','append',[
+    expect.objectContaining({tool:'color_despill',targetColor:[0,1,0],tone:.7}),
+  ]));
+});
+it('saves highlight compression and threshold independently', async () => {
+  open(); await screen.findByAltText('Retouched photograph');
+  fireEvent.change(screen.getByLabelText('Tool'), {target:{value:'highlight_compress'}});
+  fireEvent.change(screen.getByLabelText('Compression threshold'), {target:{value:'1'}});
+  fireEvent.change(screen.getByLabelText('Highlight compression'), {target:{value:'80'}});
+  fireEvent.click(screen.getByRole('button',{name:'Apply retouch'}));
+  await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','append',[
+    expect.objectContaining({tool:'highlight_compress',tone:.25,texture:1.6}),
+  ]));
+});
+it.each(['fabric_moire','shadow_balance','background_blur','highlight_glow'] as const)('authors %s through its actual native operation', async tool => {
+  open(); await screen.findByAltText('Retouched photograph');
+  fireEvent.change(screen.getByLabelText('Tool'), {target:{value:tool}});
+  fireEvent.change(screen.getByLabelText('Effect radius'), {target:{value:'1.5'}});
+  if (tool === 'shadow_balance') fireEvent.change(screen.getByLabelText('Maximum shadow lift'), {target:{value:'1.5'}});
+  if (tool === 'highlight_glow') fireEvent.change(screen.getByLabelText('Highlight threshold'), {target:{value:'3'}});
+  fireEvent.click(screen.getByRole('button',{name:'Apply retouch'}));
+  await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','append',[
+    expect.objectContaining({tool,radius:.015,tone:['shadow_balance','highlight_glow'].includes(tool) ? .75 : .5}),
+  ]));
+  expect(nativeRetouch.autoRetouch).not.toHaveBeenCalled();
+});
+it('requires a clean material source before saving fabric stain correction', async () => {
+  open(); await screen.findByAltText('Retouched photograph');
+  fireEvent.change(screen.getByLabelText('Tool'), {target:{value:'fabric_stain'}});
+  expect((screen.getByRole('button',{name:'Apply retouch'}) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.change(screen.getByLabelText('Source X (%)'), {target:{value:'80'}});
+  fireEvent.change(screen.getByLabelText('Source Y (%)'), {target:{value:'30'}});
+  fireEvent.change(screen.getByLabelText('Stain correction'), {target:{value:'.8'}});
+  fireEvent.click(screen.getByRole('button',{name:'Apply retouch'}));
+  await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','append',[
+    expect.objectContaining({tool:'fabric_stain',source:[.8,.3],tone:.8}),
+  ]));
+});
+it('authors the existing native stretch-mark tool with its own reach and texture controls',async()=>{
+  open();await screen.findByAltText('Retouched photograph');
+  fireEvent.change(screen.getByLabelText('Tool'),{target:{value:'stretch_marks'}});
+  fireEvent.change(screen.getByLabelText('Mark smoothing reach (% of short edge)'),{target:{value:'1.5'}});
+  fireEvent.change(screen.getByRole('slider',{name:'Skin texture retained'}),{target:{value:'.7'}});
+  fireEvent.click(screen.getByRole('button',{name:'Apply retouch'}));
+  await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','append',[
+    expect.objectContaining({tool:'stretch_marks',radius:.015,texture:.7}),
+  ]));
+});
 it.each(['colorize','background_color'] as const)('saves %s with the chosen color and its own selection', async tool => {
   open(); await screen.findByAltText('Retouched photograph');
   fireEvent.change(screen.getByLabelText('Tool'), {target:{value:tool}});
@@ -53,13 +233,15 @@ it('keeps manual repair available after more than 256 saved acne repairs',async(
   vi.mocked(nativeRetouch.edit).mockResolvedValue(Array.from({length:300},(_,i)=>({...freshRetouch(),id:`saved-${i}`})));
   open();
   await screen.findByAltText('Retouched photograph');
+  fireEvent.change(screen.getByLabelText('Find operation'),{target:{value:'saved-299'}});
   const duplicate=screen.getByRole('button',{name:'Duplicate retouch 300'});
   expect((duplicate as HTMLButtonElement).disabled).toBe(false);
   expect((screen.getByRole('button',{name:'Natural skin in selection'}) as HTMLButtonElement).disabled).toBe(false);
   expect((screen.getByRole('button',{name:'Polished skin in selection'}) as HTMLButtonElement).disabled).toBe(false);
   fireEvent.click(duplicate);
   await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','duplicate',[],'saved-299'));
-});
+// Three hundred saved operations take seconds to render; the suite's 5 s default is for ordinary tests.
+},15_000);
 it('uses grayscale contrast review for both sides without changing the recipe or filtering coverage',async()=>{
   vi.mocked(nativeRetouch.edit).mockResolvedValue([{...freshRetouch(),id:'saved'}]);
   open();
@@ -142,7 +324,7 @@ it('restores distinct saved retouch choices after switching photos and undoing',
   vi.mocked(develop.imageRecipe).mockRejectedValueOnce(new Error('Cannot load photo c'));
   rerender(<NativeRetouchWorkspace {...props} photoId="c" />);
   await screen.findByText('Cannot load photo c');
-  const automatic = screen.getByRole('button', { name: 'Auto retouch: Face' });
+  const automatic = screen.getByRole('button', { name: 'Auto retouch: Face + body skin' });
   expect(automatic.closest('fieldset')?.disabled).toBe(true);
   fireEvent.click(automatic);
   expect(nativeRetouch.autoRetouch).toHaveBeenCalledTimes(1);
@@ -166,6 +348,18 @@ it('saves frequency healing with its own sensitivity and dark-mark protection', 
   fireEvent.click(screen.getByText('Apply retouch'));
   await waitFor(() => expect(nativeRetouch.edit).toHaveBeenCalledWith('project', 'photo', 'append', [
     expect.objectContaining({ tool: 'frequency_heal', sensitivity: .8, keepDarkMarks: true }),
+  ]));
+});
+it('saves a defringe over the whole photo, purple on and green off by default', async () => {
+  open(); await screen.findByAltText('Retouched photograph');
+  fireEvent.change(screen.getByLabelText('Tool'), { target: { value: 'defringe' } });
+  expect(screen.getByText(/the edge of every leaf against a bright sky is green too/)).toBeTruthy();
+  expect((screen.getByLabelText('Purple fringe removal') as HTMLInputElement).value).toBe('1');
+  expect((screen.getByLabelText('Green fringe removal') as HTMLInputElement).value).toBe('0');
+  fireEvent.change(screen.getByLabelText('Green fringe removal'), { target: { value: '.4' } });
+  fireEvent.click(screen.getByText('Apply retouch'));
+  await waitFor(() => expect(nativeRetouch.edit).toHaveBeenCalledWith('project', 'photo', 'append', [
+    expect.objectContaining({ tool: 'defringe', warmth: 1, tint: .4, amount: 1, region: [.5, .5, 1, 1], radius: .003 }),
   ]));
 });
 it('saves a texture graft with its level and glint limit, with no source required', async () => {
@@ -373,6 +567,19 @@ it('keeps the versioned clean-ring fit when manually adjusting an automatic heal
     expect.objectContaining({id:'saved-heal',amount:.9,textureHeal:true,cleanRingFit:true,curvedHeal:true,healSamples:[[1.5,0],[0,1.5]],textureSources:[[.2,.2],[.3,.2],[.4,.2]],sourceScale:.5,source:[.3,.4]}),
   ]));
 });
+it('adjusts a saved operation directly without replacing its protected selection or donor data',async()=>{
+  const saved={...freshRetouch(),id:'saved-heal',tool:'patch_heal' as const,matte:'protected-skin',cleanRingFit:true,
+    source:[.3,.4] as [number,number],healSamples:[[1.5,0],[0,1.5]] as [number,number][]};
+  vi.mocked(nativeRetouch.edit).mockResolvedValue([saved]);
+  open();await screen.findByAltText('Retouched photograph');
+  fireEvent.click(screen.getByText('Adjust strength'));
+  fireEvent.change(screen.getByRole('slider',{name:'Retouch 1 strength'}),{target:{value:'25'}});
+  expect(nativeRetouch.edit).not.toHaveBeenCalledWith('project','photo','update',expect.anything());
+  fireEvent.click(screen.getByRole('button',{name:'Apply retouch 1 strength'}));
+  await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','update',[
+    expect.objectContaining({...saved,amount:.25}),
+  ]));
+});
   it('clears additional donors when manually changing an automatic patch size',async()=>{
     const saved={...freshRetouch(),id:'saved-heal',tool:'patch_heal' as const,textureHeal:true,curvedHeal:true,healSamples:[[1.5,0],[0,1.5]] as [number,number][],textureSources:[[.2,.2],[.3,.2],[.4,.2]] as [number,number][],sourceScale:.5,source:[.3,.4] as [number,number]};
     vi.mocked(nativeRetouch.edit).mockResolvedValue([saved]);open();await screen.findByAltText('Retouched photograph');
@@ -472,6 +679,17 @@ it('runs Auto advanced retouch through the workspace and reloads the stack after
   await waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(false));
   const loads = vi.mocked(nativeRetouch.edit).mock.calls.length;
   fireEvent.click(button);
-  await waitFor(() => expect(run).toHaveBeenCalledWith('project', 'photo'));
+  await waitFor(() => expect(run).toHaveBeenCalledWith('project', 'photo', undefined, 'professional'));
   await waitFor(() => expect(vi.mocked(nativeRetouch.edit).mock.calls.length).toBeGreaterThan(loads));
+});
+it('opens with the tool chosen in the Effects library, set up as the quick job asked, and takes it once',async()=>{
+  useEffectRequest.setState({request:null,sequence:0,recent:[],favourites:[]});
+  useEffectRequest.getState().ask('sparkle',{amount:.7,radius:.006});
+  open();await screen.findByAltText('Retouched photograph');
+  await waitFor(()=>expect((screen.getByLabelText('Tool') as HTMLSelectElement).value).toBe('sparkle'));
+  expect(useEffectRequest.getState().request).toBeNull();
+  fireEvent.click(screen.getByRole('button',{name:'Apply retouch'}));
+  await waitFor(()=>expect(nativeRetouch.edit).toHaveBeenCalledWith('project','photo','append',[
+    expect.objectContaining({tool:'sparkle',amount:.7,radius:.006})
+  ]));
 });

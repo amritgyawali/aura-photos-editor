@@ -28,6 +28,7 @@ fn operation(tool: Tool) -> Edit {
         target_color: None,
         sensitivity: None,
         keep_dark_marks: false,
+        mole_edge: None,
         texture: 1.0,
         tone: 1.0,
         warmth: 0.0,
@@ -287,4 +288,207 @@ fn connected_skin_never_selects_a_skin_coloured_background_it_does_not_touch() {
     apply(&mut out, W, H, &[smooth]);
     let i = ((H / 2) * W + 120) * 3;
     assert_eq!(&out[i..i + 3], &rgb[i..i + 3]);
+}
+
+#[test]
+fn disconnected_background_cannot_supply_colour_to_skin_smoothing() {
+    let fixture = |background: [f32; 3]| -> Vec<f32> {
+        (0..W * H)
+            .flat_map(|i| {
+                let x = i % W;
+                if x < 70 {
+                    [0.4, 0.26, 0.19]
+                } else if x < 78 {
+                    [0.01; 3]
+                } else {
+                    background
+                }
+            })
+            .collect()
+    };
+    let mut a = fixture([0.45, 0.27, 0.21]);
+    let mut b = fixture([0.32, 0.23, 0.19]);
+    let mut op = operation(Tool::SkinUniformity);
+    op.radius = 0.1;
+    op.skin.as_mut().unwrap().connected = true;
+    apply(&mut a, W, H, &[op.clone()]);
+    apply(&mut b, W, H, &[op]);
+    for y in 5..H - 5 {
+        for x in 45..70 {
+            let i = (y * W + x) * 3;
+            for c in 0..3 {
+                assert!(
+                    (a[i + c] - b[i + c]).abs() < 1e-6,
+                    "background contaminated skin at {x},{y}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn connected_skin_cannot_jump_a_single_pixel_dark_gap_hidden_inside_a_coarse_cell() {
+    for rotated in [false, true] {
+        let (w, h) = if rotated { (64, 1440) } else { (1440, 64) };
+        for exposure in [0.05, 1.0, 3.0] {
+            let skin = [0.55, 0.36, 0.27].map(|v| v * exposure);
+            let rgb: Vec<f32> = (0..w * h)
+                .flat_map(|i| {
+                    let coordinate = if rotated { i / w } else { i % w };
+                    if coordinate == 722 {
+                        skin.map(|v| v * 0.01)
+                    } else {
+                        skin
+                    }
+                })
+                .collect();
+            let mut op = operation(Tool::SkinSmooth);
+            if rotated {
+                op.source = Some([0.5, 0.1]);
+            }
+            op.skin.as_mut().unwrap().connected = true;
+            let mask = aura_render::retouch_tools::selection_mask(&rgb, w, h, &op);
+            let at = |position| {
+                if rotated {
+                    position * w + w / 2
+                } else {
+                    (h / 2) * w + position
+                }
+            };
+            assert!(mask[at(200)] > 0.9);
+            assert_eq!(mask[at(722)], 0.0, "the dark contour is protected");
+            assert_eq!(
+                mask[at(900)],
+                0.0,
+                "selection crossed a one-pixel gap at exposure {exposure}, rotated={rotated}"
+            );
+        }
+    }
+}
+
+#[test]
+fn connected_skin_cannot_cross_a_narrow_authored_protection_hole() {
+    use aura_recipe::retouch_tools::Matte;
+    use std::collections::BTreeMap;
+    let (w, h) = (1440, 64);
+    let rgb = [0.55, 0.36, 0.27].repeat(w * h);
+    let mut alpha = vec![255; w * h];
+    for y in 0..h {
+        alpha[y * w + 722] = 0;
+    }
+    let matte = Matte::encode([0.0, 0.0, 1.0, 1.0], w as u32, h as u32, &alpha);
+    let mattes = BTreeMap::from([("skin".into(), matte)]);
+    let mut op = operation(Tool::SkinSmooth);
+    op.matte = Some("skin".into());
+    op.skin.as_mut().unwrap().connected = true;
+    let mask = aura_render::retouch_tools::selection_mask_with_mattes(&rgb, w, h, &op, &mattes);
+    assert!(mask[(h / 2) * w + 200] > 0.9);
+    assert_eq!(
+        mask[(h / 2) * w + 900],
+        0.0,
+        "connectivity crossed protected pixels"
+    );
+}
+
+#[test]
+fn pixel_connectivity_keeps_a_one_pixel_route_but_does_not_retouch_across_a_closed_gap() {
+    let (w, h) = (1440, 64);
+    let base = [0.55, 0.36, 0.27];
+    let patch = [0.56, 0.37, 0.24];
+    let fixture = |opening: bool| -> Vec<f32> {
+        (0..w * h)
+            .flat_map(|i| {
+                let (x, y) = (i % w, i / w);
+                if x == 722 && !(opening && y == h / 2) {
+                    base.map(|v| v * 0.01)
+                } else if (200..240).contains(&x) || x > 722 {
+                    patch
+                } else {
+                    base
+                }
+            })
+            .collect()
+    };
+    let mut op = operation(Tool::SkinUniformity);
+    op.skin.as_mut().unwrap().connected = true;
+    let open = fixture(true);
+    let selection = aura_render::retouch_tools::selection_mask(&open, w, h, &op);
+    assert!(
+        selection[(h / 2) * w + 900] > 0.9,
+        "a real one-pixel path stays connected"
+    );
+    let before = fixture(false);
+    let mut after = before.clone();
+    apply(&mut after, w, h, &[op]);
+    let index = |x| ((h / 2) * w + x) * 3;
+    let left = index(220);
+    assert_ne!(
+        &after[left..left + 3],
+        &before[left..left + 3],
+        "the source component is edited"
+    );
+    for y in 0..h {
+        let i = (y * w + 723) * 3;
+        let end = (y * w + w) * 3;
+        assert_eq!(
+            &after[i..end],
+            &before[i..end],
+            "the other surface changed on row {y}"
+        );
+    }
+}
+
+#[test]
+fn hard_protection_holes_survive_the_complete_skin_and_eye_stack() {
+    use aura_recipe::retouch_tools::Matte;
+    use std::collections::BTreeMap;
+    let mut alpha = vec![255; 20 * 12];
+    alpha[6 * 20 + 10] = 0;
+    let mut matte = Matte::encode([0.0, 0.0, 1.0, 1.0], 20, 12, &alpha);
+    matte.refine_contour = true;
+    let mattes = BTreeMap::from([("skin".into(), matte)]);
+    for tool in [
+        Tool::SkinSmooth,
+        Tool::SkinUniformity,
+        Tool::PortraitDodgeBurn,
+        Tool::UnderEye,
+    ] {
+        let mut op = operation(tool);
+        op.matte = Some("skin".into());
+        op.skin = None;
+        op.texture = 0.2;
+        let before = fixture(0.3);
+        let selection =
+            aura_render::retouch_tools::selection_mask_with_mattes(&before, W, H, &op, &mattes);
+        let mut after = before.clone();
+        aura_render::retouch_tools::apply_with_mattes(&mut after, W, H, &[op], &mattes);
+        for y in 48..56 {
+            for x in 80..88 {
+                assert_eq!(selection[y * W + x], 0.0, "{tool:?} selection at {x},{y}");
+                let i = (y * W + x) * 3;
+                assert_eq!(&before[i..i + 3], &after[i..i + 3], "{tool:?} at {x},{y}");
+            }
+        }
+    }
+}
+
+#[test]
+fn coverage_cache_cannot_reuse_a_different_tools_boundary_or_radius() {
+    // A prior zero-change tone edit still populates coverage cache; a later tool must
+    // produce the same pixels as it does alone, with its own inward feather width.
+    let mut prior = operation(Tool::SkinUniformity);
+    prior.region = [0.5, 0.5, 0.25, 0.3];
+    prior.radius = 0.01;
+    prior.tone = 0.0;
+    let mut next = prior.clone();
+    next.id = "next".into();
+    next.tool = Tool::SkinSmooth;
+    next.radius = 0.08;
+    next.tone = 0.8;
+    next.texture = 0.3;
+    let mut alone = fixture(0.3);
+    let mut together = alone.clone();
+    apply(&mut alone, W, H, &[next.clone()]);
+    apply(&mut together, W, H, &[prior, next]);
+    assert_eq!(alone, together);
 }

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AI_SELECTIONS, MASK_SLIDERS, describe, type CreateMask, type LocalMask, type MaskMode, type MaskParams } from '../../ipc/localMasks';
+import type { MaskWorkflowRequest } from '../../ipc/maskWorkflows';
+import { MaskWorkflowControls } from './MaskWorkflowControls';
 
 /** What the photograph does when it is clicked or dragged while the panel is open. */
 export type MaskTool = { kind: 'object' | 'linear' | 'radial' | 'brush'; into: string | null; mode: MaskMode; invert: boolean } | null;
@@ -19,6 +21,7 @@ export type MasksPanelProps = {
   onTool: (tool: MaskTool) => void;
   onBrush: (brush: BrushSettings) => void;
   onOverlay: (on: boolean) => void;
+  onWorkflow?: (request: MaskWorkflowRequest) => void;
 };
 
 const DRAWN: ReadonlyArray<readonly [NonNullable<MaskTool>['kind'], string, string]> = [
@@ -104,6 +107,7 @@ export function MasksPanel(props: MasksPanelProps): JSX.Element {
       </li>)}
     </ol>}
     {current && <div className="masks-current" aria-label={`Adjust ${current.name}`}>
+      {props.onWorkflow && <MaskWorkflowControls masks={masks} selected={current.id} disabled={disabled} onWorkflow={props.onWorkflow} />}
       <label className="masks-overlay"><input type="checkbox" checked={overlay} onChange={event => props.onOverlay(event.target.checked)} /> Show mask overlay</label>
       <ul className="masks-components">
         {current.components.map((component, index) => <li key={index}>

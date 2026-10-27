@@ -68,6 +68,36 @@ uses the configured provider; local enhancement works without an API key.
 
 See [Photo Studio](docs/photo-studio.md) for automatic editing after import,
 reviewing every edit, matching reference colors, and rendering the final photos.
+See [Adjustable finishing and reference colour](docs/adjustable-finishing-and-reference-colour.md)
+for post-edit strength sliders and the reusable edited-photo reference library.
+The [colour-match test report](docs/reports/AURA-reference-colour-match-2026-10-22.md)
+adds original-resolution Internet references, native RAW verification and 18
+known-grade comparisons, including cases that need further manual adjustment.
+The [export verification](docs/reports/AURA-exported-colour-verification-2026-10-22.md)
+compares delivered JPEG/PNG files with saved renders and references, including a
+full-resolution camera file and adjusted matching strengths.
+The [adaptive matcher report](docs/reports/AURA-adaptive-colour-matching-2026-10-22.md)
+covers signed search, tone-dependent casts, monochrome references and native checks,
+with measured photographic results and remaining limits.
+See [Editing panels](docs/editing-panels.md) for the editor sections and
+[native research](docs/reports/AURA-Evoto-native-research-2026-10-20.md) for regional
+reference matching, REA evidence and remaining qualification work.
+The [fifty-capability continuation](docs/reports/AURA-fifty-capabilities-2026-10-20.md)
+adds native Levels/selective colour, mask refinements, reference-library batch
+management, framing and colour inspection, with a numbered implementation ledger.
+The [2026-10-22 additions](docs/additional-editing-methods-2026-10-22.md) expand
+colour, spatial repair and selection catalogues to 75 methods each and add
+delivery, surface and lighting review screens with 70 inspection measurements.
+See the [validation report](docs/reports/AURA-validation-2026-10-22.md) for
+per-tool results, edited-photo exports and the remaining Evoto parity limits.
+The [comprehensive desktop audit](docs/reports/AURA-comprehensive-test-2026-10-22.md)
+records fresh tool/control results, all 27 supplied RAW edits, command coverage,
+and the unchanged-colour-save history repair. Functional passes do not establish
+exact Evoto equivalence.
+The [advanced continuation](docs/advanced-editing-methods-2026-10-22.md) adds 100
+further capabilities, native local-detail processing for supported spatial tools,
+lower-memory colour stencils and three more review screens. See its
+[validation report](docs/reports/AURA-advanced-validation-2026-10-22.md).
 The app opens on three steps - pick one of 21 [edit profiles](docs/edit-profiles.md)
 (16 researched looks and 5 learned from professional RAW before-and-afters), optionally
 paste an Instagram profile, then upload photos or a folder.

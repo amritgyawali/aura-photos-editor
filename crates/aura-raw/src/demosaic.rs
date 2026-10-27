@@ -36,6 +36,9 @@ use rayon::prelude::*;
 
 use crate::meta::CfaPattern;
 
+mod detail;
+pub use detail::{full_malvar, full_malvar_region};
+
 /// Output samples below which the loops stay on one thread.
 const PARALLEL_MIN: usize = 1 << 18;
 
@@ -128,6 +131,13 @@ impl Levels {
     /// Readings below black become zero rather than negative: a negative
     /// radiance is not a colour, and letting one through produces bright
     /// speckles once the colour matrix rotates it.
+    ///
+    /// Readings are capped where the channel with the smallest white-balance
+    /// gain saturates. A photosite the sensor clipped holds 1.0 in every
+    /// channel, and white balance would turn that into (1.97, 1, 1.45) on a
+    /// typical daylight frame: red and blue overshooting a green that could not
+    /// rise any further, which renders every blown highlight magenta. Capped,
+    /// a clipped highlight is neutral white - the reference decoders' default.
     #[must_use]
     pub fn normalise(&self, raw: u16, colour: u8) -> f32 {
         let span = self.white.saturating_sub(self.black).max(1) as f32;
@@ -137,7 +147,14 @@ impl Levels {
             .get(colour as usize)
             .copied()
             .unwrap_or(1.0);
-        (value * gain).max(0.0)
+        let ceiling = self
+            .white_balance
+            .iter()
+            .copied()
+            .filter(|g| *g > 0.0)
+            .fold(f32::INFINITY, f32::min);
+        let ceiling = if ceiling.is_finite() { ceiling } else { 1.0 };
+        (value * gain).clamp(0.0, ceiling)
     }
 }
 
@@ -378,14 +395,20 @@ fn bilinear(source: &RgbF32, target_width: u32, target_height: u32) -> RgbF32 {
 #[must_use]
 pub fn from_srgb8(encoded: &[u8], width: u32, height: u32) -> RgbF32 {
     let mut out = RgbF32::black(width, height);
-    for (index, sample) in encoded
-        .iter()
-        .take(width as usize * height as usize * 3)
-        .enumerate()
-    {
-        if let Some(slot) = out.data.get_mut(index) {
-            *slot = crate::colour::curve::srgb_decode(f32::from(*sample) / 255.0);
-        }
+    let count = (width as usize * height as usize * 3).min(encoded.len());
+    let (Some(target), Some(source)) = (out.data.get_mut(..count), encoded.get(..count)) else {
+        return out;
+    };
+    let decode = |(slot, sample): (&mut f32, &u8)| {
+        *slot = crate::colour::curve::srgb_byte_to_linear(*sample);
+    };
+    if count >= PARALLEL_MIN {
+        target
+            .par_iter_mut()
+            .zip(source.par_iter())
+            .for_each(decode);
+    } else {
+        target.iter_mut().zip(source.iter()).for_each(decode);
     }
     out
 }
@@ -393,11 +416,14 @@ pub fn from_srgb8(encoded: &[u8], width: u32, height: u32) -> RgbF32 {
 /// Encode a linear image back to 8-bit sRGB, without the preview curve.
 #[must_use]
 pub fn to_srgb8(image: &RgbF32) -> Vec<u8> {
-    image
-        .data
-        .iter()
-        .map(|sample| crate::colour::curve::quantise_u8(crate::colour::curve::srgb_encode(*sample)))
-        .collect()
+    let encode = |sample: &f32| {
+        crate::colour::curve::quantise_u8(crate::colour::curve::srgb_encode(*sample))
+    };
+    if image.data.len() >= PARALLEL_MIN {
+        image.data.par_iter().map(encode).collect()
+    } else {
+        image.data.iter().map(encode).collect()
+    }
 }
 
 /// Multiply every pixel by a 3x3 matrix, the one place a colour rotation

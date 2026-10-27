@@ -1,6 +1,6 @@
 //! Which matrix turns *this camera's* numbers into colour.
 //!
-//! There are exactly three sources, tried in this order, and the one that was
+//! There are exactly four sources, tried in this order, and the one that was
 //! used is always recorded in the sidecar so a photographer, a support engineer
 //! or a re-training run can tell them apart:
 //!
@@ -8,17 +8,20 @@
 //!    whoever wrote the file. Nothing we bundle can beat that, so it wins.
 //! 2. **The bundled table.** Profiles AURA has measured from a ColorChecker
 //!    frame shot on that body, each one signed off by the Colour Scientist role.
-//! 3. **The generic matrix.** A documented sRGB-primaries assumption. It is
+//!    Today that is the eight synthetic bench bodies the golden suite renders.
+//! 3. **The published table.** Adobe DNG Converter's own `ColorMatrix2` for about
+//!    seven hundred real bodies - the matrix every converted DNG of that body
+//!    carries - as compiled by dcraw and LibRaw (`data/camera_matrices.tsv`,
+//!    distributed under CDDL-1.0, ADR-0124). It is a measurement, made by Adobe,
+//!    of the same body; it is what path 1 would have read had the photographer
+//!    converted the file to DNG first.
+//! 4. **The generic matrix.** A documented sRGB-primaries assumption. It is
 //!    honest, deterministic and wrong by a knowable amount, and it raises
 //!    `AURA-RAW-2006` plus a `profile=generic` badge in the UI so nobody mistakes
 //!    it for a measurement.
 //!
-//! What is deliberately *not* here: invented matrices for real cameras. An
-//! unsigned profile cannot ship (phase 02 section 6.5), so the bundled table
-//! contains only bodies with evidence behind them. Today that is the eight
-//! synthetic bench bodies the golden suite renders, whose matrices are exact by
-//! construction; every real body a photographer owns therefore takes path 1 when
-//! it shoots DNG and path 3 otherwise, until a ColorChecker frame arrives.
+//! What is deliberately *not* here: invented matrices for real cameras. Every
+//! matrix this module returns was measured by somebody, and the sidecar says who.
 
 use crate::colour::matrix::{Mat3, WHITE_D50};
 
@@ -29,6 +32,8 @@ pub enum ProfileSource {
     EmbeddedDng,
     /// Looked up in the signed table bundled with this build.
     Bundled,
+    /// Adobe's published matrix for this body, from the table in `data/`.
+    Published,
     /// Nothing matched; the documented generic matrix was used.
     Generic,
 }
@@ -40,6 +45,7 @@ impl ProfileSource {
         match self {
             Self::EmbeddedDng => "embedded_dng",
             Self::Bundled => "bundled",
+            Self::Published => "published",
             Self::Generic => "generic",
         }
     }
@@ -146,6 +152,143 @@ pub fn lookup(make: &str, model: &str) -> Option<CameraProfile> {
     })
 }
 
+/// The published table, parsed once.
+fn published_table() -> &'static [PublishedRow] {
+    static TABLE: std::sync::OnceLock<Vec<PublishedRow>> = std::sync::OnceLock::new();
+    TABLE.get_or_init(|| parse_published(include_str!("../../data/camera_matrices.tsv")))
+}
+
+/// One row of `data/camera_matrices.tsv`.
+#[derive(Debug, Clone, PartialEq)]
+struct PublishedRow {
+    maker: String,
+    prefix: String,
+    /// `None` when the row exists only to stop a shorter prefix matching.
+    matrix: Option<Mat3>,
+}
+
+fn parse_published(text: &str) -> Vec<PublishedRow> {
+    text.lines()
+        .filter(|line| !line.starts_with('#') && !line.trim().is_empty())
+        .filter_map(|line| {
+            let mut fields = line.split('\t');
+            let maker = fields.next()?.trim().to_string();
+            let prefix = fields.next()?.trim().to_string();
+            let _black = fields.next()?;
+            let _maximum = fields.next()?;
+            let values: Vec<f64> = fields
+                .next()?
+                .split_whitespace()
+                .filter_map(|value| value.parse::<f64>().ok())
+                .map(|value| value / 10_000.0)
+                .collect();
+            let at = |index: usize| values.get(index).copied().unwrap_or(0.0);
+            let matrix = (values.len() == 9 && values.iter().any(|v| v.abs() > 0.0)).then(|| {
+                [
+                    [at(0), at(1), at(2)],
+                    [at(3), at(4), at(5)],
+                    [at(6), at(7), at(8)],
+                ]
+            });
+            Some(PublishedRow {
+                maker,
+                prefix,
+                matrix,
+            })
+        })
+        .collect()
+}
+
+/// The table's name for whoever made a body, from EXIF's `Make`.
+fn published_maker(make: &str, model: &str) -> Option<&'static str> {
+    const MAKERS: [(&str, &str); 22] = [
+        ("CANON", "Canon"),
+        ("NIKON", "Nikon"),
+        ("SONY", "Sony"),
+        ("FUJI", "Fujifilm"),
+        ("PANASONIC", "Panasonic"),
+        ("OLYMPUS", "Olympus"),
+        ("PENTAX", "Pentax"),
+        ("RICOH", "Ricoh"),
+        ("SAMSUNG", "Samsung"),
+        ("LEICA", "Leica"),
+        ("HASSELBLAD", "Hasselblad"),
+        ("PHASE ONE", "PhaseOne"),
+        ("SIGMA", "Sigma"),
+        ("KODAK", "Kodak"),
+        ("LEAF", "Leaf"),
+        ("MINOLTA", "Minolta"),
+        ("KONICA", "Minolta"),
+        ("MAMIYA", "Mamiya"),
+        ("CASIO", "Casio"),
+        ("GOPRO", "GoPro"),
+        ("APPLE", "Apple"),
+        ("SINAR", "Sinar"),
+    ];
+    let make = make.trim().to_ascii_uppercase();
+    let model = model.trim().to_ascii_uppercase();
+    // Ricoh sells Pentax bodies under its own name; OM System sells Olympus ones.
+    if model.starts_with("PENTAX") {
+        return Some("Pentax");
+    }
+    if make.starts_with("OM DIGITAL") || make.starts_with("OM SYSTEM") {
+        return Some("Olympus");
+    }
+
+    MAKERS
+        .iter()
+        .find(|(key, _)| make.contains(key))
+        .map(|(_, name)| *name)
+}
+
+/// The model as the table spells it: EXIF's string without the maker's name
+/// in front ("NIKON D780" is "D780", "Canon EOS R" is "EOS R").
+fn published_model(make: &str, model: &str, maker: &str) -> String {
+    let mut model = model.trim().to_string();
+    let first_word = make
+        .split_whitespace()
+        .next()
+        .unwrap_or("")
+        .to_ascii_uppercase();
+    for prefix in [first_word.as_str(), &maker.to_ascii_uppercase(), "PENTAX"] {
+        if prefix.is_empty() {
+            continue;
+        }
+        if model.to_ascii_uppercase().starts_with(prefix) {
+            model = model.get(prefix.len()..).unwrap_or("").trim().to_string();
+            break;
+        }
+    }
+    model
+}
+
+/// Adobe's published matrix for a body, when the table has one.
+///
+/// The table is matched the way its compilers match it: the first row whose
+/// model prefix starts the model wins, so "EOS R5" is found before "EOS R".
+#[must_use]
+pub fn published(make: &str, model: &str) -> Option<CameraProfile> {
+    let maker = published_maker(make, model)?;
+    let wanted = published_model(make, model, maker).to_ascii_lowercase();
+    if wanted.is_empty() {
+        return None;
+    }
+    let row = published_table()
+        .iter()
+        .filter(|row| row.maker == maker)
+        .find(|row| wanted.starts_with(&row.prefix.to_ascii_lowercase()))?;
+    let matrix = row.matrix?;
+    crate::colour::matrix::invert(matrix)?;
+    Some(CameraProfile {
+        make: make.trim().to_string(),
+        model: model.trim().to_string(),
+        xyz_to_camera: matrix,
+        illuminant: "D65",
+        source: ProfileSource::Published,
+        signed_by: "Adobe DNG Converter (ColorMatrix2), via LibRaw's table",
+    })
+}
+
 /// The documented fallback: sRGB primaries under D50.
 #[must_use]
 pub fn generic() -> CameraProfile {
@@ -183,6 +326,9 @@ pub fn resolve(make: &str, model: &str, embedded: Option<Mat3>) -> CameraProfile
     if let Some(found) = lookup(make, model) {
         return found;
     }
+    if let Some(found) = published(make, model) {
+        return found;
+    }
     let mut fallback = generic();
     fallback.make = make.trim().to_string();
     fallback.model = model.trim().to_string();
@@ -195,5 +341,42 @@ pub fn illuminant_white(profile: &CameraProfile) -> crate::colour::matrix::Vec3 
     match profile.illuminant {
         "D65" => crate::colour::matrix::WHITE_D65,
         _ => WHITE_D50,
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::disallowed_methods)]
+mod published_tests {
+    use super::*;
+
+    #[test]
+    fn the_published_table_finds_real_bodies_by_their_exif_names() {
+        for (make, model) in [
+            ("Canon", "Canon EOS 5D Mark IV"),
+            ("Canon", "Canon EOS R"),
+            ("SONY", "ILCE-7M3"),
+            ("SONY", "ILCE-7M4"),
+            ("NIKON CORPORATION", "NIKON D780"),
+            ("NIKON CORPORATION", "NIKON Z 50"),
+            ("FUJIFILM", "X-T4"),
+            ("Panasonic", "DC-S5"),
+        ] {
+            let found = resolve(make, model, None);
+            assert_eq!(found.source, ProfileSource::Published, "{make} {model}");
+            assert_eq!(found.illuminant, "D65");
+        }
+        assert_eq!(
+            resolve("Acme", "Wedding-o-tron", None).source,
+            ProfileSource::Generic
+        );
+    }
+
+    #[test]
+    fn a_longer_model_is_matched_before_its_prefix() {
+        let r5 = published("Canon", "Canon EOS R5").unwrap();
+        let r = published("Canon", "Canon EOS R").unwrap();
+        assert_ne!(r5.xyz_to_camera, r.xyz_to_camera);
+        // The EOS R's matrix as Adobe publishes it.
+        assert!((r.xyz_to_camera[0][0] - 0.8293).abs() < 1e-9);
     }
 }

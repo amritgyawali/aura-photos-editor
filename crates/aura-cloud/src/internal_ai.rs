@@ -244,8 +244,13 @@ fn canonical_model<'a>(endpoint: &str, model: &'a str) -> &'a str {
     }
 }
 
-/// Import all credentials and inspect model catalogues. Catalogue access is not
-/// proof of a working completion; the first governed task verifies that.
+/// Import all credentials, inspect model catalogues, and check every route that is to be
+/// sent photographs by showing it a picture and reading its answer.
+///
+/// A catalogue says a model exists. It does not say the key is accepted for a completion,
+/// that today's quota is unspent, that the model reads an image, or that it answers before
+/// a photographer has given up: all four were wrong for some provider the first time a real
+/// file was imported. A route is offered only after it answered the check.
 ///
 /// # Errors
 /// Invalid configuration or OS credential-storage failure. Provider failures
@@ -260,103 +265,240 @@ pub fn import(
     for (profile, secret) in &parsed {
         keys.store(&profile.account(), secret)?;
     }
-    let mut result = Vec::new();
-    for (mut profile, secret) in parsed {
-        let request = HttpRequest {
-            method: "GET".to_string(),
-            url: format!("{}/models", profile.endpoint),
-            headers: vec![(
-                "authorization".to_string(),
-                format!("Bearer {}", secret.expose()),
-            )],
-            body: Vec::new(),
-        };
-        match transport.send(&request, Duration::from_secs(10)) {
-            Ok(response) if response.status == 200 => {
-                if let Ok(value) = serde_json::from_slice::<serde_json::Value>(&response.body) {
-                    apply_catalogue(&mut profile, &value);
-                    // A configured text model remains available for text tasks.
-                    // A separately labelled vision route can use the same key,
-                    // with its own model, capability and published prices.
-                    if !profile.vision
-                        || profile.endpoint
-                            == "https://generativelanguage.googleapis.com/v1beta/openai"
-                    {
-                        if let Some(rows) = value.get("data").and_then(serde_json::Value::as_array)
-                        {
-                            let mut candidates: Vec<_> = rows
-                                .iter()
-                                .filter_map(|row| {
-                                    let name = canonical_model(
-                                        &profile.endpoint,
-                                        row.get("id")?.as_str()?,
-                                    );
-                                    if name == canonical_model(&profile.endpoint, &profile.model)
-                                        || name.len() > 200
-                                        || credential_model_name(name)
-                                        || (secret.len() > 7 && name.contains(secret.expose()))
-                                        || !name.bytes().all(|b| {
-                                            b.is_ascii_alphanumeric() || b"._:/-".contains(&b)
-                                        })
-                                    {
-                                        return None;
-                                    }
-                                    let mut candidate = profile.clone();
-                                    candidate.id = format!("{}:vision", profile.id);
-                                    candidate.key_profile = Some(profile.id.clone());
-                                    candidate.model = name.to_string();
-                                    candidate.input_usd_per_mtok = None;
-                                    candidate.output_usd_per_mtok = None;
-                                    apply_model(&mut candidate, row);
-                                    (candidate.vision
-                                        && candidate.available()
-                                        && candidate.input_usd_per_mtok? <= 5.0
-                                        && candidate.output_usd_per_mtok? <= 25.0)
-                                        .then_some(candidate)
-                                })
-                                .collect();
-                            candidates.sort_by(|a, b| {
-                                // A configured free model authorizes a free
-                                // vision alternative, not an automatic paid upgrade.
-                                b.priority()
-                                    .total_cmp(&a.priority())
-                                    .then(
-                                        a.input_usd_per_mtok
-                                            .unwrap_or(1000.0)
-                                            .total_cmp(&b.input_usd_per_mtok.unwrap_or(1000.0)),
-                                    )
-                                    .then(a.model.cmp(&b.model))
-                            });
-                            if profile.model.ends_with(":free") || profile.model.ends_with("/free")
-                            {
-                                candidates.retain(|candidate| {
-                                    candidate
-                                        .input_usd_per_mtok
-                                        .is_some_and(|v| v.abs() < f64::EPSILON)
-                                        && candidate
-                                            .output_usd_per_mtok
-                                            .is_some_and(|v| v.abs() < f64::EPSILON)
-                                });
-                            }
-                            if let Some(candidate) = candidates.into_iter().next() {
-                                result.push(candidate);
-                            }
-                        }
-                    }
-                } else {
-                    profile.status = "unreadable_catalogue".to_string();
+    // One provider does not wait for another: a slow catalogue or a slow answer costs the
+    // import that provider's time once, not once per provider in the file.
+    let found: Vec<Vec<Profile>> = std::thread::scope(|scope| {
+        let workers: Vec<_> = parsed
+            .into_iter()
+            .map(|(profile, secret)| {
+                let unknown = Profile {
+                    status: "unreachable".to_string(),
+                    ..profile.clone()
+                };
+                (
+                    unknown,
+                    scope.spawn(move || discover(profile, &secret, transport)),
+                )
+            })
+            .collect();
+        workers
+            .into_iter()
+            .map(|(unknown, worker)| worker.join().unwrap_or_else(|_| vec![unknown]))
+            .collect()
+    });
+    Ok(found.into_iter().flatten().collect())
+}
+
+/// How many alternative image models of one provider are shown the check picture.
+const ALTERNATIVES: usize = 3;
+
+/// One provider: its catalogue, the configured model, and an image-capable alternative.
+fn discover(mut profile: Profile, secret: &SecretKey, transport: &dyn Transport) -> Vec<Profile> {
+    let mut found = Vec::new();
+    let request = HttpRequest {
+        method: "GET".to_string(),
+        url: format!("{}/models", profile.endpoint),
+        headers: vec![(
+            "authorization".to_string(),
+            format!("Bearer {}", secret.expose()),
+        )],
+        body: Vec::new(),
+    };
+    match transport.send(&request, Duration::from_secs(10)) {
+        Ok(response) if response.status == 200 => {
+            if let Ok(value) = serde_json::from_slice::<serde_json::Value>(&response.body) {
+                apply_catalogue(&mut profile, &value);
+                if profile.vision && profile.available() {
+                    check(&mut profile, secret, transport);
                 }
-            }
-            Ok(response) => {
-                profile.status = format!("http_{}", response.status);
-            }
-            Err(_) => {
-                profile.status = "unreachable".to_string();
+                // A configured text model remains available for text tasks.
+                // A separately labelled vision route can use the same key,
+                // with its own model, capability and published prices.
+                if !(profile.vision && profile.available())
+                    || profile.endpoint == "https://generativelanguage.googleapis.com/v1beta/openai"
+                {
+                    let mut first_refused = None;
+                    for mut candidate in alternatives(&profile, secret, &value)
+                        .into_iter()
+                        .take(ALTERNATIVES)
+                    {
+                        check(&mut candidate, secret, transport);
+                        if candidate.available() {
+                            first_refused = None;
+                            found.push(candidate);
+                            break;
+                        }
+                        // Shown when none answers, so the panel says why there is no route.
+                        first_refused.get_or_insert(candidate);
+                    }
+                    found.extend(first_refused);
+                }
+            } else {
+                profile.status = "unreadable_catalogue".to_string();
             }
         }
-        result.push(profile);
+        Ok(response) => {
+            profile.status = format!("http_{}", response.status);
+        }
+        Err(_) => {
+            profile.status = "unreachable".to_string();
+        }
     }
-    Ok(result)
+    found.push(profile);
+    found
+}
+
+/// The other image-capable models the same key reaches, best first.
+fn alternatives(
+    profile: &Profile,
+    secret: &SecretKey,
+    catalogue: &serde_json::Value,
+) -> Vec<Profile> {
+    let Some(rows) = catalogue.get("data").and_then(serde_json::Value::as_array) else {
+        return Vec::new();
+    };
+    let mut candidates: Vec<_> = rows
+        .iter()
+        .filter_map(|row| {
+            let name = canonical_model(&profile.endpoint, row.get("id")?.as_str()?);
+            if name == canonical_model(&profile.endpoint, &profile.model)
+                || name.len() > 200
+                || credential_model_name(name)
+                || (secret.len() > 7 && name.contains(secret.expose()))
+                || !name
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b"._:/-".contains(&b))
+            {
+                return None;
+            }
+            let mut candidate = profile.clone();
+            candidate.id = format!("{}:vision", profile.id);
+            candidate.key_profile = Some(profile.id.clone());
+            candidate.model = name.to_string();
+            candidate.vision = false;
+            candidate.input_usd_per_mtok = None;
+            candidate.output_usd_per_mtok = None;
+            apply_model(&mut candidate, row);
+            (candidate.vision
+                && candidate.available()
+                && candidate.input_usd_per_mtok? <= 5.0
+                && candidate.output_usd_per_mtok? <= 25.0)
+                .then_some(candidate)
+        })
+        .collect();
+    candidates.sort_by(|a, b| {
+        // A configured free model authorizes a free
+        // vision alternative, not an automatic paid upgrade.
+        b.priority()
+            .total_cmp(&a.priority())
+            .then(
+                a.input_usd_per_mtok
+                    .unwrap_or(1000.0)
+                    .total_cmp(&b.input_usd_per_mtok.unwrap_or(1000.0)),
+            )
+            .then(a.model.cmp(&b.model))
+    });
+    if profile.model.ends_with(":free") || profile.model.ends_with("/free") {
+        candidates.retain(|candidate| {
+            candidate
+                .input_usd_per_mtok
+                .is_some_and(|v| v.abs() < f64::EPSILON)
+                && candidate
+                    .output_usd_per_mtok
+                    .is_some_and(|v| v.abs() < f64::EPSILON)
+        });
+    }
+    candidates
+}
+
+/// Longer than this and a photographer pressing Auto edit has stopped waiting.
+const CHECK_TIMEOUT: Duration = Duration::from_secs(15);
+const CHECK_QUESTION: &str = "The picture is split into a left half and a right half, each one plain colour. Name the colour of the left half, then the colour of the right half. Answer with those two words only.";
+/// Edge of the check picture, in pixels.
+const CARD: u32 = 64;
+
+/// Yellow on the left, blue on the right: generated here, so no photograph is sent to find
+/// out whether a provider works, and a model that cannot see it does not guess the pair.
+fn card() -> AuraResult<crate::contract::cloud::ImagePart> {
+    let mut samples = Vec::with_capacity((CARD * CARD * 3) as usize);
+    for _ in 0..CARD {
+        for x in 0..CARD {
+            samples.extend_from_slice(if x < CARD / 2 {
+                &[240, 215, 20]
+            } else {
+                &[25, 60, 220]
+            });
+        }
+    }
+    let bytes = aura_raw::codec::encode_jpeg(
+        &aura_raw::codec::Rgb8 {
+            width: CARD,
+            height: CARD,
+            data: samples,
+        },
+        90,
+    )?;
+    Ok(crate::contract::cloud::ImagePart {
+        media_type: "image/jpeg".to_string(),
+        content_hash: blake3::hash(&bytes).to_hex().to_string(),
+        bytes,
+        width: CARD,
+        height: CARD,
+    })
+}
+
+/// True when the answer names the left colour and then the right one.
+fn saw_the_card(answer: &str) -> bool {
+    let answer = answer.to_ascii_lowercase();
+    match (answer.find("yellow"), answer.find("blue")) {
+        (Some(left), Some(right)) => left < right,
+        _ => false,
+    }
+}
+
+/// Show one route the check picture. Its status stays `catalogue_ready` only when it read
+/// the picture in time; otherwise the status says what happened, and nothing else of the
+/// provider's reply is kept.
+fn check(profile: &mut Profile, secret: &SecretKey, transport: &dyn Transport) {
+    let provider = FileProvider(crate::compat::provider_with_aliases(
+        &profile.endpoint,
+        crate::compat::aliases_for(&profile.model),
+    ));
+    let request = card().and_then(|card| {
+        provider.build(
+            &CloudRequest {
+                model: profile.model.clone(),
+                prompt: crate::contract::cloud::PromptSpec::new(
+                    "You describe pictures exactly and briefly.",
+                    CHECK_QUESTION,
+                )
+                .with_images(vec![card])
+                .with_max_tokens(200),
+                repair: None,
+            },
+            secret,
+        )
+    });
+    let Ok(request) = request else {
+        profile.status = "check_not_sent".to_string();
+        return;
+    };
+    // Every provider in the file is being asked at this same moment, so the first silence is
+    // as likely to be this machine as that service. One more try, and only for silence: a
+    // refusal is an answer, and asking again would spend the allowance it is about.
+    let mut reply = transport.send(&request, CHECK_TIMEOUT);
+    if reply.is_err() {
+        reply = transport.send(&request, CHECK_TIMEOUT);
+    }
+    profile.status = match reply {
+        Ok(response) if response.status == 200 => match provider.parse(&response) {
+            Ok(answer) if saw_the_card(&answer.text) => "catalogue_ready".to_string(),
+            Ok(_) => "check_image_not_read".to_string(),
+            Err(_) => "check_unreadable_answer".to_string(),
+        },
+        Ok(response) => format!("check_http_{}", response.status),
+        Err(_) => "check_no_answer_in_time".to_string(),
+    };
 }
 
 fn apply_catalogue(profile: &mut Profile, catalogue: &serde_json::Value) {
@@ -387,8 +529,10 @@ fn apply_model(profile: &mut Profile, model: &serde_json::Value) {
         // Google's OpenAI model catalogue omits capabilities; this endpoint and
         // model family are documented as multimodal in the Gemini API docs.
         || (profile.endpoint == "https://generativelanguage.googleapis.com/v1beta/openai" && matches!(canonical_model(&profile.endpoint, &profile.model), "gemini-3.8-flash" | "gemini-3.6-flash"))
-        // NVIDIA's catalogue omits modalities for this documented vision API.
-        || (profile.endpoint == "https://integrate.api.nvidia.com/v1" && profile.model == "meta/llama-3.2-90b-vision-instruct");
+        // NVIDIA's catalogue omits modalities for these documented vision APIs.
+        || (profile.endpoint == "https://integrate.api.nvidia.com/v1" && matches!(profile.model.as_str(), "meta/llama-3.2-11b-vision-instruct" | "meta/llama-3.2-90b-vision-instruct"))
+        // Groq's catalogue omits modalities too; this model answered an image request.
+        || (profile.endpoint == "https://api.groq.com/openai/v1" && profile.model == "qwen/qwen3.8-27b");
     for (field, target) in [
         ("prompt", &mut profile.input_usd_per_mtok),
         ("completion", &mut profile.output_usd_per_mtok),

@@ -35,6 +35,14 @@
 .retouch-apply-bar { display: grid; gap: 10px; padding: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
 .retouch-primary { background: var(--accent) !important; color: #19151e !important; font-weight: 600; }
 .retouch-operation-actions button { padding: 8px 12px; }
+.retouch-operation-filters { display: grid; gap: 10px; margin: 12px 0; }
+.retouch-operation-filters label { display: grid; gap: 6px; }
+.retouch-operation-filters input, .retouch-operation-filters select { width: 100%; min-width: 0; box-sizing: border-box; }
+.retouch-operation-list nav { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.saved-retouch-strength { display: grid; gap: 8px; min-width: 0; margin: 8px 0; padding: 12px; border: 1px solid var(--line); border-radius: 9px; }
+.saved-retouch-strength label { display: grid; gap: 8px; min-width: 0; }
+.saved-retouch-strength input[type='range'] { width: 100%; min-height: 24px; margin: 0; }
+.saved-retouch-strength button { white-space: normal; }
 .retouch-shortcuts { margin-top: 20px; color: var(--muted); font-size: 12px; line-height: 1.6; }
 /* ADR-0082: presets wrap as whole words rather than splitting "Studio clean" over two lines. */
 .auto-retouch-settings .retouch-presets { display: flex; flex-wrap: wrap; gap: 4px 14px; }

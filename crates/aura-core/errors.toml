@@ -165,6 +165,15 @@ runbook      = "docs/runbooks/AURA-RAW-2008.md"
 introduced   = "PHASE-02"
 
 [[error]]
+code         = "AURA-RAW-2009"
+severity     = "item_failed"
+recovery     = "ask_user"
+summary      = "An iPhone HEIC or HEIF photo, which this build cannot decode"
+user_message = "This is an iPhone HEIC photo, which AURA cannot open yet. Export it as JPEG, or set the iPhone to Camera > Formats > Most Compatible, then import it again."
+runbook      = "docs/runbooks/AURA-RAW-2009.md"
+introduced   = "PHASE-02"
+
+[[error]]
 code         = "AURA-DB-3001"
 severity     = "fatal"
 recovery     = "ask_user"

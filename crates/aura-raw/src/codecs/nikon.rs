@@ -172,21 +172,27 @@ pub fn read_params(bytes: &[u8], meta: usize, little: bool, bits: u8) -> AuraRes
     let table_size = usize::from(short(at));
     at += 2;
 
-    let max = if bits >= 14 {
+    let mut max = if bits >= 14 {
         1usize << 14
     } else {
         1usize << 12
     };
-    let step = if table_size > 1 {
+    let mut step = if table_size > 1 {
         max / (table_size - 1)
     } else {
         0
     };
+    // Version 0x44 0x40 stores a quarter-resolution sparse curve.
+    let quarter = version_0 == 0x44 && version_1 == 0x40 && step > 3;
+    if quarter {
+        step /= 4;
+        max /= 4;
+    }
 
     let mut curve = identity_curve();
     let mut split = 0u32;
 
-    if version_0 == 0x44 && version_1 == 0x20 && step > 0 {
+    if version_0 == 0x44 && (version_1 == 0x20 || quarter) && step > 0 {
         // A sparse curve: `table_size` knots, linearly interpolated between.
         for index in 0..table_size {
             let knot = index * step;

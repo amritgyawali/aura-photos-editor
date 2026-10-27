@@ -30,7 +30,7 @@
 
 #![allow(clippy::needless_pass_by_value)]
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use aura_core::contract::delivery::{
@@ -172,45 +172,7 @@ impl ExportField {
             .unwrap_or((0, 0));
 
         let key = project.to_db();
-        let frames = catalog
-            .read(move |conn| {
-                let mut out = std::collections::BTreeMap::new();
-                let Ok(mut stmt) = conn.prepare(
-                    "SELECT p.photo_id, p.original_name, p.capture_time, p.camera_model
-                     FROM photo p WHERE p.project_id = ?1",
-                ) else {
-                    return Ok(out);
-                };
-                let rows = stmt.query_map(rusqlite::params![key], |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, Option<String>>(1)?,
-                        row.get::<_, Option<i64>>(2)?,
-                        row.get::<_, Option<String>>(3)?,
-                    ))
-                });
-                let Ok(rows) = rows else { return Ok(out) };
-                for (id, original, capture, camera) in rows.flatten() {
-                    let Ok(image) = ImageId::from_db(&id) else {
-                        continue;
-                    };
-                    out.insert(
-                        id,
-                        Frame {
-                            image: Some(image),
-                            original_stem: original.map(|n| stem_of(&n)),
-                            date: capture.map(date_of),
-                            chapter: None,
-                            camera,
-                            cleanup_disclosures: Vec::new(),
-                            recipe_json: None,
-                            original_path: None,
-                        },
-                    );
-                }
-                Ok(out)
-            })
-            .unwrap_or_default();
+        let frames = catalog.read(move |conn| frame_facts(conn, &key))?;
 
         Ok(Self {
             couple,
@@ -228,6 +190,64 @@ impl ExportField {
             ],
         })
     }
+}
+
+fn frame_facts(
+    conn: &rusqlite::Connection,
+    key: &str,
+) -> AuraResult<std::collections::BTreeMap<String, Frame>> {
+    let mut out = std::collections::BTreeMap::new();
+    let mut stmt = conn
+        .prepare(
+            "SELECT p.photo_id, f.file_name, p.capture_time, p.camera_model,
+                r.abs_path, f.rel_path
+         FROM photo p
+         LEFT JOIN photo_file f ON f.file_id = (
+             SELECT candidate.file_id FROM photo_file candidate
+             JOIN photo owner ON owner.photo_id = candidate.photo_id
+             WHERE candidate.photo_id = p.photo_id AND candidate.role = 'primary'
+             ORDER BY candidate.is_present DESC,
+                      CASE WHEN candidate.file_id = owner.primary_file_id THEN 0 ELSE 1 END,
+                      candidate.rel_path, candidate.file_id LIMIT 1)
+         LEFT JOIN source_root r ON r.root_id = f.root_id
+         WHERE p.project_id = ?1",
+        )
+        .map_err(|e| aura_core::errors::db::statement_failed("delivery frames", &e))?;
+    let rows = stmt
+        .query_map(rusqlite::params![key], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, Option<String>>(1)?,
+                row.get::<_, Option<String>>(2)?,
+                row.get::<_, Option<String>>(3)?,
+                row.get::<_, Option<String>>(4)?,
+                row.get::<_, Option<String>>(5)?,
+            ))
+        })
+        .map_err(|e| aura_core::errors::db::statement_failed("delivery frames", &e))?;
+    for row in rows {
+        let (id, original, capture, camera, root, relative) =
+            row.map_err(|e| aura_core::errors::db::statement_failed("delivery frame", &e))?;
+        let Ok(image) = ImageId::from_db(&id) else {
+            continue;
+        };
+        out.insert(
+            id,
+            Frame {
+                image: Some(image),
+                original_stem: original.map(|n| stem_of(&n)),
+                date: capture.as_deref().and_then(capture_date),
+                chapter: None,
+                camera,
+                cleanup_disclosures: Vec::new(),
+                recipe_json: None,
+                original_path: root
+                    .zip(relative)
+                    .map(|(root, file)| Path::new(&root).join(file)),
+            },
+        );
+    }
+    Ok(out)
 }
 
 impl Field for ExportField {
@@ -259,6 +279,32 @@ fn stem_of(name: &str) -> String {
     match name.rsplit_once('.') {
         Some((stem, _)) if !stem.is_empty() => stem.to_owned(),
         _ => name.to_owned(),
+    }
+}
+
+fn capture_date(value: &str) -> Option<String> {
+    time::OffsetDateTime::parse(value, &time::format_description::well_known::Rfc3339)
+        .ok()
+        .map(|date| date_of(date.unix_timestamp().saturating_mul(1000)))
+        .or_else(|| value.parse::<i64>().ok().map(date_of))
+}
+
+#[cfg(test)]
+mod metadata_tests {
+    use super::capture_date;
+
+    #[test]
+    fn catalogue_capture_times_use_utc_dates_and_unknown_stays_unknown() {
+        assert_eq!(
+            capture_date("2026-10-16T09:30:00Z").as_deref(),
+            Some("2026-10-16")
+        );
+        assert_eq!(
+            capture_date("2026-10-16T00:30:00+05:45").as_deref(),
+            Some("2026-10-15")
+        );
+        assert_eq!(capture_date("0").as_deref(), Some("1970-01-01"));
+        assert_eq!(capture_date("unknown"), None);
     }
 }
 
@@ -305,13 +351,19 @@ fn civil_from_days(z: i64) -> (i64, u32, u32) {
 #[derive(Debug)]
 pub struct ExportSource<'a> {
     state: &'a AppState,
+    capture_recipe: bool,
+    expected_recipes: Option<&'a std::collections::BTreeMap<String, String>>,
 }
 
 impl<'a> ExportSource<'a> {
     /// A source over one application state.
     #[must_use]
     pub fn new(state: &'a AppState) -> Self {
-        Self { state }
+        Self {
+            state,
+            capture_recipe: true,
+            expected_recipes: None,
+        }
     }
 }
 
@@ -328,7 +380,19 @@ impl Source for ExportSource<'_> {
         })?;
         // The recipe the develop surface already loads: stored, or neutral when this frame has
         // never been edited. One loader, because two would be two answers to what the edit is.
-        let recipe = crate::develop_commands::load_or_neutral(self.state, image)?;
+        let recipe = {
+            let _t = crate::perf::step(self.state, "export.recipe_load");
+            crate::develop_commands::load_or_neutral(self.state, image)?
+        };
+        // Compare the actual owned recipe passed to this render, closing the race between
+        // a batch preflight and a later user edit. A missing entry is never an approval.
+        if let Some(expected) = self.expected_recipes {
+            require_checked_recipe(expected, &image.to_db(), &recipe)?;
+        }
+        let recipe_json = self
+            .capture_recipe
+            .then(|| aura_recipe::canonical(&recipe).map(Arc::<str>::from))
+            .transpose()?;
 
         // `RenderPurpose::Export`: nothing is skipped, at full precision. The interactive path
         // skips restoration and heavy retouch, and a delivered file that skipped them is a file
@@ -344,7 +408,10 @@ impl Source for ExportSource<'_> {
             },
             purpose: RenderPurpose::Export,
         };
-        let rendered = engine.render(request)?;
+        let rendered = {
+            let _t = crate::perf::step(self.state, "export.render_full");
+            engine.render(request)?
+        };
 
         Ok(Rendered {
             width: rendered.width,
@@ -355,7 +422,39 @@ impl Source for ExportSource<'_> {
             },
             colour,
             render_hash: rendered.render_hash,
+            recipe_json,
         })
+    }
+}
+
+fn require_checked_recipe(
+    expected: &std::collections::BTreeMap<String, String>,
+    image: &str,
+    recipe: &aura_recipe::Recipe,
+) -> AuraResult<()> {
+    if expected.get(image) != Some(&aura_recipe::recipe_hash(recipe)?) {
+        return Err(aura_export::errors::render_failed(
+            "The recipe changed after automatic checks; review it before delivery.",
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod checked_recipe_tests {
+    use super::*;
+
+    #[test]
+    fn unchanged_recipes_pass_but_new_edits_and_unchecked_photos_are_withheld() {
+        let mut recipe = aura_recipe::fixtures::neutral("test", "test");
+        let expected = std::collections::BTreeMap::from([(
+            "one".into(),
+            aura_recipe::recipe_hash(&recipe).unwrap(),
+        )]);
+        assert!(require_checked_recipe(&expected, "one", &recipe).is_ok());
+        assert!(require_checked_recipe(&expected, "two", &recipe).is_err());
+        recipe.global.exposure = 0.4;
+        assert!(require_checked_recipe(&expected, "one", &recipe).is_err());
     }
 }
 
@@ -468,14 +567,75 @@ pub fn export_run_with_watermark(
     input: ExportJobInput,
     watermark: Option<Watermark>,
 ) -> IpcResult<ExportStatusDto> {
+    export_run_reporting(state, input, watermark, None)
+}
+
+/// [`export_run_with_watermark`], also telling `also` after every file. The export appears in
+/// the status bar for as long as it runs, with the file it has just written.
+/// # Errors
+/// Invalid job/graphic, unavailable pixels, or export I/O failure.
+pub(crate) fn export_run_reporting(
+    state: &AppState,
+    input: ExportJobInput,
+    watermark: Option<Watermark>,
+    also: Option<&(dyn Fn(aura_export::api::Progress<'_>) + Sync)>,
+) -> IpcResult<ExportStatusDto> {
+    export_run_checked(state, input, watermark, also, None)
+}
+
+pub(crate) fn export_run_checked(
+    state: &AppState,
+    input: ExportJobInput,
+    watermark: Option<Watermark>,
+    also: Option<&(dyn Fn(aura_export::api::Progress<'_>) + Sync)>,
+    expected_recipes: Option<&std::collections::BTreeMap<String, String>>,
+) -> IpcResult<ExportStatusDto> {
     crate::licensing::require_export(state)?;
+    let photos: usize = input.sets.iter().map(|set| set.image_ids.len()).sum();
+    let busy = crate::activity::begin(
+        state,
+        "export",
+        format!("Exporting {photos} photograph(s) to {}", input.destination),
+    );
+    busy.progress(0, photos as u64);
+    let report = |p: aura_export::api::Progress<'_>| {
+        busy.progress(p.done as u64, p.total as u64);
+        if let Some((first, last)) = p.rendering {
+            busy.detail(format!(
+                "Rendering photos {first} to {last}; {} written so far",
+                p.written
+            ));
+            if let Some(also) = also {
+                also(p);
+            }
+            return;
+        }
+        busy.detail(format!(
+            "{}{} written, {} read back and verified",
+            if p.path.as_os_str().is_empty() {
+                String::new()
+            } else {
+                format!("{} - ", p.path.display())
+            },
+            p.written,
+            p.verified
+        ));
+        if let Some(also) = also {
+            also(p);
+        }
+    };
     let project = parse_project(&input.project_id)?;
     let job = build_job(&input)?;
     let field = ExportField::new(state, project)?;
-    let source = ExportSource::new(state);
+    let source = ExportSource {
+        state,
+        capture_recipe: job.sets.iter().any(|set| set.sidecar),
+        expected_recipes,
+    };
     let store = ExportStore::new(Arc::clone(state.catalog()));
     let pass = ExportPass::new(&store, &field, &source, crate::state::APP_VERSION)
-        .with_workers(state.image_work_gate().permits());
+        .with_workers(state.image_work_gate().permits())
+        .with_progress(&report);
     pass.run_with_watermark(project, &job, watermark.as_ref())?;
 
     let service = Export::new(store, field.photos(), field.selected());

@@ -1,0 +1,3305 @@
+{
+  "date": "2026-10-20",
+  "scope": "Installed Evoto Windows 8.0, official desktop documentation and AURA enhancement branch",
+  "completeParity": false,
+  "superiorityEstablished": false,
+  "installedExecutable": {
+    "path": "F:/evoto/Evoto.exe",
+    "fileVersion": "8.0.0.0",
+    "sha256": "7f020192f3b659ca4a1e4f8631b21879982bb21d97d26196a604ad70e2f3b2fa",
+    "hashVerifiedOn": "2026-10-20"
+  },
+  "freshLiveEvidence": {
+    "qualifiedScreenshotExample": ".work-checks/evoto-research-2026-10-20/live-skin.png",
+    "referenceModesScreenshot": ".work-checks/evoto-research-2026-10-20/live-match-modes.png",
+    "observedPanelGroups": 21,
+    "screenshotQualified": true,
+    "panelSwitchQualified": true,
+    "limitation": "Foreground capture recovered after activation correction. Earlier black/wrong-foreground captures are excluded. Masking remained at Detecting in this session; detailed masks/manual modes retain separately dated historical evidence. AI Lab catalogue was opened after returning to Full Image, then cancelled. Controls outside the viewport can still appear in Qt accessibility."
+  },
+  "families": [
+    {
+      "family": "Library and culling",
+      "historicalObservation": {
+        "date": "2026-10-18",
+        "document": "AURA-Evoto-8-features-and-colour-matching-2026-10-18.json",
+        "jsonPointer": "/panels/0",
+        "observedLabelCount": 42
+      },
+      "auraStatus": "partial_counterpart_not_qualified_equivalent",
+      "implementationEvidence": [
+        "crates/aura-app/src/measured_cull.rs"
+      ],
+      "remainingAcceptance": "Labelled culling cohorts, grouping decisions and complete asset/template workflows.",
+      "identicalOutputVerified": false,
+      "freshObservation": {
+        "date": "2026-10-20",
+        "accessibilityTree": ".work-checks/evoto-research-2026-10-20/live-project.json",
+        "screenshot": ".work-checks/evoto-research-2026-10-20/live-project.png",
+        "controls": 272,
+        "qualification": "Opened panel; observed controls, without evaluating every operation or slider endpoint."
+      }
+    },
+    {
+      "family": "Blemishes",
+      "historicalObservation": {
+        "date": "2026-10-18",
+        "document": "AURA-Evoto-8-features-and-colour-matching-2026-10-18.json",
+        "jsonPointer": "/panels/1",
+        "observedLabelCount": 57
+      },
+      "auraStatus": "partial_counterpart_not_qualified_equivalent",
+      "implementationEvidence": [
+        "crates/aura-app/src/automatic_strength.rs"
+      ],
+      "remainingAcceptance": "Task classification, permanent marks, mixed light and fine anatomical controls.",
+      "identicalOutputVerified": false,
+      "freshObservation": {
+        "date": "2026-10-20",
+        "accessibilityTree": ".work-checks/evoto-research-2026-10-20/live-portrait.json",
+        "screenshot": ".work-checks/evoto-research-2026-10-20/live-portrait.png",
+        "controls": 578,
+        "qualification": "Opened panel; observed controls, without evaluating every operation or slider endpoint.",
+        "labels": [
+          {
+            "label": "Portrait Retouching",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Female",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Male",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Child",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Elderly Female",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Elderly Male",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Indiv.",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "All",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Master Slider",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Face Refinement",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Freckles",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Acne",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Freckles & Acne",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Face Mole Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Reduce Face Shine",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Dark Circles",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Eye Bags",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Remove Glasses Glare",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Nostril Cleanup",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Lip Wrinkles & Flakes",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Double Chin",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Beard Protection",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Facial Wrinkles",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Forehead Wrinkles",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Eleven Lines",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Eye Wrinkles",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Nasal Wrinkles",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Smile Line",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "L",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "R",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Cheek Wrinkles",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Marionette Lines",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Perioral Wrinkles",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Body Refinement",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Body Blemishes",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Neck Wrinkles",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Armpit Touch-up",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Stomach Stretch Marks",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Stretch Marks",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Tattoos",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Blemish Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Skin Retouching",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Facial Reshape",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Facial Expression",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Teeth",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Eyes",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Makeup",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Hair",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Hands",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Full Body Reshape",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Feet",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "AI Lab",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Belly Slimming",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Strong Glare Removal",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Face Shadow Removal",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Golden Blonde Hair",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Liquify Background Repair",
+            "withinWindowBounds": false
+          }
+        ]
+      }
+    },
+    {
+      "family": "Colour",
+      "historicalObservation": {
+        "date": "2026-10-18",
+        "document": "AURA-Evoto-8-features-and-colour-matching-2026-10-18.json",
+        "jsonPointer": "/panels/2",
+        "observedLabelCount": 48
+      },
+      "auraStatus": "partial_counterpart_not_qualified_equivalent",
+      "implementationEvidence": [
+        "crates/aura-app/src/color_match/fine.rs"
+      ],
+      "remainingAcceptance": "Matched camera profiles, slider transforms and native preview/export comparison.",
+      "identicalOutputVerified": false,
+      "freshObservation": {
+        "date": "2026-10-20",
+        "accessibilityTree": ".work-checks/evoto-research-2026-10-20/live-editor.json",
+        "screenshot": ".work-checks/evoto-research-2026-10-20/live-editor.png",
+        "controls": 537,
+        "qualification": "Opened panel; observed controls, without evaluating every operation or slider endpoint.",
+        "labels": [
+          {
+            "label": "Color Adjustments",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Features Reorganized",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "AI Color Adjustments and Masking are now easier to find on the right bar.",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "AI Color Adjustments",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Open Masking",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Profile",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Filters",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Basic",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "White Balance",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Temp",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Tint",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Tone",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Exposure",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Contrast",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Brightness",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Highlights",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Shadows",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "White",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Black",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Presence",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Texture",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Clarity",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Dehaze",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Vibrance",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Saturation",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Level",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Curves",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "HSL",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Color Grading",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Selective Color",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Detail",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Grain",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Lens Corrections",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Transform Correction",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Color Calibration",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Histogram",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "ISO 100",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "154mm",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "f/2.8",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "1/400s",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "R",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "-",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "G",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "B",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "L",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "a",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "b",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Real-Time Color Adjustments",
+            "withinWindowBounds": true
+          }
+        ]
+      }
+    },
+    {
+      "family": "AI colour and reference matching",
+      "historicalObservation": {
+        "date": "2026-10-18",
+        "document": "AURA-Evoto-8-features-and-colour-matching-2026-10-18.json",
+        "jsonPointer": "/panels/3",
+        "observedLabelCount": 68
+      },
+      "auraStatus": "partial_counterpart_not_qualified_equivalent",
+      "implementationEvidence": [
+        "crates/aura-app/src/color_match/library.rs",
+        "crates/aura-app/src/color_match/regional.rs",
+        "ui/src/components/look/RegionalColorMatchPanel.tsx"
+      ],
+      "remainingAcceptance": "Regional photographic/edge qualification, individual-person correspondence, matching modes, reference reorder and trained style adaptation.",
+      "identicalOutputVerified": false,
+      "freshObservation": {
+        "date": "2026-10-20",
+        "accessibilityTree": ".work-checks/evoto-research-2026-10-20/live-ai-colour.json",
+        "screenshot": ".work-checks/evoto-research-2026-10-20/live-ai-colour.png",
+        "controls": 303,
+        "qualification": "Opened panel; observed controls, without evaluating every operation or slider endpoint.",
+        "labels": [
+          {
+            "label": "AI Color Adjustments",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "AI Color Tools",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Auto Color Corrections",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Apply",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Multi-Image Consistency",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Overall Color (Basic)",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Match",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Background Color (BasÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "AI Style",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Color Looks",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Color Match",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Supported Formats: JPEG, JPG, TIFF, PNG\nImage Dimensions: 512px to 12,000px",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Upload References",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Create Reference",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Quick Mode",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Recommended",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "My References",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Wedding 01",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Wedding 02",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Family",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "School",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Baby",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Headshot",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Ungrouped",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Histogram",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "ISO 100",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "154mm",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "f/2.8",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "1/400s",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "R",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "-",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "G",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "B",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "L",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "a",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "b",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Real-Time Color Adjustments",
+            "withinWindowBounds": true
+          }
+        ]
+      }
+    },
+    {
+      "family": "Reference matching modes",
+      "historicalObservation": {
+        "date": "2026-10-18",
+        "document": "AURA-Evoto-8-features-and-colour-matching-2026-10-18.json",
+        "jsonPointer": "/panels/4",
+        "observedLabelCount": 44
+      },
+      "auraStatus": "partial_counterpart_not_qualified_equivalent",
+      "implementationEvidence": [
+        "crates/aura-app/src/color_match.rs"
+      ],
+      "remainingAcceptance": "Proprietary Quick/Control mode behavior has no qualified equivalent.",
+      "identicalOutputVerified": false,
+      "freshObservation": {
+        "date": "2026-10-20",
+        "accessibilityTree": ".work-checks/evoto-research-2026-10-20/live-match-modes.json",
+        "screenshot": ".work-checks/evoto-research-2026-10-20/live-match-modes.png",
+        "controls": 319,
+        "qualification": "Opened panel; observed controls, without evaluating every operation or slider endpoint.",
+        "labels": [
+          {
+            "label": "Evoto_pro",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Mode Selection:",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Quick Mode",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Fast workflow with quick adjustments for efficient editing.",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Control Mode",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Refined control with familiar tools. Improved tone balance.",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "AI Color Adjustments",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "AI Color Tools",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Auto Color Corrections",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Apply",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Multi-Image Consistency",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Overall Color (Basic)",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Match",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Background Color (BasÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "AI Style",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Color Looks",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Color Match",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Supported Formats: JPEG, JPG, TIFF, PNG\nImage Dimensions: 512px to 12,000px",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Upload References",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Create Reference",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Recommended",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "My References",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Wedding 01",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Wedding 02",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Family",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "School",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Baby",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Headshot",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Ungrouped",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Histogram",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "ISO 100",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "154mm",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "f/2.8",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "1/400s",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "R",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "-",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "G",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "B",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "L",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "a",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "b",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Real-Time Color Adjustments",
+            "withinWindowBounds": true
+          }
+        ]
+      }
+    },
+    {
+      "family": "Masking",
+      "historicalObservation": {
+        "date": "2026-10-18",
+        "document": "AURA-Evoto-8-features-and-colour-matching-2026-10-18.json",
+        "jsonPointer": "/panels/5",
+        "observedLabelCount": 46
+      },
+      "auraStatus": "partial_counterpart_not_qualified_equivalent",
+      "implementationEvidence": [
+        "crates/aura-app/src/local_mask_commands.rs"
+      ],
+      "remainingAcceptance": "Dense semantic parts, apparel, overlapping people and edge/occlusion qualification.",
+      "identicalOutputVerified": false
+    },
+    {
+      "family": "Person mask chooser",
+      "historicalObservation": {
+        "date": "2026-10-18",
+        "document": "AURA-Evoto-8-features-and-colour-matching-2026-10-18.json",
+        "jsonPointer": "/panels/6",
+        "observedLabelCount": 13
+      },
+      "auraStatus": "partial_counterpart_not_qualified_equivalent",
+      "implementationEvidence": [
+        "crates/aura-app/src/mask_commands.rs"
+      ],
+      "remainingAcceptance": "Dedicated anatomical parts and apparel parsing.",
+      "identicalOutputVerified": false
+    },
+    {
+      "family": "Skin retouch",
+      "historicalObservation": {
+        "date": "2026-10-18",
+        "document": "AURA-Evoto-8-features-and-colour-matching-2026-10-18.json",
+        "jsonPointer": "/panels/7",
+        "observedLabelCount": 24
+      },
+      "auraStatus": "partial_counterpart_not_qualified_equivalent",
+      "implementationEvidence": [
+        "crates/aura-app/src/automatic_strength.rs"
+      ],
+      "remainingAcceptance": "Texture/tone quality across skin tones, body regions, age, makeup and varied lighting.",
+      "identicalOutputVerified": false,
+      "freshObservation": {
+        "date": "2026-10-20",
+        "accessibilityTree": ".work-checks/evoto-research-2026-10-20/live-skin.json",
+        "screenshot": ".work-checks/evoto-research-2026-10-20/live-skin.png",
+        "controls": 559,
+        "qualification": "Opened panel; observed controls, without evaluating every operation or slider endpoint.",
+        "labels": [
+          {
+            "label": "Portrait Retouching",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Female",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Male",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Child",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Elderly Female",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Elderly Male",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Indiv.",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "All",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Master Slider",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Blemish Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Facial Skin",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Even (Dodge & Burn)",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Facial Features",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Facial Contours",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Sculpt (Dodge & Burn)",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Textured Smoothing",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Frequency Separation",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Skin Softening",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Body Skin",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Skin Texture",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Glossiness",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Texture",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Clarity",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Skin Tone",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "AI Unify Face Complexion",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "AI Unify Body Complexion",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Unify Body Complexion",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "AI Body Complexion",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Select Skin Tone",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Temperature",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Tint",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Skin Radiance",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Rosy Complexion",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Remove Tan Lines",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Skin Retouching",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Facial Reshape",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Facial Expression",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Teeth",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Eyes",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Makeup",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Hair",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Hands",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Full Body Reshape",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Feet",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "AI Lab",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Belly Slimming",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Strong Glare Removal",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Face Shadow Removal",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Golden Blonde Hair",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Liquify Background Repair",
+            "withinWindowBounds": false
+          }
+        ]
+      }
+    },
+    {
+      "family": "Face geometry",
+      "historicalObservation": {
+        "date": "2026-10-18",
+        "document": "AURA-Evoto-8-features-and-colour-matching-2026-10-18.json",
+        "jsonPointer": "/panels/8",
+        "observedLabelCount": 21
+      },
+      "auraStatus": "primitives_only_dedicated_task_missing_or_unqualified",
+      "implementationEvidence": [
+        "crates/aura-render/src/retouch_reshape.rs"
+      ],
+      "remainingAcceptance": "Pose/landmark-driven 3D face structure, linked left/right controls and identity qualification.",
+      "identicalOutputVerified": false,
+      "freshObservation": {
+        "date": "2026-10-20",
+        "accessibilityTree": ".work-checks/evoto-research-2026-10-20/live-face-reshape.json",
+        "screenshot": ".work-checks/evoto-research-2026-10-20/live-face-reshape.png",
+        "controls": 548,
+        "qualification": "Opened panel; observed controls, without evaluating every operation or slider endpoint.",
+        "labels": [
+          {
+            "label": "Portrait Retouching",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Female",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Male",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Child",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Elderly Female",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Elderly Male",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Indiv.",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "All",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Master Slider",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Blemish Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Skin Retouching",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Face Shape",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Face",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "L",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "R",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Temple",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Cheekbones",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Jaw",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Face Size",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "V-Shape",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Jaw Length",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Face Width",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Chin Taper",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Chin Length",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Chin Shape",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Head Pose",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Up / Down",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Face Ratio",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Eyebrows",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Eyes",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Nose",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Mouth",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Symmetrize",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Facial Reshape",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Facial Expression",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Teeth",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Makeup",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Hair",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Hands",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Full Body Reshape",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Feet",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "AI Lab",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Belly Slimming",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Strong Glare Removal",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Face Shadow Removal",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Golden Blonde Hair",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Liquify Background Repair",
+            "withinWindowBounds": false
+          }
+        ]
+      }
+    },
+    {
+      "family": "Expression",
+      "historicalObservation": {
+        "date": "2026-10-18",
+        "document": "AURA-Evoto-8-features-and-colour-matching-2026-10-18.json",
+        "jsonPointer": "/panels/9",
+        "observedLabelCount": 5
+      },
+      "auraStatus": "primitives_only_dedicated_task_missing_or_unqualified",
+      "implementationEvidence": [
+        "crates/aura-render/src/retouch_reshape.rs"
+      ],
+      "remainingAcceptance": "Validated expression generation, occlusion handling and identity preservation.",
+      "identicalOutputVerified": false,
+      "freshObservation": {
+        "date": "2026-10-20",
+        "accessibilityTree": ".work-checks/evoto-research-2026-10-20/live-expression.json",
+        "screenshot": ".work-checks/evoto-research-2026-10-20/live-expression.png",
+        "controls": 342,
+        "qualification": "Opened panel; observed controls, without evaluating every operation or slider endpoint.",
+        "labels": [
+          {
+            "label": "Portrait Retouching",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Female",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Male",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Child",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Elderly Female",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Elderly Male",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Indiv.",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "All",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Master Slider",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Blemish Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Skin Retouching",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Facial Reshape",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Gummy Smile",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "L",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "R",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Gentle Smile",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Smile Generation",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Facial Expression",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Teeth",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Eyes",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Makeup",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Hair",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Hands",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Full Body Reshape",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Feet",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "AI Lab",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Belly Slimming",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Strong Glare Removal",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Face Shadow Removal",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Golden Blonde Hair",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Liquify Background Repair",
+            "withinWindowBounds": false
+          }
+        ]
+      }
+    },
+    {
+      "family": "Teeth",
+      "historicalObservation": {
+        "date": "2026-10-18",
+        "document": "AURA-Evoto-8-features-and-colour-matching-2026-10-18.json",
+        "jsonPointer": "/panels/10",
+        "observedLabelCount": 4
+      },
+      "auraStatus": "partial_counterpart_not_qualified_equivalent",
+      "implementationEvidence": [
+        "crates/aura-app/src/portrait_auto.rs"
+      ],
+      "remainingAcceptance": "Alignment/generation and fine tooth/gum selection.",
+      "identicalOutputVerified": false,
+      "freshObservation": {
+        "date": "2026-10-20",
+        "accessibilityTree": ".work-checks/evoto-research-2026-10-20/live-teeth.json",
+        "screenshot": ".work-checks/evoto-research-2026-10-20/live-teeth.png",
+        "controls": 331,
+        "qualification": "Opened panel; observed controls, without evaluating every operation or slider endpoint.",
+        "labels": [
+          {
+            "label": "Portrait Retouching",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Female",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Male",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Child",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Elderly Female",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Elderly Male",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Indiv.",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "All",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Master Slider",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Blemish Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Skin Retouching",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Facial Reshape",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Facial Expression",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Teeth Flaws Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Teeth Whitening",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Teeth Alignment",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Pretty Teeth",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Teeth",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Eyes",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Makeup",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Hair",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Hands",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Full Body Reshape",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Feet",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "AI Lab",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Belly Slimming",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Strong Glare Removal",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Face Shadow Removal",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Golden Blonde Hair",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Liquify Background Repair",
+            "withinWindowBounds": false
+          }
+        ]
+      }
+    },
+    {
+      "family": "Eyes",
+      "historicalObservation": {
+        "date": "2026-10-18",
+        "document": "AURA-Evoto-8-features-and-colour-matching-2026-10-18.json",
+        "jsonPointer": "/panels/11",
+        "observedLabelCount": 12
+      },
+      "auraStatus": "partial_counterpart_not_qualified_equivalent",
+      "implementationEvidence": [
+        "crates/aura-app/src/portrait_auto.rs"
+      ],
+      "remainingAcceptance": "Dedicated iris/vein/symmetry models and independent eye geometry qualification.",
+      "identicalOutputVerified": false,
+      "freshObservation": {
+        "date": "2026-10-20",
+        "accessibilityTree": ".work-checks/evoto-research-2026-10-20/live-eyes.json",
+        "screenshot": ".work-checks/evoto-research-2026-10-20/live-eyes.png",
+        "controls": 384,
+        "qualification": "Opened panel; observed controls, without evaluating every operation or slider endpoint.",
+        "labels": [
+          {
+            "label": "Portrait Retouching",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Female",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Male",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Child",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Elderly Female",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Elderly Male",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Indiv.",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "All",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Master Slider",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Blemish Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Skin Retouching",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Facial Reshape",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Facial Expression",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Teeth",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Brightness",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "L",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "R",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Remove Glasses Glare",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Eye White Enhance",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Red Eye Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Eye Symmetry",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Iris Correction",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "AI Iris Correction",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Catchlights",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "General",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Indoors",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Eyes",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Makeup",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Hair",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Hands",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Full Body Reshape",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Feet",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "AI Lab",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Belly Slimming",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Strong Glare Removal",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Face Shadow Removal",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Golden Blonde Hair",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Liquify Background Repair",
+            "withinWindowBounds": false
+          }
+        ]
+      }
+    },
+    {
+      "family": "Makeup",
+      "historicalObservation": {
+        "date": "2026-10-18",
+        "document": "AURA-Evoto-8-features-and-colour-matching-2026-10-18.json",
+        "jsonPointer": "/panels/12",
+        "observedLabelCount": 18
+      },
+      "auraStatus": "partial_counterpart_not_qualified_equivalent",
+      "implementationEvidence": [
+        "crates/aura-render/src/retouch_tools.rs"
+      ],
+      "remainingAcceptance": "Dense lip/eyelash/eyelid localization, material-aware makeup and identity quality.",
+      "identicalOutputVerified": false,
+      "freshObservation": {
+        "date": "2026-10-20",
+        "accessibilityTree": ".work-checks/evoto-research-2026-10-20/live-makeup.json",
+        "screenshot": ".work-checks/evoto-research-2026-10-20/live-makeup.png",
+        "controls": 441,
+        "qualification": "Opened panel; observed controls, without evaluating every operation or slider endpoint.",
+        "labels": [
+          {
+            "label": "Portrait Retouching",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Female",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Male",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Child",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Elderly Female",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Elderly Male",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Indiv.",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "All",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Master Slider",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Blemish Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Skin Retouching",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Facial Reshape",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Facial Expression",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Teeth",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Eyes",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Makeup Suite",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Highlights",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Contour Intensity",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Eyebrow Makeup",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "L",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "R",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Eye Makeup",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Amount",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Lip Makeup",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Eyebrows",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Eyeshadow",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Eyelashes",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Eyeliner",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Contacts",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Blush",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Lipstick",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Contour",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Face Decorations",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Makeup",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Hair",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Hands",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Full Body Reshape",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Feet",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "AI Lab",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Belly Slimming",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Strong Glare Removal",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Face Shadow Removal",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Golden Blonde Hair",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Liquify Background Repair",
+            "withinWindowBounds": false
+          }
+        ]
+      }
+    },
+    {
+      "family": "Hair",
+      "historicalObservation": {
+        "date": "2026-10-18",
+        "document": "AURA-Evoto-8-features-and-colour-matching-2026-10-18.json",
+        "jsonPointer": "/panels/13",
+        "observedLabelCount": 14
+      },
+      "auraStatus": "partial_counterpart_not_qualified_equivalent",
+      "implementationEvidence": [
+        "crates/aura-render/src/retouch_material.rs"
+      ],
+      "remainingAcceptance": "Matting, hairline/volume geometry and strand reconstruction.",
+      "identicalOutputVerified": false,
+      "freshObservation": {
+        "date": "2026-10-20",
+        "accessibilityTree": ".work-checks/evoto-research-2026-10-20/live-hair.json",
+        "screenshot": ".work-checks/evoto-research-2026-10-20/live-hair.png",
+        "controls": 432,
+        "qualification": "Opened panel; observed controls, without evaluating every operation or slider endpoint.",
+        "labels": [
+          {
+            "label": "Portrait Retouching",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Female",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Male",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Child",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Elderly Female",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Elderly Male",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Indiv.",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "All",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Master Slider",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Blemish Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Skin Retouching",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Facial Reshape",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Facial Expression",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Teeth",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Eyes",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Makeup",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Hair Reshape",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Hair Part Line",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Top Hair Volume",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Side Hair Volume",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "L",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "R",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Hairline",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Hair Perfection",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Stray Hairs Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Smooth Hair",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Hair Shine Enhancement",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Hair Color Adjustments",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "White Hair Blackening",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Hair Color",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Hair",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Hands",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Full Body Reshape",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Feet",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "AI Lab",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Belly Slimming",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Strong Glare Removal",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Face Shadow Removal",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Golden Blonde Hair",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Liquify Background Repair",
+            "withinWindowBounds": false
+          }
+        ]
+      }
+    },
+    {
+      "family": "Hands",
+      "historicalObservation": {
+        "date": "2026-10-18",
+        "document": "AURA-Evoto-8-features-and-colour-matching-2026-10-18.json",
+        "jsonPointer": "/panels/14",
+        "observedLabelCount": 3
+      },
+      "auraStatus": "primitives_only_dedicated_task_missing_or_unqualified",
+      "implementationEvidence": [
+        "crates/aura-render/src/retouch_skin.rs"
+      ],
+      "remainingAcceptance": "Hand-specific localization, vein removal and articulated reshape.",
+      "identicalOutputVerified": false,
+      "freshObservation": {
+        "date": "2026-10-20",
+        "accessibilityTree": ".work-checks/evoto-research-2026-10-20/live-hands.json",
+        "screenshot": ".work-checks/evoto-research-2026-10-20/live-hands.png",
+        "controls": 323,
+        "qualification": "Opened panel; observed controls, without evaluating every operation or slider endpoint.",
+        "labels": [
+          {
+            "label": "Portrait Retouching",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Female",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Male",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Child",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Elderly Female",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Elderly Male",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Indiv.",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "All",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Master Slider",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Blemish Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Skin Retouching",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Facial Reshape",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Facial Expression",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Teeth",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Eyes",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Makeup",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Hair",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Even (Dodge & Burn)",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Hand Vein",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Hand Reshape",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Hands",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Full Body Reshape",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Feet",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "AI Lab",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Belly Slimming",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Strong Glare Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Face Shadow Removal",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Golden Blonde Hair",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Liquify Background Repair",
+            "withinWindowBounds": false
+          }
+        ]
+      }
+    },
+    {
+      "family": "Body geometry",
+      "historicalObservation": {
+        "date": "2026-10-18",
+        "document": "AURA-Evoto-8-features-and-colour-matching-2026-10-18.json",
+        "jsonPointer": "/panels/15",
+        "observedLabelCount": 23
+      },
+      "auraStatus": "primitives_only_dedicated_task_missing_or_unqualified",
+      "implementationEvidence": [
+        "crates/aura-render/src/retouch_reshape.rs"
+      ],
+      "remainingAcceptance": "Articulated pose/occlusion-aware body proportions, garments and nearby-person protection.",
+      "identicalOutputVerified": false,
+      "freshObservation": {
+        "date": "2026-10-20",
+        "accessibilityTree": ".work-checks/evoto-research-2026-10-20/live-body-reshape.json",
+        "screenshot": ".work-checks/evoto-research-2026-10-20/live-body-reshape.png",
+        "controls": 507,
+        "qualification": "Opened panel; observed controls, without evaluating every operation or slider endpoint.",
+        "labels": [
+          {
+            "label": "Portrait Retouching",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Female",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Male",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Child",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Elderly Female",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Elderly Male",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Indiv.",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "All",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Master Slider",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Blemish Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Skin Retouching",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Facial Reshape",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Facial Expression",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Teeth",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Eyes",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Makeup",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Hair",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Hands",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Liquify Background Repair",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Try Now",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Full Body",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "AI Reshape",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Head",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Body",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Height",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Upper Body",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Upper Body Length",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Neck Width",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "L",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "R",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Neck Length",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Arms",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Breasts",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Waist Width",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Waist Length",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Hips",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Leg",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Leg Width",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Thigh",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Calf",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Amount",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Leg Length",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Full Body Reshape",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Feet",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "AI Lab",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Belly Slimming",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Strong Glare Removal",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Face Shadow Removal",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Golden Blonde Hair",
+            "withinWindowBounds": false
+          }
+        ]
+      }
+    },
+    {
+      "family": "Feet",
+      "historicalObservation": {
+        "date": "2026-10-18",
+        "document": "AURA-Evoto-8-features-and-colour-matching-2026-10-18.json",
+        "jsonPointer": "/panels/16",
+        "observedLabelCount": 1
+      },
+      "auraStatus": "primitives_only_dedicated_task_missing_or_unqualified",
+      "implementationEvidence": [
+        "crates/aura-render/src/retouch_skin.rs"
+      ],
+      "remainingAcceptance": "Foot-specific localization and validated vein removal.",
+      "identicalOutputVerified": false,
+      "freshObservation": {
+        "date": "2026-10-20",
+        "accessibilityTree": ".work-checks/evoto-research-2026-10-20/live-feet.json",
+        "screenshot": ".work-checks/evoto-research-2026-10-20/live-feet.png",
+        "controls": 304,
+        "qualification": "Opened panel; observed controls, without evaluating every operation or slider endpoint.",
+        "labels": [
+          {
+            "label": "Portrait Retouching",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Female",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Male",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Child",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Elderly Female",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Elderly Male",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Indiv.",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "All",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Master Slider",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Blemish Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Skin Retouching",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Facial Reshape",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Facial Expression",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Teeth",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Eyes",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Makeup",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Hair",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Hands",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Full Body Reshape",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Foot Veins",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Feet",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "AI Lab",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Belly Slimming",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Strong Glare Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Face Shadow Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Golden Blonde Hair",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Liquify Background Repair",
+            "withinWindowBounds": false
+          }
+        ]
+      }
+    },
+    {
+      "family": "Background",
+      "historicalObservation": {
+        "date": "2026-10-18",
+        "document": "AURA-Evoto-8-features-and-colour-matching-2026-10-18.json",
+        "jsonPointer": "/panels/17",
+        "observedLabelCount": 21
+      },
+      "auraStatus": "partial_counterpart_not_qualified_equivalent",
+      "implementationEvidence": [
+        "crates/aura-render/src/retouch_material.rs"
+      ],
+      "remainingAcceptance": "Complete shadow/reflection/retained-object workflow and complex-edge quality.",
+      "identicalOutputVerified": false,
+      "freshObservation": {
+        "date": "2026-10-20",
+        "accessibilityTree": ".work-checks/evoto-research-2026-10-20/live-background.json",
+        "screenshot": ".work-checks/evoto-research-2026-10-20/live-background.png",
+        "controls": 274,
+        "qualification": "Opened panel; observed controls, without evaluating every operation or slider endpoint.",
+        "labels": [
+          {
+            "label": "Background Adjustments",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Solid Backdrop Refinement",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Distractions Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Clean Backdrop",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Unify Lighting",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Color Banding Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Background Refinement",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Grass Fill",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Try Now",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Background Enhancement",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Backdrop Changer",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Sky Replacement",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "AI Lab",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Smart Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "People Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "AI Background Fusion",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Generative Expand",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "AI Sky Replacement",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Features Reorganized",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Lens Blur is now moved to Creative Effects.",
+            "withinWindowBounds": false
+          },
+          {
+            "label": "Locate Lens Blur",
+            "withinWindowBounds": false
+          }
+        ]
+      }
+    },
+    {
+      "family": "Clothing",
+      "historicalObservation": {
+        "date": "2026-10-18",
+        "document": "AURA-Evoto-8-features-and-colour-matching-2026-10-18.json",
+        "jsonPointer": "/panels/18",
+        "observedLabelCount": 19
+      },
+      "auraStatus": "partial_counterpart_not_qualified_equivalent",
+      "implementationEvidence": [
+        "crates/aura-render/src/retouch_material.rs"
+      ],
+      "remainingAcceptance": "Automatic localization, fine/coarse wrinkles, edge reshape and print/seam protection.",
+      "identicalOutputVerified": false,
+      "freshObservation": {
+        "date": "2026-10-20",
+        "accessibilityTree": ".work-checks/evoto-research-2026-10-20/live-clothing.json",
+        "screenshot": ".work-checks/evoto-research-2026-10-20/live-clothing.png",
+        "controls": 271,
+        "qualification": "Opened panel; observed controls, without evaluating every operation or slider endpoint.",
+        "labels": [
+          {
+            "label": "Clothes & Accessories Adjustments",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "All",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Female",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Male",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Child",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Elderly Female",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Elderly Male",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "De-wrinkle Clothing",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Amount",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Fine Wrinkles Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Deep Wrinkles Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "De-blemish Clothing",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Lint Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Sweat Stain Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Clothing Edge Smoothing",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Clothing MoirÃƒÆ’Ã‚Â© Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Try it now",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Clothing Adjustment",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "AI Lab",
+            "withinWindowBounds": true
+          }
+        ]
+      }
+    },
+    {
+      "family": "Pets",
+      "historicalObservation": {
+        "date": "2026-10-18",
+        "document": "AURA-Evoto-8-features-and-colour-matching-2026-10-18.json",
+        "jsonPointer": "/panels/19",
+        "observedLabelCount": 14
+      },
+      "auraStatus": "primitives_only_dedicated_task_missing_or_unqualified",
+      "implementationEvidence": [
+        "crates/aura-render/src/retouch_tools.rs"
+      ],
+      "remainingAcceptance": "Species-specific detection, leash reconstruction and eye/fur localization.",
+      "identicalOutputVerified": false,
+      "freshObservation": {
+        "date": "2026-10-20",
+        "accessibilityTree": ".work-checks/evoto-research-2026-10-20/live-pets.json",
+        "screenshot": ".work-checks/evoto-research-2026-10-20/live-pets.png",
+        "controls": 257,
+        "qualification": "Opened panel; observed controls, without evaluating every operation or slider endpoint.",
+        "labels": [
+          {
+            "label": "Pet Retouching",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Leash Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Apply",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Stray Fur Removal",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Body",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Eye Lightening",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "L",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "R",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Eye Color Enhancement",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Catchlights",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "General",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Indoors",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Outdoors",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Eyes",
+            "withinWindowBounds": true
+          }
+        ]
+      }
+    },
+    {
+      "family": "Crop",
+      "historicalObservation": {
+        "date": "2026-10-18",
+        "document": "AURA-Evoto-8-features-and-colour-matching-2026-10-18.json",
+        "jsonPointer": "/panels/20",
+        "observedLabelCount": 17
+      },
+      "auraStatus": "partial_counterpart_not_qualified_equivalent",
+      "implementationEvidence": [
+        "crates/aura-app/src/develop_commands.rs"
+      ],
+      "remainingAcceptance": "Equivalent subject-location/expand rules and batch orientation/crop behavior.",
+      "identicalOutputVerified": false,
+      "freshObservation": {
+        "date": "2026-10-20",
+        "accessibilityTree": ".work-checks/evoto-research-2026-10-20/live-crop.json",
+        "screenshot": ".work-checks/evoto-research-2026-10-20/live-crop.png",
+        "controls": 200,
+        "qualification": "Opened panel; observed controls, without evaluating every operation or slider endpoint.",
+        "labels": [
+          {
+            "label": "Crop  Rotate",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Expand",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Crop",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Subject",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Face",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "AI Locate",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Subject Locate",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Person Auto Alignment",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Vertical Alignment",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Horizontal Eye Alignment",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Rotate",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "AI Horizontal Correction",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Auto",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Angle",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Crop & Rotate",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Cancel",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "OK",
+            "withinWindowBounds": true
+          }
+        ]
+      }
+    },
+    {
+      "family": "Creative effects",
+      "historicalObservation": {
+        "date": "2026-10-18",
+        "document": "AURA-Evoto-8-features-and-colour-matching-2026-10-18.json",
+        "jsonPointer": "/panels/21",
+        "observedLabelCount": 8
+      },
+      "auraStatus": "partial_counterpart_not_qualified_equivalent",
+      "implementationEvidence": [
+        "crates/aura-render/src/retouch_optics.rs"
+      ],
+      "remainingAcceptance": "Depth/focus/occlusion quality; optical control behavior and native-resolution qualification.",
+      "identicalOutputVerified": false,
+      "freshObservation": {
+        "date": "2026-10-20",
+        "accessibilityTree": ".work-checks/evoto-research-2026-10-20/live-creative-effects.json",
+        "screenshot": ".work-checks/evoto-research-2026-10-20/live-creative-effects.png",
+        "controls": 220,
+        "qualification": "Opened panel; observed controls, without evaluating every operation or slider endpoint.",
+        "labels": [
+          {
+            "label": "Creative Effects",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Lens Blur",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "AI Lens Blur",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Glow Effect",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Post-Crop Vignetting",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "AI Lab",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Old Photo Restoration",
+            "withinWindowBounds": true
+          },
+          {
+            "label": "Detail Enhance",
+            "withinWindowBounds": true
+          }
+        ]
+      }
+    },
+    {
+      "family": "AI Lab",
+      "historicalObservation": {
+        "date": "2026-10-18",
+        "document": "AURA-Evoto-8-features-and-colour-matching-2026-10-18.json",
+        "jsonPointer": "/panels/22",
+        "observedLabelCount": 55
+      },
+      "auraStatus": "partial_counterpart_not_qualified_equivalent",
+      "implementationEvidence": [
+        "crates/aura-render/src/retouch_heal.rs"
+      ],
+      "remainingAcceptance": "Dedicated validated scene fusion, expansion, people removal, restoration and reconstruction models.",
+      "identicalOutputVerified": false,
+      "freshObservation": {
+        "date": "2026-10-20",
+        "accessibilityTree": ".work-checks/evoto-research-2026-10-20/live-ai-lab-retry.json",
+        "screenshot": ".work-checks/evoto-research-2026-10-20/live-ai-lab-retry.png",
+        "controls": 404,
+        "qualification": "Opened catalogue, observed generation families, then cancelled without applying any task."
+      }
+    },
+    {
+      "family": "Healing",
+      "historicalObservation": {
+        "date": "2026-10-18",
+        "document": "AURA-Evoto-8-features-and-colour-matching-2026-10-18.json",
+        "jsonPointer": "/panels/23",
+        "observedLabelCount": 11
+      },
+      "auraStatus": "partial_counterpart_not_qualified_equivalent",
+      "implementationEvidence": [
+        "crates/aura-app/src/native_retouch.rs"
+      ],
+      "remainingAcceptance": "Mode/range comparison and high-resolution donor quality.",
+      "identicalOutputVerified": false
+    },
+    {
+      "family": "Patch",
+      "historicalObservation": {
+        "date": "2026-10-18",
+        "document": "AURA-Evoto-8-features-and-colour-matching-2026-10-18.json",
+        "jsonPointer": "/panels/24",
+        "observedLabelCount": 11
+      },
+      "auraStatus": "partial_counterpart_not_qualified_equivalent",
+      "implementationEvidence": [
+        "crates/aura-app/src/native_retouch.rs"
+      ],
+      "remainingAcceptance": "Source/destination mode equivalence, edge transitions and mixed-stack behavior.",
+      "identicalOutputVerified": false
+    },
+    {
+      "family": "Clone",
+      "historicalObservation": {
+        "date": "2026-10-18",
+        "document": "AURA-Evoto-8-features-and-colour-matching-2026-10-18.json",
+        "jsonPointer": "/panels/25",
+        "observedLabelCount": 13
+      },
+      "auraStatus": "partial_counterpart_not_qualified_equivalent",
+      "implementationEvidence": [
+        "crates/aura-app/src/native_retouch.rs"
+      ],
+      "remainingAcceptance": "Mode/opacity/source behavior and high-resolution output comparison.",
+      "identicalOutputVerified": false
+    }
+  ],
+  "additionalDocumentedWorkflows": [
+    {
+      "name": "Wired and wireless camera tethering",
+      "auraStatus": "hardware_qualification_required",
+      "source": "https://support.evoto.ai/home/evoto-desktop/"
+    },
+    {
+      "name": "Watched folders and automated delivery",
+      "auraStatus": "workflow_comparison_required",
+      "source": "https://support.evoto.ai/auto-import-and-export/"
+    },
+    {
+      "name": "Settings, assets, workflow templates and unified navigation",
+      "auraStatus": "partial_or_unassessed",
+      "source": "https://support.evoto.ai/evoto-ai-assistant-and-unified-search/"
+    }
+  ],
+  "implementedThisChange": [
+    "Absolute 0-200% overall and category strengths for saved native automatic retouch",
+    "Zero/full restoration, saved baselines, manual/disabled preservation and mask snapshots",
+    "Protected automatic identities on reruns and subsequent individual edits",
+    "Twelve fine colour matching strengths within existing baseline/native safeguards",
+    "Reference thumbnails/search/groups/favorites/rename/remove/saved default strengths",
+    "Reference creation from current full-quality edited preview",
+    "Multiple reference upload with independent import outcomes and navigation checks",
+    "Native independent regional reference fitting with frozen local masks and reversible strengths",
+    "Seven editor panels with preserved drafts and direct automatic finish controls"
+  ],
+  "validation": {
+    "frontendBuild": "passed",
+    "frontendTestsPassed": 851,
+    "frontendTestFilesPassed": 100,
+    "native": "passed: cargo test -p aura-app --lib --test color_reference_match -j1",
+    "strictLint": "passed: cargo clippy --workspace --all-targets -j2 -- -D warnings",
+    "desktop": "passed",
+    "bannedPatterns": "passed",
+    "nativeUnitTestsPassed": 299,
+    "nativeIntegrationTestsPassed": 4,
+    "nativeIgnored": 3,
+    "frozenContracts": 83,
+    "formatting": "passed for workspace and desktop shell; git diff --check passed",
+    "desktopBuild": "passed: Windows debug desktop with bundled production frontend",
+    "desktopBuildDiagnostic": "GNU linker emitted multiple non-default resource manifests warning; executable launched and all smoke cases passed.",
+    "desktopSmoke": {
+      "casesPassed": 7,
+      "fixture": "Generated chart with saved automatic-operation fixture; does not test face detection or establish Evoto image-quality parity.",
+      "isolatedCatalogue": true,
+      "artifact": ".work-checks/evoto-research-2026-10-20/desktop-171926/result.json",
+      "cases": [
+        {
+          "case": "Real GUI zero smoothing changes native pixels and preserves manual operation",
+          "result": "PASS"
+        },
+        {
+          "case": "Real GUI restores original automatic pixels after zero",
+          "result": "PASS"
+        },
+        {
+          "case": "Real GUI increases strength to 150 percent from original baseline",
+          "result": "PASS"
+        },
+        {
+          "case": "Real GUI captures edited preview and saves thumbnail, name, group and favorite",
+          "result": "PASS"
+        },
+        {
+          "case": "Real GUI stores independent temperature and tint reference defaults",
+          "result": "PASS"
+        },
+        {
+          "case": "Native IPC different-scene reference fit uses saved fine defaults and full-resolution guards",
+          "result": "PASS",
+          "before": 22.514046,
+          "after": 19.107729
+        },
+        {
+          "case": "Removing a library reference preserves saved photo and original files",
+          "result": "PASS",
+          "originalSha256": "a473fb13b663cb251c2ec437d397ed47aeb5657d66a88118cabdeda27714e4c2"
+        }
+      ],
+      "qualification": "Seven finishing/library cases rerun on the final rebuilt desktop; six regional/panel cases recorded separately."
+    },
+    "packagingParserTestsPassed": 5,
+    "regionalDesktopSmoke": {
+      "casesPassed": 6,
+      "artifact": ".work-checks/rea-evoto-2026-10-20/desktop-171421/result.json"
+    }
+  },
+  "researchSources": [
+    "https://support.evoto.ai/home/evoto-desktop/",
+    "https://support.evoto.ai/feature-introduction-ai-color-match/",
+    "https://support.evoto.ai/feature-introduction-masking/",
+    "https://support.evoto.ai/facial-expression/",
+    "https://support.evoto.ai/full-body-reshape/",
+    "https://support.evoto.ai/clothing-adjustment/",
+    "https://support.evoto.ai/background-adjustments/",
+    "https://support.evoto.ai/backdrop-changer/",
+    "https://support.evoto.ai/sky-replacement/",
+    "https://support.evoto.ai/pet-body/",
+    "https://support.evoto.ai/pet-eyes/",
+    "https://support.evoto.ai/crop/",
+    "https://support.evoto.ai/how-to-use-setting/",
+    "https://support.evoto.ai/auto-import-and-export/",
+    "https://support.evoto.ai/smart-culling/",
+    "https://support.evoto.ai/evoto-ai-assistant-and-unified-search/"
+  ],
+  "notes": [
+    "Historical labels are observed UI, not individually exercised algorithm branches.",
+    "Marketing routes overlap and include use cases and separate video/mobile products; no parity percentage is asserted.",
+    "No proprietary competitor code/assets/weights were incorporated.",
+    "No automatic claim of equivalent model quality follows from a native renderer primitive."
+  ],
+  "nativeContinuation": "AURA-Evoto-native-research-2026-10-20.json"
+}

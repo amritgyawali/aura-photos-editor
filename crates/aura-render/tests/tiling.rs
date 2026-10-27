@@ -35,6 +35,7 @@ fn tiled_render_equals_whole_render() {
     recipe.global.highlights = -25;
     recipe.global.clarity = 45;
     recipe.global.texture = 30;
+    recipe.global.dehaze = 35;
     recipe.global.vibrance = 20;
     recipe.global.sharpen.amount = 80;
     recipe.global.sharpen.masking = 30;
@@ -149,5 +150,10 @@ fn the_halo_is_large_enough_for_every_enabled_stage() {
     );
     let expected: u32 = plan.stages.iter().map(|s| s.halo()).sum();
     assert_eq!(tiles::halo_for(&plan), expected);
-    assert!(expected >= 48 + 12 + 12 + 16 + 24);
+    // Texture, sharpening and noise reduction read their neighbours. Clarity and dehaze
+    // read a frame-wide edge-aware base the tiler measures once, so they add nothing to the
+    // halo - which is what keeps them identical across tiles. ADR-0126.
+    assert!(expected >= 12 + 12 + 16);
+    assert_eq!(graph::Stage::Clarity.halo(), 0);
+    assert_eq!(graph::Stage::Dehaze.halo(), 0);
 }

@@ -72,6 +72,19 @@ pub struct Selection {
     pub gradient: Option<Gradient>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub luminance: Option<LuminanceRange>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<ColorRange>,
+}
+
+/// Colour measured at this coordinate immediately before the operation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct ColorRange {
+    pub sample: [f32; 2],
+    /// Euclidean D65 Lab distance, used only as a selection metric.
+    pub tolerance: f32,
+    pub softness: f32,
+    pub lightness: f32,
 }
 
 impl Default for SkinSettings {
@@ -104,6 +117,26 @@ pub enum Tool {
     EyeDetail,
     RedEye,
     Fabric,
+    /// Selection-limited chroma filtering; original luminance detail is preserved.
+    FabricMoire,
+    /// Low-frequency fabric correction toward a required clean source sample.
+    FabricStain,
+    /// Lift a smooth shadow field toward selected upper midtones, bounded by `tone * 2` stops.
+    ShadowBalance,
+    /// Blur selected background pixels without mixing excluded subjects into the kernel.
+    BackgroundBlur,
+    /// Spread highlight energy above `0.18 * 2^(tone * 4)` in linear light.
+    HighlightGlow,
+    /// Selected line integration; `warmth * 180` is direction in degrees.
+    MotionBlur,
+    /// Radial integration around `source` or the image centre; travel is `radius * 10`.
+    ZoomBlur,
+    /// Suppress chroma aligned to `target_color`, preserving working luminance.
+    ColorDespill,
+    /// Continuous luminance shoulder above `0.18 * 2^(tone * 4)`.
+    HighlightCompress,
+    /// Local chroma gain: `warmth` is saturation, `tint` is adaptive vibrance.
+    ColorSaturation,
     Backdrop,
     Glare,
     Makeup,
@@ -128,6 +161,258 @@ pub enum Tool {
     /// pores. With `preserve_microtexture` it also evens flat redness. Without a matte it is
     /// a brush: paint over what is left. ADR-0092.
     AcneClear,
+    /// Evens long, faint marks out of an expanse of skin with a filter that flows across
+    /// them and stops at structure: a hand resting on an abdomen and a navel are left as
+    /// they are. `radius` is the reach of the evening and `texture` how much of the clean
+    /// skin's own grain is put back. ADR-0118.
+    StretchMarks,
+    // Selected effects (ADR-0131). Each reads only the fields its comment names; the warps
+    // move pixels, and `amount` is their strength rather than an opacity.
+    /// Push the selection's content by (`warmth`, `tint`) region radii, times `amount`.
+    LiquifyPush,
+    /// Enlarge the content around the region centre (eyes, hair volume).
+    LiquifyBloat,
+    /// Shrink the content toward the region centre.
+    LiquifyPucker,
+    /// Rotate the content around the region centre by up to `warmth * 180` degrees.
+    LiquifyTwirl,
+    /// Rotational blur around `source` or the region centre; `tone` is the sweep (0..30 degrees).
+    SpinBlur,
+    /// Square blocks `radius` of the short edge across; for hiding a face, plate or screen.
+    Pixelate,
+    /// A strong even blur of radius `radius`; for hiding detail or softening a background.
+    PrivacyBlur,
+    /// Diffusion filter: highlights bloom into their surroundings; `tone` is the overall softness.
+    SoftFocus,
+    /// Orton glow: a brightened, blurred copy screened over the photograph; `tone` brightens it.
+    OrtonGlow,
+    /// Unsharp mask on luminance: `radius` is the detail size, `texture` the gain.
+    LocalSharpen,
+    /// Edge-preserving noise reduction: all colour noise, and luminance noise up to `tone`.
+    LocalDenoise,
+    /// Rotates hue by `warmth * 180` degrees, keeping each pixel's luminance.
+    HueShift,
+    /// Inverts colours in the display encoding.
+    InvertColors,
+    /// Replaces the colour sampled at `source` (a green screen) with `target_color`, or removes
+    /// its spill when no colour is given; `tone` is the tolerance.
+    ChromaKey,
+    /// Evens bluish, darker lines (veins) toward the skin around them; `tone` evens the darkness.
+    VeinReduce,
+    /// Pulls every colour in the selection toward the selection's own average (hair, clothing).
+    ColorUnify,
+    /// A coloured leak of light from `source` or the region centre, in `target_color` or warm.
+    LightLeak,
+    /// Channel offsets of `radius` and, with `tone`, horizontal slice displacement.
+    Glitch,
+    /// Atmospheric haze toward `target_color` or a light grey.
+    Haze,
+    /// Rays of light from `source` or the region centre; `tone` sets how many.
+    Starburst,
+    /// White balance for the selection only, from a neutral sampled at `source`.
+    LocalWhiteBalance,
+    /// A soft light in the eye, the shape of the selection, in `target_color` or white.
+    Catchlight,
+    /// Darkens glowing pupils of any colour (flash in animal eyes); `tone` is how dark.
+    EyeGlowFix,
+    /// Lifts the highlights already on the lips; `radius` is the highlight size.
+    LipGloss,
+    /// Adds deterministic freckles: `tone` is the density, `radius` the size.
+    Freckles,
+    /// Mirrors what is above the selection's top edge into it, fading over `tone` of its height.
+    FloorReflection,
+    /// A shadow of the selection offset by (`warmth`, `tint`) region radii, blurred by `radius`.
+    DropShadow,
+    /// Film halation: a red glow around highlights brighter than `tone` sets.
+    Halation,
+    // Practical repairs and creative looks (ADR-0132), read the same fields as above.
+    /// Replaces specks that differ from the median of `radius` around them by more than `tone`.
+    DustScratches,
+    /// Smooths small steps at the 8 x 8 block edges of a compressed JPEG; `tone` is the step
+    /// size still counted as an artefact, so real edges stay.
+    JpegCleanup,
+    /// Removes banding from smooth gradients such as skies, with a fine fixed dither.
+    Deband,
+    /// Stretches the selection's own darkest and brightest tones to a full range.
+    AutoLevels,
+    /// Removes the selection's own average colour cast (grey world).
+    AutoNeutral,
+    /// Evens out a gradient of light across the selection, keeping its detail.
+    FlattenLight,
+    /// Large-scale local contrast in log luminance: `radius` is the structure size,
+    /// `texture` the gain, `tone` lifts shadows.
+    HdrDetail,
+    /// Turns highlights brighter than `tone` sets into round out-of-focus discs of `radius`.
+    BokehHighlights,
+    /// Miniature look: blur that grows away from a sharp band through the region centre.
+    TiltShift,
+    /// Maps luminance between a shadow colour and `target_color`; `warmth` turns the shadows.
+    Duotone,
+    /// Reduces each channel to `2 + tone * 14` levels.
+    Posterize,
+    /// A rotated print screen of dots `radius` across, in `target_color` or black.
+    Halftone,
+    /// A pencil drawing made from the photograph; `tone` keeps some of its colour.
+    PencilSketch,
+    /// Kuwahara oil-paint filter of `radius`.
+    OilPaint,
+    /// Cross-processed film colour.
+    CrossProcess,
+    /// Infrared: foliage goes white; `tone` from monochrome to false colour.
+    Infrared,
+    /// Mirrors one half of the region onto the other: `warmth` chooses the side,
+    /// a positive `tint` mirrors top and bottom instead.
+    MirrorSymmetry,
+    /// Lens flare ghosts on the line from `source` through the frame centre.
+    LensFlare,
+    /// Rays of light streaming from `source` through the highlights between.
+    GodRays,
+    /// Falling snow, or rain streaks when `tint` is positive; `tone` is the density.
+    Weather,
+    // Twenty more selected effects (ADR-0134): colour looks, light and lens, artistic, repair.
+    /// Shadows toward a colour turned from `target_color` by `warmth`, highlights toward `target_color`; `tone` is the balance.
+    SplitTone,
+    /// Faded film: blacks lifted by `tone`, colour muted, a cast of `warmth`.
+    FilmFade,
+    /// Silver retained: desaturated, with contrast raised by `tone`.
+    BleachBypass,
+    /// Shadows toward teal and warm tones toward orange by `tone`, skin hues held.
+    TealOrange,
+    /// Keeps the colour sampled at `source` within `tone` and turns the rest of the selection grey.
+    ColourSplash,
+    /// Restores blue to a washed-out sky: bright, low-colour or bluish pixels move toward `target_color` or sky blue.
+    SkyBlue,
+    /// Light falling on `source` or the region centre: lighter inside `radius`, darker away by `tone`.
+    Spotlight,
+    /// A glow along the selection's own edge on the side facing (`warmth`, `tint`), in `target_color` or warm white.
+    RimLight,
+    /// Creative lateral colour: red and blue scaled apart around the region centre by `radius`.
+    ChromaticAberration,
+    /// Maps the ellipse onto a sphere, bulging its centre; `amount` is the curvature.
+    Fisheye,
+    /// Long horizontal streaks from highlights brighter than `tone` sets, in `target_color` or blue.
+    AnamorphicStreak,
+    /// Mirrors the region into `4 + tone * 8` segments around its centre.
+    Kaleidoscope,
+    /// Watercolour: flattened washes, pigment pooled at edges, paper grain.
+    Watercolor,
+    /// Voronoi cells `radius` across, each one colour, with dark leading between them.
+    StainedGlass,
+    /// Flat smoothed colours in `2 + tone * 8` levels with ink lines at edges.
+    Cartoon,
+    /// Edges glow in their own colour over a background darkened by `tone`.
+    NeonEdges,
+    /// A thermal camera palette mapped from luminance.
+    Thermal,
+    /// Rebuilds the colour of channels clipped in highlights from the unclipped pixels around them.
+    ClippedHighlightRepair,
+    /// Dark-channel haze removal measured on the selection; `tone` is how much haze is removed.
+    LocalDehaze,
+    /// Darkens the iris's outer ring, the band just inside the ellipse; `tone` is its width.
+    LimbalRing,
+    // Twenty more selected effects (ADR-0135): grooming, colour, distortion, art and light.
+    /// Darkens thin dark strokes (lashes, liner) against their surroundings by `amount`.
+    LashDarken,
+    /// Fills the light gaps between hairs of a brow or beard with the hair's own darker colour; `tone` is how full.
+    HairFill,
+    /// Adds grain matching the photograph's own measured noise, for a smoothed area that looks too clean; `tone` scales it.
+    MatchGrain,
+    /// Swaps colour channels; `warmth` chooses which.
+    ChannelSwap,
+    /// A warm glow falling from the top of the region, in `target_color` or sunset orange.
+    SunsetGlow,
+    /// Night: darker by `tone`, blue, with the brightest lights kept warm.
+    DayToNight,
+    /// Lomography: saturated, contrasty, shifted colour and a dark ring at the region edge.
+    Lomo,
+    /// Instant film: cyan shadows, creamy highlights, soft contrast.
+    InstantFilm,
+    /// Four bold flat colours by brightness, the first `target_color`.
+    PopArt,
+    /// Sharp at the region centre, blurring toward its edge; `tone` is the sharp area's size.
+    IrisBlur,
+    /// A faint copy offset by (`warmth`, `tint`) region radii, screened over the photograph.
+    EchoDouble,
+    /// Water ripples of wavelength `radius`, fading at the ellipse edge.
+    Ripple,
+    /// Each pixel scattered by up to `radius`, as through frosted glass.
+    FrostedGlass,
+    /// Sorts runs of pixels in each row by brightness, between thresholds `tone` sets.
+    PixelSort,
+    /// VHS: scanlines, colour bleeding sideways, soft and a little noisy.
+    VhsRetro,
+    /// A relief lit from the top left; `tone` keeps the colour.
+    Emboss,
+    /// Pen hatching that thickens in the darker tones.
+    Crosshatch,
+    /// Four-point stars on the brightest points - jewellery, sequins, water.
+    Sparkle,
+    /// Soft warm orbs of light scattered over the selection; `tone` is the density.
+    FairyLights,
+    /// A prism rainbow band through the region centre at `warmth` times 180 degrees.
+    RainbowPrism,
+    /// Removes the purple (`warmth`) and green (`tint`) rims a lens leaves on the dark side of a
+    /// bright edge, `radius` from it; each rim pixel takes the colour of its calm surroundings
+    /// at its own luminance. A colour its calm surroundings share, or the glow of a coloured
+    /// light, is kept. ADR-0125.
+    Defringe,
+    // ---- ADR-0150: body, attire and background repairs placed by hand ----
+    /// Fine dark hair on arms or legs lifted to the level a closing of the skin fills it with;
+    /// `radius` is the hair's width and `tone` the sensitivity.
+    BodyHairSoften,
+    /// The light and shade at the size of a dimple (`radius`) taken out, finer texture and the
+    /// body's own shape kept.
+    Cellulite,
+    /// The selection's two levels of skin evened across a soft boundary of `radius`: the lighter
+    /// brought to the darker when `tone` is under one half, the darker to the lighter above.
+    TanLine,
+    /// Hands: fine wrinkles at `radius` softened, redder knuckles and bluer veins moved toward the
+    /// hand's own median colour by `tone`.
+    HandRejuvenate,
+    /// Darker knuckles or elbows lifted toward the selection's median level at the scale of
+    /// `radius`, their colour with them.
+    KnuckleEven,
+    /// A lens coating's coloured reflection taken to the colour around it (`radius` is its size)
+    /// and its extra brightness down by `tone`.
+    LensReflection,
+    /// A cast shadow inside the selection relit to the selection's lit level, colour included;
+    /// `tone` softens its edge.
+    ShadowRemove,
+}
+
+impl Tool {
+    /// The tools that read a point on the photograph and cannot run without one.
+    #[must_use]
+    pub fn needs_source(self) -> bool {
+        matches!(
+            self,
+            Self::Clone
+                | Self::ColorMatch
+                | Self::FabricStain
+                | Self::SkinSmooth
+                | Self::SkinUniformity
+                | Self::PortraitDodgeBurn
+                | Self::ChromaKey
+                | Self::LocalWhiteBalance
+                | Self::ColourSplash
+        )
+    }
+
+    /// The warps: they move pixels, so an inverted selection would warp the whole frame.
+    #[must_use]
+    pub fn is_warp(self) -> bool {
+        matches!(
+            self,
+            Self::Reshape
+                | Self::LiquifyPush
+                | Self::LiquifyBloat
+                | Self::LiquifyPucker
+                | Self::LiquifyTwirl
+                | Self::Fisheye
+                | Self::Ripple
+                | Self::FrostedGlass
+        )
+    }
 }
 
 // Each flag is an independent opt-in that old recipes read as off; none of them is a state
@@ -190,6 +475,16 @@ pub struct Edit {
     /// them, so a mole or a freckle is never removed by default-off automation.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub keep_dark_marks: bool,
+    /// Healing leaves pigment: a connected patch whose red channel is under half that of the
+    /// skin around it. The value is the step its edge must have, as a share of the skin's red
+    /// across one frequency radius, to count. `1` keeps what has a crisp edge - a mole, a
+    /// beauty mark - and still heals the diffuse trace of an old spot, which is what a face
+    /// wants. `0` keeps every such patch, which is what a body wants: it has no landmarks,
+    /// and a navel is pigment-dark with no edge at all. Absent heals pigment like any other
+    /// mark, as recipes written before it existed do. Only read by [`Tool::FrequencyHeal`].
+    /// ADR-0118.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mole_edge: Option<f32>,
     pub tone: f32,
     pub warmth: f32,
     pub tint: f32,
@@ -226,6 +521,10 @@ pub struct Matte {
     /// soft surface selection, so blemishes cannot cut holes in their own correction.
     #[serde(default = "default_refine_edges")]
     pub refine_edges: bool,
+    /// Contract only the external contour against image edges. Protected holes and
+    /// skin texture retain their authored coverage; this mode never adds selection.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub refine_contour: bool,
 }
 
 fn default_refine_edges() -> bool {
@@ -317,6 +616,7 @@ impl Matte {
             height,
             data: base64_encode(&runs),
             refine_edges: true,
+            refine_contour: false,
         }
     }
 
@@ -375,6 +675,24 @@ fn valid_heal_support(edit: &Edit) -> bool {
     samples && donors
 }
 
+fn valid_target_color(edit: &Edit) -> bool {
+    let Some(color) = edit.target_color else {
+        return !matches!(
+            edit.tool,
+            Tool::Colorize | Tool::BackgroundColor | Tool::ColorDespill
+        );
+    };
+    if !color
+        .iter()
+        .all(|v| v.is_finite() && (0.0..=1.0).contains(v))
+    {
+        return false;
+    }
+    let lo = color.into_iter().fold(f32::INFINITY, f32::min);
+    let hi = color.into_iter().fold(f32::NEG_INFINITY, f32::max);
+    edit.tool != Tool::ColorDespill || hi - lo >= 0.02
+}
+
 /// Validate retouch parameters and aggregate authoring limits.
 ///
 /// # Errors
@@ -410,24 +728,16 @@ pub fn validate(edits: &[Edit]) -> AuraResult<()> {
             || edit.repair_passes.is_some_and(|n| {
                 !(1..=4).contains(&n) || !matches!(edit.tool, Tool::AcneClear | Tool::FrequencyHeal)
             })
-            || edit
-                .target_color
-                .is_some_and(|rgb| !rgb.iter().all(|v| unit(*v)))
-            || (matches!(edit.tool, Tool::Colorize | Tool::BackgroundColor)
-                && edit.target_color.is_none())
-            || (edit.tool == Tool::Reshape && edit.selection.as_ref().is_some_and(|s| s.inverted))
+            || !valid_target_color(edit)
+            || (edit.tool.is_warp() && edit.selection.as_ref().is_some_and(|s| s.inverted))
             || !edit.source_scale.is_finite()
             || !(0.2..=1.0).contains(&edit.source_scale)
             || edit.sensitivity.is_some_and(|v| !unit(v))
+            || edit
+                .mole_edge
+                .is_some_and(|v| !v.is_finite() || !(0.0..=4.0).contains(&v))
             || (edit.source_scale < 1.0 && edit.tool == Tool::PatchHeal && edit.source.is_none())
-            || (matches!(
-                edit.tool,
-                Tool::Clone
-                    | Tool::ColorMatch
-                    | Tool::SkinSmooth
-                    | Tool::SkinUniformity
-                    | Tool::PortraitDodgeBurn
-            ) && edit.source.is_none())
+            || (edit.tool.needs_source() && edit.source.is_none())
         {
             return Err(recipe_invalid(
                 KEY,
@@ -600,6 +910,16 @@ fn validate_selection(edit: &Edit) -> AuraResult<()> {
                 || !(0.0..=4.0).contains(&r.softness)
         }) {
             return Err(recipe_invalid(KEY, "invalid luminance range"));
+        }
+        if selection.color.as_ref().is_some_and(|r| {
+            !r.sample.iter().all(|v| unit(*v))
+                || !r.tolerance.is_finite()
+                || !(0.0..=100.0).contains(&r.tolerance)
+                || !r.softness.is_finite()
+                || !(0.0..=100.0).contains(&r.softness)
+                || !unit(r.lightness)
+        }) {
+            return Err(recipe_invalid(KEY, "invalid color range"));
         }
         if edit.tool == Tool::Heal
             && edit.source.is_none()

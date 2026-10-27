@@ -1,16 +1,16 @@
 //! Segmentation mattes at render resolution, with edges re-derived from the photograph. ADR-0082.
 //!
-//! A stored matte is at most 256 cells on its long side, so on a 24-megapixel export one cell
-//! covers twenty pixels. Upsampling it bilinearly would put a twenty-pixel ramp across every jaw
-//! line. Instead the bilinear plane is passed through a guided filter whose guide is the frame's
-//! own luminance, which moves each soft edge onto the edge in the photograph - the same
-//! refinement the segmenter applied at analysis resolution, repeated at whatever resolution is
-//! being rendered, so preview and export agree about where the skin ends.
+//! Stored mattes have up to 512 cells per side. At full resolution each cell can still span
+//! several pixels. Colour-guided refinement tightens these uncertain boundaries against the
+//! actual image. Protected portrait mattes use exterior-only contraction: enclosed feature
+//! holes cannot become background references, and no additional pixel can become selected.
 // Dimensions are validated by the caller; every index is inside a bounds-checked rectangle.
 #![allow(clippy::indexing_slicing)]
 
 use aura_recipe::retouch_tools::Matte;
 use rayon::prelude::*;
+
+pub(crate) const VERSION: &str = "bounded-contour-v2-zero-cell-support";
 
 /// A matte rendered over a pixel rectangle of the working buffer.
 #[derive(Debug, Clone)]
@@ -60,6 +60,16 @@ impl MattePlane {
                     let gx0 = fx as usize;
                     let gx1 = (gx0 + 1).min(mw - 1);
                     let tx = fx - gx0 as f32;
+                    // A zero cell in an authored protection matte is a hard exclusion.
+                    // Bilinear interpolation alone gives its interior partial coverage
+                    // (even its centre at even upsampling ratios). Preserve its footprint.
+                    if matte.refine_contour {
+                        let nx = ((fx + 0.5).floor() as usize).min(mw - 1);
+                        let ny = ((fy + 0.5).floor() as usize).min(mh - 1);
+                        if cell(ny * mw + nx) == 0.0 {
+                            return 0.0;
+                        }
+                    }
                     let top = cell(gy0 * mw + gx0) * (1.0 - tx) + cell(gy0 * mw + gx1) * tx;
                     let bottom = cell(gy1 * mw + gx0) * (1.0 - tx) + cell(gy1 * mw + gx1) * tx;
                     top * (1.0 - ty) + bottom * ty
@@ -68,7 +78,7 @@ impl MattePlane {
             .collect();
         // Pixels per matte cell; below about one and a half there is no edge to recover.
         let scale = (1.0 / sx).max(1.0 / sy);
-        if scale >= 1.5 && matte.refine_edges {
+        if scale >= 1.5 && (matte.refine_edges || matte.refine_contour) {
             let guide: Vec<[f32; 3]> = (y0..y1)
                 .into_par_iter()
                 .flat_map_iter(|y| (x0..x1).map(move |x| (y * w + x) * 3))
@@ -76,12 +86,24 @@ impl MattePlane {
                 .map(|i| [0, 1, 2].map(|c| rgb[i + c].max(0.0).powf(1.0 / 2.2).min(1.5)))
                 .collect();
             let radius = ((scale * 2.0).round() as usize).max(2);
-            plane = two_colour(&guide, &plane, bw, bh, radius);
+            let authored = plane;
+            let exterior = matte.refine_contour.then(|| exterior(&authored, bw, bh));
+            plane = two_colour(&guide, &authored, bw, bh, radius, exterior.as_deref());
             let luma: Vec<f32> = guide
                 .par_iter()
                 .map(|p| p[0] * 0.2627 + p[1] * 0.678 + p[2] * 0.0593)
                 .collect();
-            plane = guided(&luma, &plane, bw, bh, (radius / 4).max(1), 1e-3);
+            if !matte.refine_contour {
+                plane = guided(&luma, &plane, bw, bh, (radius / 4).max(1), 1e-3);
+            }
+            for (value, original) in plane.iter_mut().zip(authored) {
+                // A filter must not reopen a protected hole or grow beyond support.
+                if matte.refine_contour {
+                    *value = value.min(original);
+                } else if original == 0.0 {
+                    *value = 0.0;
+                }
+            }
         }
         if plane.iter().all(|v| *v <= 0.0) {
             return None;
@@ -99,13 +121,25 @@ impl MattePlane {
 /// sure is *outside* is measured; a pixel in between is then as selected as its own colour is
 /// close to the inside colour along the line between the two. Where the two sides look alike
 /// (skin against a skin-toned wall) there is nothing to snap to and the matte is kept.
-fn two_colour(guide: &[[f32; 3]], plane: &[f32], w: usize, h: usize, r: usize) -> Vec<f32> {
+fn two_colour(
+    guide: &[[f32; 3]],
+    plane: &[f32],
+    w: usize,
+    h: usize,
+    r: usize,
+    exterior: Option<&[bool]>,
+) -> Vec<f32> {
     let channel = |c: usize, inside: bool| -> Vec<f32> {
         guide
             .par_iter()
             .zip(plane.par_iter())
-            .map(|(p, a)| {
-                let sure = if inside { *a > 0.9 } else { *a < 0.1 };
+            .enumerate()
+            .map(|(i, (p, a))| {
+                let sure = if inside {
+                    *a > 0.9
+                } else {
+                    *a < 0.1 && exterior.is_none_or(|e| e[i])
+                };
                 if sure {
                     p[c]
                 } else {
@@ -117,8 +151,13 @@ fn two_colour(guide: &[[f32; 3]], plane: &[f32], w: usize, h: usize, r: usize) -
     let count = |inside: bool| -> Vec<f32> {
         plane
             .iter()
-            .map(|a| {
-                let sure = if inside { *a > 0.9 } else { *a < 0.1 };
+            .enumerate()
+            .map(|(i, a)| {
+                let sure = if inside {
+                    *a > 0.9
+                } else {
+                    *a < 0.1 && exterior.is_none_or(|e| e[i])
+                };
                 f32::from(u8::from(sure))
             })
             .collect()
@@ -154,34 +193,44 @@ fn two_colour(guide: &[[f32; 3]], plane: &[f32], w: usize, h: usize, r: usize) -
         .collect()
 }
 
-/// Mean over a (2r+1)^2 window clipped at the borders, via an integral image.
-fn box_mean(values: &[f32], w: usize, h: usize, r: usize) -> Vec<f32> {
-    let stride = w + 1;
-    let mut sum = vec![0.0_f64; stride * (h + 1)];
+/// Background connected to the crop border. Internal eye/bindi/blemish exclusions
+/// must never become outside-colour references for contour contraction.
+fn exterior(plane: &[f32], w: usize, h: usize) -> Vec<bool> {
+    let mut seen = vec![false; w * h];
+    let mut stack = Vec::new();
     for y in 0..h {
-        let mut row = 0.0_f64;
         for x in 0..w {
-            row += f64::from(values[y * w + x]);
-            sum[(y + 1) * stride + x + 1] = sum[y * stride + x + 1] + row;
+            let i = y * w + x;
+            if (x == 0 || y == 0 || x + 1 == w || y + 1 == h) && plane[i] < 0.1 {
+                seen[i] = true;
+                stack.push(i);
+            }
         }
     }
-    let mut out = vec![0.0_f32; w * h];
-    // Each output row reads the finished integral image only, so rows run in parallel.
-    {
-        out.par_chunks_exact_mut(w)
-            .enumerate()
-            .for_each(|(y, line)| {
-                let (y0, y1) = (y.saturating_sub(r), (y + r + 1).min(h));
-                for (x, slot) in line.iter_mut().enumerate() {
-                    let (x0, x1) = (x.saturating_sub(r), (x + r + 1).min(w));
-                    let total =
-                        sum[y1 * stride + x1] - sum[y0 * stride + x1] - sum[y1 * stride + x0]
-                            + sum[y0 * stride + x0];
-                    *slot = (total / ((y1 - y0) * (x1 - x0)) as f64) as f32;
-                }
-            });
+    while let Some(i) = stack.pop() {
+        let (x, y) = (i % w, i / w);
+        for (valid, next) in [
+            (x > 0, i.wrapping_sub(1)),
+            (x + 1 < w, i + 1),
+            (y > 0, i.wrapping_sub(w)),
+            (y + 1 < h, i + w),
+        ] {
+            if valid && !seen[next] && plane[next] < 0.1 {
+                seen[next] = true;
+                stack.push(next);
+            }
+        }
     }
-    out
+    seen
+}
+
+/// Mean over a (2r+1)^2 window clipped at the borders.
+///
+/// The renderer's one box mean, [`crate::bands::box_mean`]: a running sum per row and per
+/// column, every core in use, the same result on every machine. An integral image built on one
+/// core did the same job two and a half times slower, and agreed with it to about 3e-8.
+fn box_mean(values: &[f32], w: usize, h: usize, r: usize) -> Vec<f32> {
+    crate::bands::box_mean(values, w, h, r)
 }
 
 /// Guided filter (He, Sun and Tang), clamped to 0..1.
@@ -210,8 +259,86 @@ fn guided(guide: &[f32], src: &[f32], w: usize, h: usize, r: usize, eps: f32) ->
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)] // Exact exclusion and identity are part of the mask contract.
 mod tests {
     use super::*;
+
+    #[test]
+    fn contour_contraction_removes_spill_without_reopening_feature_holes() {
+        let (w, h) = (100, 100);
+        let rgb: Vec<f32> = (0..w * h)
+            .flat_map(|i| {
+                if i % w < 50 {
+                    [0.02; 3]
+                } else {
+                    [0.4, 0.25, 0.18]
+                }
+            })
+            .collect();
+        let alpha: Vec<u8> = (0..25 * 25)
+            .map(|i| {
+                let (x, y) = (i % 25, i / 25);
+                if x == 20 && y == 12 {
+                    return 0;
+                }
+                match x {
+                    0..=10 => 0,
+                    11 => 80,
+                    12 => 175,
+                    _ => 255,
+                }
+            })
+            .collect();
+        let mut matte = Matte::encode([0.0, 0.0, 1.0, 1.0], 25, 25, &alpha);
+        matte.refine_edges = false;
+        let original = MattePlane::render(&matte, &rgb, w, h).unwrap();
+        matte.refine_contour = true;
+        let contracted = MattePlane::render(&matte, &rgb, w, h).unwrap();
+        let outside = |p: &MattePlane| (40..50).map(|x| p.at(x, 40)).sum::<f32>();
+        assert!(outside(&contracted) < outside(&original) * 0.3);
+        assert!(contracted.at(60, 40) > 0.99);
+        for y in 0..h {
+            for x in 0..w {
+                assert!(contracted.at(x, y) <= original.at(x, y) + 1e-6);
+                // The protected cell's entire footprint stays excluded at even scales.
+                if (80..84).contains(&x) && (48..52).contains(&y) {
+                    assert_eq!(contracted.at(x, y), 0.0);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn protected_cells_survive_even_odd_and_noninteger_resampling() {
+        let mut alpha = vec![255; 10 * 10];
+        alpha[55] = 0;
+        for (w, h) in [(80, 60), (90, 90), (73, 117)] {
+            let mut matte = Matte::encode([0.0, 0.0, 1.0, 1.0], 10, 10, &alpha);
+            matte.refine_contour = true;
+            let plane = MattePlane::render(&matte, &vec![0.3; w * h * 3], w, h).unwrap();
+            for y in 0..h {
+                for x in 0..w {
+                    let mx = ((x as f32 + 0.5) * 10.0 / w as f32) as usize;
+                    let my = ((y as f32 + 0.5) * 10.0 / h as f32) as usize;
+                    if mx == 5 && my == 5 {
+                        assert_eq!(plane.at(x, y), 0.0, "{w}x{h} at {x},{y}");
+                    }
+                }
+            }
+            assert!(plane.at(w / 4, h / 4) > 0.99);
+        }
+    }
+
+    #[test]
+    fn guided_filter_never_reopens_authored_zero_coverage() {
+        let mut alpha = vec![255; 10 * 10];
+        alpha[55] = 0;
+        let matte = Matte::encode([0.0, 0.0, 1.0, 1.0], 10, 10, &alpha);
+        let plane = MattePlane::render(&matte, &vec![0.3; 90 * 90 * 3], 90, 90).unwrap();
+        // The centre of the zero cell is also a pixel centre at this scale.
+        assert_eq!(plane.at(49, 49), 0.0);
+        assert!(plane.at(20, 20) > 0.99);
+    }
 
     #[test]
     fn a_coarse_matte_snaps_to_the_photographs_edge_when_upsampled() {
