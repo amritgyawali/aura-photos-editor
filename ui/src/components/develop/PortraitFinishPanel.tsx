@@ -23,6 +23,8 @@ export type PortraitFinishPanelProps = {
   /** The face picker: the faces in this photograph. Absent where it cannot run. */
   onFindFaces?: () => Promise<EvotoFace[]>;
   initialTab?: Tab;
+  /** What the last save could not do on this photograph, shown above the tools. */
+  notes?: string[];
 };
 
 type Tab = 'face' | 'body' | 'skin' | 'light' | 'liquify' | 'background' | 'makeup' | 'hair' | 'people' | 'faces';
@@ -87,28 +89,20 @@ const BACKGROUND_MODES: ReadonlyArray<readonly [BackgroundMode, string]> = [
  * and makeup, each saved as one undoable step. Nothing here is applied automatically; Auto light
  * runs only when pressed. ADR-0108, ADR-0127.
  */
-export function PortraitFinishPanel({ finish, disabled, liquify, onSave, onLiquify, onSuggestLight, subject, onFindFaces, initialTab = 'face' }: PortraitFinishPanelProps): JSX.Element {
+export function PortraitFinishPanel({ finish, disabled, liquify, onSave, onLiquify, onSuggestLight, subject, onFindFaces, initialTab = 'face', notes = [] }: PortraitFinishPanelProps): JSX.Element {
   const [tab, setTab] = useState<Tab>(initialTab);
   useEffect(() => { setTab(initialTab); }, [initialTab]);
   const [faces, setFaces] = useState<EvotoFace[] | null>(null);
   const [findingFaces, setFindingFaces] = useState(false);
-  // Faces looked up and none found, as opposed to a lookup that failed.
-  const [noFace, setNoFace] = useState(false);
-  useEffect(() => { setFaces(null); setFindingFaces(false); setNoFace(false); }, [subject]);
+  useEffect(() => { setFaces(null); setFindingFaces(false); }, [subject]);
   const findFaces = () => {
     if (!onFindFaces) return;
     const asked = subject;
     setFindingFaces(true);
-    onFindFaces().then(found => { if (current.current === asked) { setFaces(found); setNoFace(found.length === 0); } })
-      .catch(() => { if (current.current === asked) { setFaces([]); setNoFace(false); } })
+    onFindFaces().then(found => { if (current.current === asked) setFaces(found); })
+      .catch(() => { if (current.current === asked) setFaces([]); })
       .finally(() => { if (current.current === asked) setFindingFaces(false); });
   };
-  // Body and people tools act only on a person, and the evidence of one is a face: look once when
-  // their tab opens, so a photograph with nobody in it says so instead of moving no slider.
-  const peopleTab = tab === 'body' || tab === 'people';
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (peopleTab && faces === null && !findingFaces) findFaces(); }, [peopleTab, faces, findingFaces, subject]);
-  const noPerson = noFace && <p role="status" className="lr-notice">No face was found in this photograph, so body and people changes have no one to act on. Draw a missed face in Portrait retouch.</p>;
   const chosen = finish.faces ?? [];
   const isChosen = (face: EvotoFace) => chosen.some(p => Math.hypot(p[0] - face.centre[0], p[1] - face.centre[1]) < (face.bounds[2] - face.bounds[0]) * 0.5);
   const toggleFace = (face: EvotoFace) => {
@@ -147,6 +141,7 @@ export function PortraitFinishPanel({ finish, disabled, liquify, onSave, onLiqui
 
   return <div className="portrait-finish" aria-label="Portrait finishing">
     <p className="lr-hint">Reshape, light, background and makeup tools in the style of Evoto. Every change is one step in your history, and none of them is ever applied automatically.</p>
+    {notes.length > 0 && <div className="portrait-finish-notes" aria-live="polite">{notes.map(note => <p key={note} className="lr-notice">{note}</p>)}</div>}
     <div className="lr-crops" aria-label="Finishing presets">{FINISH_PRESETS.map(preset =>
       <button type="button" key={preset.id} title={preset.hint} disabled={disabled} onClick={() => onSave(preset.apply(finish), preset.name)}>{preset.name}</button>)}
     </div>
@@ -165,7 +160,6 @@ export function PortraitFinishPanel({ finish, disabled, liquify, onSave, onLiqui
 
     {tab === 'body' && <div role="tabpanel" aria-label="Body shape">
       <p className="lr-hint">Applies to the main person. The background bends a little with a strong change, as in any reshaping tool.</p>
-      {noPerson}
       {BODY_SLIDERS.map(([key, label]) => <ShapeSlider key={key} label={label} value={finish.body[key]} disabled={disabled}
         onCommit={value => onSave({ ...finish, body: { ...finish.body, [key]: value } }, `Body: ${label}`)} />)}
       <SliderGroup title="More body shape" list={MORE_BODY_SLIDERS} values={finish.body} disabled={disabled}
@@ -248,7 +242,6 @@ export function PortraitFinishPanel({ finish, disabled, liquify, onSave, onLiqui
     </div>}
 
     {tab === 'people' && <div role="tabpanel" aria-label="People and scene">
-      {noPerson}
       <SliderGroup title="People" list={SUBJECT_SLIDERS} values={finish.subject} neutral={{ relightDirection: -45 }} disabled={disabled}
         onCommit={(key, value, label) => onSave({ ...finish, subject: { ...finish.subject, [key]: value } }, `People: ${label}`)} />
       <SliderGroup title="Background" list={SCENE_SLIDERS} values={finish.scene} disabled={disabled}

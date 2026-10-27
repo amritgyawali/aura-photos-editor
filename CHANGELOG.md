@@ -2,6 +2,18 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## Cloud TLS on `ring`; the photographer is told when body tools have no person - 2026-10-27
+
+- **AI provider connections use rustls's standard `ring` crypto** instead of the alpha-stage,
+  unmaintained `rustls-rustcrypto` (ADR-0066 addendum). Seven advisory exceptions and about 470
+  lockfile lines go with it; a verified handshake with Anthropic and OpenAI was checked live.
+  Key exchange offers X25519, P-256 and P-384, all constant-time.
+- **The finishing panel says when people tools have no person.** Face, body, skin, makeup and
+  people adjustments act only on a detected face (PR #73). Saving one on a photograph with no face
+  now returns a note the panel shows above its tools - "No face was found... draw their face in
+  Portrait retouch" - instead of a slider that silently does nothing. Background tools, which need
+  no person, report nothing.
+
 ## Match a look: fixes for the deep assessment, learned originals, tone from the reference - 2026-10-25
 
 - **Your own edit, learned.** When the edited reference you upload was made from a photo in the

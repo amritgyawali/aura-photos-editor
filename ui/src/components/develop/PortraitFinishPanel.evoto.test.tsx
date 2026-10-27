@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 
 import { NEUTRAL_FINISH, finishOf } from '../../ipc/studioFinish';
@@ -71,28 +71,6 @@ it('the face picker lists the faces found and saves the chosen ones', async () =
   fireEvent.click(second);
   expect(onSave.mock.lastCall?.[0].faces).toEqual([[0.7, 0.3]]);
   expect(onSave.mock.lastCall?.[1]).toBe('Faces: chosen');
-});
-
-it('says so on the body and people tabs when the photograph has no face, and looks only once', async () => {
-  const onFindFaces = vi.fn().mockResolvedValue([]);
-  render(<PortraitFinishPanel finish={NEUTRAL_FINISH} disabled={false} liquify={null} onSave={vi.fn()} onLiquify={vi.fn()} onFindFaces={onFindFaces} subject="p/1" />);
-  expect(onFindFaces).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole('tab', { name: 'Body' }));
-  expect(await screen.findByText(/No face was found in this photograph/)).toBeTruthy();
-  fireEvent.click(screen.getByRole('tab', { name: 'People & scene' }));
-  expect(screen.getByText(/No face was found in this photograph/)).toBeTruthy();
-  expect(onFindFaces).toHaveBeenCalledTimes(1);
-});
-
-it('says nothing on the body tab when a face is found or the lookup fails', async () => {
-  const face = { bounds: [0.1, 0.2, 0.3, 0.4], centre: [0.2, 0.3], tilt: 0, eyes: [0.08, 0.07], closed: false, confidence: 0.9 };
-  for (const onFindFaces of [vi.fn().mockResolvedValue([face]), vi.fn().mockRejectedValue(new Error('unreadable'))]) {
-    const { unmount } = render(<PortraitFinishPanel finish={NEUTRAL_FINISH} disabled={false} liquify={null} onSave={vi.fn()} onLiquify={vi.fn()} onFindFaces={onFindFaces} subject="p/1" initialTab="body" />);
-    await waitFor(() => expect(onFindFaces).toHaveBeenCalledTimes(1));
-    await act(async () => { await Promise.resolve(); });
-    expect(screen.queryByText(/No face was found in this photograph/)).toBeNull();
-    unmount();
-  }
 });
 
 it('offers the two new backgrounds', () => {

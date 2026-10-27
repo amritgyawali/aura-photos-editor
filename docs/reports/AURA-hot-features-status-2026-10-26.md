@@ -91,8 +91,8 @@ The Match a look work of the same day is reported in [AURA-status-2026-10-26.md]
    the edit) and then either re-scope or re-design the two gates.
 3. Collect a labelled set of real glasses photos (reflections marked) to train or tune the glare
    finder's rim evidence beyond the 128 tiles used here.
-4. Show a sentence in the finish panel when body or subject controls cannot act because no face
-   was found, pointing to "draw a missed face".
+4. ~~Show a sentence in the finish panel when body or subject controls cannot act because no face
+   was found.~~ Done in #75: `save_studio_finish` returns a note the panel shows.
 5. Keep the C: drive healthy (the Rust build folder reached ~132 GB once); build tests on F:.
 
 ## 6. Final test results

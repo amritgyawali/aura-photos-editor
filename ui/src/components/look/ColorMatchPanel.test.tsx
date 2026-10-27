@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { ColorMatchPanel } from './ColorMatchPanel';
 import { colorMatch, pickColorReference, pickColorReferences, type ColorMatchReport } from '../../ipc/colorMatch';
@@ -18,7 +18,9 @@ const backendError = (message: string) => ({ code: 'AURA-ML-5070', message, runb
 const reference = { id: 'ref', name: 'My wedding.tiff', width: 4480, height: 6720, convertedIcc: true, regions: ['whole image', 'face skin'] };
 const analysis: ColorMatchReport = { sessionId: 'session', photoId: 'photo', reference,
   controls: { amount: 1, tone: 1, color: 1, whiteBalance: 1 }, matchedRegions: reference.regions,
-  beforeDistance: 8, afterDistance: 3, changed: 0, protectedFields: 0, fullResolutionChecked: false, current: true };
+  beforeDistance: 8, afterDistance: 3, changed: 0, protectedFields: 0, fullResolutionChecked: false, current: true,
+  // The panel's default goal is the reference's exact colours (ADR-0183).
+  fitting: { engine: 'reference-exact-colours-v1', quality: 'precise', intent: 'exact', refinementCandidates: 1, uniqueRenders: 2, cachedProposals: 0 } };
 const onApply = async (action: () => Promise<unknown>) => { await action(); };
 it('puts Lightroom export last and disables generation for unsaved strengths', async () => {
   vi.mocked(colorMatch.status).mockResolvedValue({ ...analysis, fullResolutionChecked: true });
@@ -70,6 +72,21 @@ it('sends independent slider strengths and uses an explicit native application',
   expect(screen.getByTestId('colour-match-measurement').textContent).toContain('native-resolution');
   fireEvent.click(screen.getByRole('button', { name: 'Remove matched treatment' }));
   await waitFor(() => expect(colorMatch.apply).toHaveBeenLastCalledWith('photo', 'session', { amount: 0, tone: 0.2, color: 0.8, whiteBalance: 0 }, expect.any(String)));
+  // A removal is not reported as a match too slight to see.
+  await screen.findByText(/Matched treatment removed/);
+  expect(screen.queryByText(/looks almost the same as before/)).toBeNull();
+});
+it('matches again at full strength after the matched treatment was removed', async () => {
+  render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
+  await screen.findByRole('option', { name: reference.name });
+  fireEvent.click(screen.getByRole('button', { name: 'Match reference to this photo' }));
+  await screen.findByText(/Matched My wedding/);
+  fireEvent.click(screen.getByRole('button', { name: 'Remove matched treatment' }));
+  await screen.findByText(/Matched treatment removed/);
+  vi.mocked(colorMatch.apply).mockClear();
+  fireEvent.click(screen.getByRole('button', { name: 'Match reference to this photo' }));
+  await waitFor(() => expect(colorMatch.apply).toHaveBeenCalledWith('photo', 'session', expect.objectContaining({ amount: 1 }), expect.any(String)));
+  await screen.findByText(/Matched My wedding/);
 });
 
 it('shows separately verified tone and palette differences for the saved strengths', async () => {
@@ -124,7 +141,7 @@ it('matches the newly selected reference with a fresh analysis and native apply 
   expect(colorMatch.apply).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Match reference to this photo' }));
   await screen.findByText('Matched Warm portrait.jpg to this photo. Use Undo to compare.');
-  expect(colorMatch.prepare).toHaveBeenCalledWith('photo','warm',expect.any(String),'precise','natural');
+  expect(colorMatch.prepare).toHaveBeenCalledWith('photo','warm',expect.any(String),'precise','exact');
   expect(colorMatch.apply).toHaveBeenCalledWith('photo','warm-session',analysis.controls,expect.any(String));
   expect(screen.queryByText(/selected reference has not been applied/)).toBeNull();
 });
@@ -218,7 +235,9 @@ it('treats an edit that is still saving as nothing saved', async () => {
   expect(screen.queryByText(/Matching the selected reference/)).toBeNull();
 });
 it('does not report a closer match when native safety retained an unchanged endpoint', async () => {
-  vi.mocked(colorMatch.apply).mockResolvedValue({ ...analysis, afterDistance: analysis.beforeDistance, changed: 0, fullResolutionChecked: true });
+  // A look fit (not the exact colours, which say what they did) that safety held at the photograph.
+  vi.mocked(colorMatch.apply).mockResolvedValue({ ...analysis, afterDistance: analysis.beforeDistance, changed: 0, fullResolutionChecked: true,
+    fitting: { ...analysis.fitting!, engine: 'reference-palette-transport-v8', intent: 'palette' } });
   render(<ColorMatchPanel photoId="photo" disabled={false} onApply={onApply}/>);
   await screen.findByRole('option', { name: reference.name });
   fireEvent.click(screen.getByRole('button', { name: 'Match reference to this photo' }));
@@ -254,7 +273,11 @@ it('does not import or fit when the reference picker is cancelled', async () => 
   expect(colorMatch.prepare).not.toHaveBeenCalled();
 });
 
-it('requires a new analysis when changing from natural look to reference palette and tone', async () => {
+it('opens on the exact colours goal and requires a new analysis for reference palette and tone', async () => {
+  render(<ColorMatchPanel photoId="other" disabled={false} onApply={onApply}/>);
+  expect((screen.getByRole('combobox', { name: 'Matching goal' }) as HTMLSelectElement).value).toBe('exact');
+  expect((screen.getAllByRole('option') as HTMLOptionElement[]).find(option => option.selected)?.textContent).toBe('Full look of the reference');
+  cleanup();
   vi.mocked(colorMatch.status).mockResolvedValue(analysis);
   vi.mocked(colorMatch.prepare).mockResolvedValue({ ...analysis, fitting: {
     engine: 'reference-palette-transport-v8', quality: 'precise', intent: 'palette',
@@ -271,7 +294,7 @@ it('requires a new analysis when changing from natural look to reference palette
 });
 
 it('analyses the exact colours of the reference when that goal is chosen, and says what it does', async () => {
-  vi.mocked(colorMatch.status).mockResolvedValue(analysis);
+  vi.mocked(colorMatch.status).mockResolvedValue({ ...analysis, fitting: { ...analysis.fitting!, engine: 'reference-grade-transfer-v4-scene-tone', intent: 'natural' } });
   const exact = { ...analysis, sessionId: 'exact', fitting: {
     engine: 'reference-exact-colours-v1', quality: 'precise' as const, intent: 'exact' as const,
     refinementCandidates: 1, uniqueRenders: 2, cachedProposals: 0,
@@ -392,7 +415,7 @@ it('debounces live changes and saves the newest strengths from one immutable ana
   fireEvent.change(screen.getByRole('slider', { name: 'Match amount' }), { target: { value: '80' } });
   await waitFor(() => expect(colorMatch.apply).toHaveBeenCalledOnce());
   expect(colorMatch.prepare).toHaveBeenCalledOnce();
-  expect(colorMatch.prepare).toHaveBeenCalledWith('photo', 'ref', expect.any(String), 'precise');
+  expect(colorMatch.prepare).toHaveBeenCalledWith('photo', 'ref', expect.any(String), 'precise', 'exact');
   expect(colorMatch.apply).toHaveBeenLastCalledWith('photo', 'session', expect.objectContaining({ amount: 0.8 }), expect.any(String));
   fireEvent.change(screen.getByRole('slider', { name: 'Match amount' }), { target: { value: '40' } });
   await waitFor(() => expect(colorMatch.apply).toHaveBeenCalledTimes(2));
@@ -482,7 +505,7 @@ it('uses real Quick analysis and persists the authored Extreme strengths as a re
   fireEvent.change(screen.getByRole('combobox', { name: 'Matching mode' }), { target: { value: 'quick' } });
   fireEvent.click(screen.getByRole('button', { name: 'Analyse reference match' }));
   await screen.findByTestId('colour-match-measurement');
-  expect(colorMatch.prepare).toHaveBeenCalledWith('photo', 'ref', expect.any(String), 'quick');
+  expect(colorMatch.prepare).toHaveBeenCalledWith('photo', 'ref', expect.any(String), 'quick', 'exact');
   fireEvent.change(screen.getByRole('combobox', { name: 'Color Match Preferences' }), { target: { value: 'extreme' } });
   expect((screen.getByRole('slider', { name: 'Match amount' }) as HTMLInputElement).value).toBe('200');
   fireEvent.click(screen.getByRole('button', { name: 'Save Preset' }));
@@ -498,7 +521,7 @@ it('syncs selected other photos with independent fitting and quality forwarding'
   await screen.findByRole('option', { name: reference.name });
   fireEvent.click(screen.getByRole('button', { name: 'Sync' }));
   await waitFor(() => expect(colorMatch.apply).toHaveBeenCalledOnce());
-  expect(colorMatch.prepare).toHaveBeenCalledWith('target', 'ref', expect.any(String), 'precise');
+  expect(colorMatch.prepare).toHaveBeenCalledWith('target', 'ref', expect.any(String), 'precise', 'exact');
   expect(colorMatch.apply).toHaveBeenCalledWith('target', 'session', expect.any(Object), expect.any(String));
   expect(await screen.findByRole('list', { name: 'Collection colour matching results' })).toBeTruthy();
 });

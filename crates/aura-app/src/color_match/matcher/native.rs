@@ -30,6 +30,9 @@ pub(super) struct Review {
     /// Whether a result must also come closer to the reference's colour distribution. A learned
     /// look need not: a correct edit of a different scene does not have to.
     regression: bool,
+    /// The reference's own regions, which skin may move toward under an allowance that asks for
+    /// the reference's skin (ADR-0183).
+    skin_target: Vec<appearance::Region>,
 }
 
 /// Up to this many pixels compare a result with the original.
@@ -89,6 +92,8 @@ pub(super) struct FitInput<'a> {
     pub(super) grade: &'a mut ReferenceGrade,
     /// Larger skin and clipping limits, for the reference's exact colours (ADR-0182).
     pub(super) allowance: Option<Allowance>,
+    /// The reference's regions: the skin the exact colours move skin toward (ADR-0183).
+    pub(super) skin_target: &'a [appearance::Region],
 }
 
 pub(super) fn fit(
@@ -112,7 +117,8 @@ pub(super) fn fit(
         input.monochrome,
         input.allowance,
     )?
-    .with_regression_check(true);
+    .with_regression_check(true)
+    .with_skin_target(input.skin_target);
     let endpoint = review.fit(state, cancel, input.ungraded, input.grade)?
         .ok_or_else(|| super::invalid("No colour match kept this photo's smooth gradients, skin tones and highlights while bringing it closer to the reference. Try a different reference. No edit was saved."))?;
     *input.grade = endpoint.grade;
@@ -395,7 +401,29 @@ impl Review {
             learned,
             original: sampled(&image),
             regression: learned.is_none(),
+            skin_target: Vec::new(),
         })
+    }
+
+    /// The reference's regions, for an allowance that lets skin move toward the reference's skin.
+    pub(super) fn with_skin_target(mut self, regions: &[appearance::Region]) -> Self {
+        self.skin_target = regions
+            .iter()
+            .filter(|region| region.name.ends_with("skin"))
+            .map(|region| appearance::Region {
+                name: region.name.clone(),
+                points: Vec::new(),
+                appearance: region.appearance.clone(),
+            })
+            .collect();
+        self
+    }
+
+    /// Whether `readings` put every person's skin closer to the reference's own skin than the
+    /// photograph had it, in every measured respect: then a large move is the reference's skin, not
+    /// damage. A reference without measured skin gives nothing to move toward.
+    fn skin_toward_reference(&self, readings: &[appearance::Region]) -> bool {
+        appearance::skin_toward(&self.skin_target, &self.guard.regions, readings)
     }
 
     /// Require, or not, that a result comes closer to the reference's colour distribution.
@@ -432,6 +460,7 @@ impl Review {
         let skin_ok = match self.learned {
             Some(allowance) if !self.monochrome => {
                 appearance::skin_change(&self.guard.regions, &readings) <= allowance.skin
+                    || (allowance.toward_reference && self.skin_toward_reference(&readings))
             }
             _ => skin_guard(&self.guard.regions, &readings, self.monochrome),
         };

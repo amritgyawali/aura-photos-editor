@@ -715,6 +715,7 @@ fn the_exact_goal_gives_a_photograph_the_reference_colours() {
         &reference_stats(&reference),
         &target,
         &colours,
+        None,
         &aura_core::progress::CancelToken::new(),
     )
     .unwrap();

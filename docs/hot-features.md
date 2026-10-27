@@ -45,3 +45,13 @@ Limits: faint, broad lens sheen that does not stand out from the skin is left al
 Tried and reverted: applying the reference's neutral-axis cast on top of the target's own cast (instead of replacing it) when the reference shows another scene. On the synthetic batch check it stopped an already-warm photograph from moving away from the known grade (1.28 to 1.79 became 1.28 to 0.94). But in the real window a match onto a different scene then measured no improvement in appearance, the non-regression check kept the photograph unchanged, and the button appeared to do nothing. The tool's job is to make a photograph look like the reference, so the replacing cast stays.
 
 The two accuracy gates that ask an unrelated-scene match to close 40% of the gap to a known, hidden grade (`a_batch_matched_to_one_reference_converges_on_one_look`, `a_new_photograph_takes_an_edited_references_look_through_the_renderer`) still fail, as they did at commit 8a7866f: a single edited reference cannot separate its grade from its scene's own colours, and matching appearance is a different goal from recovering a hidden edit. Their thresholds are unchanged.
+
+## When there is no person (2026-10-27)
+
+Face, body, skin, makeup and people adjustments act only where the portrait parse found a face
+(or the photographer drew one in Portrait retouch). On a photograph with nobody in it - a still
+life, an empty venue, wildlife - they leave the photograph unchanged, and saving one now returns a
+note that the finishing panel shows above its tools, so a slider never appears to be broken.
+Background adjustments need no person and are never reported. `save_studio_finish` carries the
+note in `notes`; the parse it checks is the renderer's own, so the note agrees with the render.
+
