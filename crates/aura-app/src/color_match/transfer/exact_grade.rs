@@ -167,6 +167,7 @@ pub(in crate::color_match) fn fit_exact(
     reference: &GradeStats,
     target: &[Sample],
     colours: &[[f32; 3]],
+    skin: Option<super::super::exact::Skin<'_>>,
     cancel: &CancelToken,
 ) -> AuraResult<Fit> {
     let labs: Vec<[f32; 3]> = target.iter().map(|s| s.lab).collect();
@@ -178,7 +179,7 @@ pub(in crate::color_match) fn fit_exact(
             "This photograph or reference has too few pixels to copy its colours. No edit was saved.",
         ));
     }
-    let transport = super::super::exact::Transport::learn(&learned, colours, cancel)?;
+    let transport = super::super::exact::Transport::learn(&learned, colours, skin, cancel)?;
     check_cancel_with(cancel)?;
     let pairs: Vec<([f32; 3], [f32; 3])> =
         learned.iter().map(|&x| (x, transport.apply(x))).collect();

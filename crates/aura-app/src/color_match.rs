@@ -421,10 +421,10 @@ fn persist_reference(
     check_cancel(cancel)?;
     let key = asset_key(&summary.id)?;
     let refreshed = transfer::remember(state, &summary.id, image)?;
-    exact::remember(state, &summary.id, image)?;
     if let Some(mut existing) = read::<Reference>(state, &key)? {
         if existing.engine == ENGINE {
             if !refreshed && existing.summary.thumbnail.is_some() {
+                exact::remember(state, &summary.id, image, None)?;
                 let mut updated = false;
                 if existing.small_rgb.len() != content::BYTES {
                     existing.small_rgb = content::thumbnail(image);
@@ -446,6 +446,7 @@ fn persist_reference(
     }
     let mut regions = appearance::analyse(image)?;
     regions.retain(|r| !r.name.starts_with("guard:"));
+    exact::remember(state, &summary.id, image, Some(&regions))?;
     check_cancel(cancel)?;
     summary.regions = regions.iter().map(|r| r.name.clone()).collect();
     let rgb = image::RgbImage::from_raw(image.width, image.height, image.data.clone())

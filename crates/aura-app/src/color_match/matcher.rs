@@ -223,16 +223,28 @@ pub(super) fn prepare(
     // apply, and the native checks allow it a larger move.
     let mut allowance = None;
     let (mut fit, skin) = if input.intent == MatchIntent::Exact {
-        let (colours, reference_clipped) =
+        let colours =
             super::exact::reference_colours(state, &reference.summary.id)?.ok_or_else(|| {
                 invalid("This reference has no stored colours. Upload its edited photo again, then match. No edit was saved.")
             })?;
         // The reference's own clipped highlights are part of its colours; more than that is not.
         allowance = Some(super::gallery_fit::Allowance {
             skin: EXACT_SKIN,
-            clipping: (reference_clipped - appearance::clipped(&plain)).max(0.0) + 0.01,
+            clipping: (colours.clipped - appearance::clipped(&plain)).max(0.0) + 0.01,
+            toward_reference: true,
         });
-        let fit = transfer::fit_exact(&reference_measurements, &target_samples, &colours, cancel)?;
+        let own_skin = super::exact::skin_of(&plain, &target_regions);
+        let skin = colours.skin.as_deref().map(|reference| super::exact::Skin {
+            photograph: &own_skin,
+            reference,
+        });
+        let fit = transfer::fit_exact(
+            &reference_measurements,
+            &target_samples,
+            &colours.colours,
+            skin,
+            cancel,
+        )?;
         (fit, transfer::SkinReview::default())
     } else {
         let mut fit = transfer::fit_with_intent_checkpoint(
@@ -263,6 +275,7 @@ pub(super) fn prepare(
             monochrome,
             grade: &mut fit.grade,
             allowance,
+            skin_target: &reference.regions,
         },
     )?;
     // The renderer is the instrument: report what the stage drew, not what the fit predicted.
@@ -579,7 +592,8 @@ fn verified_distances(
             .map(|learned| learned.allowance)
             .or(transfer.allowance),
     )?
-    .with_regression_check(transfer.learned.is_none());
+    .with_regression_check(transfer.learned.is_none())
+    .with_skin_target(&session.reference_regions);
     Ok(review.check(state, cancel, candidate)?.map(|checked| {
         (
             review.before,
