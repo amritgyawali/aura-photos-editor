@@ -67,6 +67,9 @@ pub fn manage(state: &AppState, input: &ManageInput) -> IpcResult<Option<Referen
                 .map_err(|e| {
                     aura_core::errors::db::statement_failed("remove colour reference", &e)
                 })?;
+            super::one_click::forget_preview(conn, &input.reference_id).map_err(|e| {
+                aura_core::errors::db::statement_failed("remove colour reference preview", &e)
+            })?;
             return Ok(None);
         }
         let text = text.ok_or_else(|| invalid("This reference is no longer in the library."))?;
@@ -126,9 +129,11 @@ pub fn capture(state: &AppState, input: &CaptureInput) -> IpcResult<ReferenceSum
         };
         let rgb = image::RgbImage::from_raw(image.width, image.height, pixels)
             .ok_or_else(|| invalid("The edited preview could not be read."))?;
-        let small = image::DynamicImage::ImageRgb8(rgb)
-            .thumbnail(512, 512)
-            .to_rgb8();
+        let rendered = image::DynamicImage::ImageRgb8(rgb);
+        let small = rendered.thumbnail(512, 512).to_rgb8();
+        // The side-by-side view gets a sharper picture than the 512 px analysis copy.
+        let view = rendered.thumbnail(1280, 1280).to_rgb8();
+        drop(rendered);
         let mut digest = blake3::Hasher::new();
         digest.update(b"edited-preview-reference-v1");
         digest.update(&small.width().to_le_bytes());
@@ -141,6 +146,15 @@ pub fn capture(state: &AppState, input: &CaptureInput) -> IpcResult<ReferenceSum
             image.height,
             false,
         );
+        super::one_click::remember_preview(
+            state,
+            &summary.id,
+            &Rgb8 {
+                width: view.width(),
+                height: view.height(),
+                data: view.into_raw(),
+            },
+        )?;
         let pixels = Rgb8 {
             width: small.width(),
             height: small.height(),

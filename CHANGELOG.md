@@ -2,6 +2,26 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## One-click AI Color Match - 2026-10-23
+
+- Match a photo to a reference in one click, including a photo nobody has edited yet,
+  whose unedited state is saved first so Undo returns to it.
+- Preference levels from Light to Extreme. A level a full-resolution highlight, skin or
+  distance check refuses is stepped down to the strongest amount that passes, and the
+  panel says so.
+- Reference and Color Match canvas views with a sharp stored reference preview;
+  Recommended, My References and Presets lists; Save Preset; Sync to selected photos
+  or the whole collection, each photo measured on its own. See
+  [AI Color Match](docs/one-click-color-match.md) and ADR-0170.
+- A look fit that follows the reference's warmth, overall tint, tone shape, colourfulness and
+  per-colour treatment while holding each person's skin and the highlights; 10-45 % closer
+  to the reference on twelve real photo/reference pairs, against 1-11 % before.
+- A reference must be a different photograph; the photo itself or a copy is refused.
+- Fixed: a recipe value within half a millionth of a whole number had two fingerprints, so
+  every later save on that photo was refused as a concurrent edit.
+- Verified in the real window: 20 of 20 steps. See the
+  [verification report](docs/reports/AURA-one-click-color-match-2026-10-24.md).
+
 ## Calibrated original/edited reference transfer - 2026-10-23
 
 - Learn a shared global RGB transformation from an aligned original/edited pair

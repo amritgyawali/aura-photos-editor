@@ -679,6 +679,7 @@ pub fn run(
                 }
                 for id in previous_ids.into_iter().filter(|id| !references.iter().any(|reference| reference.summary.id == *id)) {
                     transaction.execute("DELETE FROM setting WHERE key=?1",[format!("{ASSET}{id}")]).map_err(|e| db(&e))?;
+                    super::super::one_click::forget_preview(&transaction, &id).map_err(|e| db(&e))?;
                 }
             }
         }

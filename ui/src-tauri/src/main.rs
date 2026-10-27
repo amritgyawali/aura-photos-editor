@@ -3392,6 +3392,51 @@ async fn color_match_status(
 }
 
 #[tauri::command]
+async fn quick_color_match(
+    state: State<'_, AppState>,
+    input: aura_app::color_match::QuickMatchInput,
+) -> IpcResult<aura_app::color_match::QuickMatchReport> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::color_match::quick_match(&app, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn recommend_color_references(
+    state: State<'_, AppState>,
+    input: aura_app::color_match::RecommendInput,
+) -> IpcResult<Vec<aura_app::color_match::Recommendation>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::color_match::recommend_references(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn color_reference_preview(
+    state: State<'_, AppState>,
+    reference_id: String,
+) -> IpcResult<Option<String>> {
+    aura_app::color_match::reference_preview(state.inner(), &reference_id)
+}
+
+#[tauri::command]
+async fn color_match_presets(
+    state: State<'_, AppState>,
+    input: aura_app::color_match::PresetInput,
+) -> IpcResult<Vec<aura_app::color_match::ColorMatchPreset>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::color_match::color_match_presets(&app, &input)
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
 async fn analyse_portrait(
     state: State<'_, AppState>,
     input: aura_app::portrait_commands::PortraitInput,
@@ -4210,6 +4255,10 @@ fn main() {
             apply_regional_color_match,
             prepare_color_match,
             apply_color_match,
+            quick_color_match,
+            recommend_color_references,
+            color_reference_preview,
+            color_match_presets,
             color_match_status,
             enhance_photo,
             enhance_portrait,

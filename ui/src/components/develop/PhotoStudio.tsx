@@ -13,7 +13,8 @@ import { PortraitAutoReport } from './PortraitAutoReport';
 import { MasksPanel, type BrushSettings, type MaskTool } from './MasksPanel';
 import { coverageDataUrl } from './rgbImage';
 import { PairedReference } from '../look/PairedReference';
-import { ColorMatchPanel } from '../look/ColorMatchPanel';
+import { ColorMatchStudio, type ActiveReference } from '../look/ColorMatchStudio';
+import { oneClickMatch } from '../../ipc/colorMatch';
 import { localMasks, masksOf, type MaskCoverage, type MaskSource } from '../../ipc/localMasks';
 import type { BrushStroke } from '../../ipc/nativeRetouch';
 import { PortraitFinishPanel, type LiquifyTool } from './PortraitFinishPanel';
@@ -65,7 +66,13 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
   const writing = useRef(false);
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<'essentials' | 'advanced'>('essentials');
-  const [view, setView] = useState<'edited' | 'original' | 'split' | 'color'>('edited');
+  const [view, setView] = useState<'edited' | 'original' | 'split' | 'color' | 'reference' | 'match'>('edited');
+  // AI Color Match (ADR-0170): the reference shown beside the photo, and its picture.
+  const [activeReference, setActiveReference] = useState<ActiveReference | null>(null);
+  const [referencePicture, setReferencePicture] = useState<string | null>(null);
+  // The matched photo for the side-by-side view, at screen size. The full-quality preview of a
+  // 30-megapixel file is a ~160 MB bitmap; mounting a second copy of it ran the page out of memory.
+  const [matchShot, setMatchShot] = useState<string | null>(null);
   const [colorPreview, setColorPreview] = useState<RenderDto | null>(null);
   const [colorError, setColorError] = useState<string | null>(null);
   const [probing, setProbing] = useState(false);
@@ -183,6 +190,30 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
     finally { writing.current = false; setBusy(false); }
   }, []);
 
+  useEffect(() => {
+    setReferencePicture(activeReference?.thumbnail ?? null);
+    if (!activeReference || !inTauri()) return;
+    let live = true;
+    Promise.resolve().then(() => oneClickMatch.preview(activeReference.id))
+      .then(picture => { if (live && picture) setReferencePicture(picture); })
+      .catch(() => undefined);
+    return () => { live = false; };
+  }, [activeReference]);
+  useEffect(() => {
+    if (!activeReference || view !== 'match' || !inTauri() || !recipe) return;
+    let live = true;
+    Promise.resolve()
+      .then(() => develop.renderImage({ photoId, level: 'screen', screen: [1600, 1600], purpose: 'interactive' }))
+      .then(image => { if (live) setMatchShot(previewSource(image)); })
+      .catch(() => undefined);
+    return () => { live = false; };
+  }, [activeReference, view, recipe?.recipeHash, photoId]);
+  const referenceChanged = useCallback((reference: ActiveReference | null, chosen: boolean) => {
+    setActiveReference(prior => prior?.id === reference?.id && prior?.thumbnail === reference?.thumbnail ? prior : reference);
+    if (!reference) setView(value => value === 'reference' || value === 'match' ? 'edited' : value);
+    else if (chosen) { setView(value => value === 'edited' || value === 'reference' ? 'match' : value); setPicking(false); setProbing(false); setProbe(null); }
+  }, []);
+
   const pick = (x: number, y: number) => {
     if (disabled || busy || loading || waiting || !recipe || problem) return;
     void write(async () => {
@@ -260,6 +291,8 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
       <div><span className="eyebrow">PHOTO STUDIO</span><h2>Make it yours.</h2></div>
       <div className="view-switch" aria-label="Preview mode">
         {(['edited', 'original', 'split', 'color'] as const).map(mode => <button type="button" key={mode} aria-pressed={view === mode} disabled={!edited || !original} onClick={() => { setView(mode); setPicking(false); setProbe(null); }}>{mode === 'split' ? 'Compare' : mode === 'edited' ? 'Edited' : mode === 'color' ? 'Colour only' : 'Original'}</button>)}
+        {activeReference && (['reference', 'match'] as const).map(mode => <button type="button" key={mode} aria-pressed={view === mode} disabled={!edited || !original}
+          onClick={() => { setView(mode); setPicking(false); setProbing(false); setProbe(null); setMaskTool(null); setLiquifyTool(null); }}>{mode === 'reference' ? 'Reference' : 'Color Match'}</button>)}
       </div>
     </div>
     {problem && <p role="alert">{problem} <button type="button" onClick={() => setRefresh(value => value + 1)}>Retry preview</button></p>}
@@ -310,7 +343,17 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
             const point = imagePoint(event.clientX - box.left, event.clientY - box.top, box.width, box.height, aspect);
             if (point) pick(...point);
           }}>
-          {edited && original ? <>
+          {edited && original && activeReference && (view === 'reference' || view === 'match') ? <>
+            {view === 'reference' ? <figure className="studio-reference-only">
+              {referencePicture ? <img src={referencePicture} alt={`Reference: ${activeReference.name}`} /> : <p>Loading the reference…</p>}
+              <figcaption>Reference · {activeReference.name}</figcaption>
+            </figure> : <div className="studio-reference-pair">
+              <figure>{referencePicture ? <img src={referencePicture} alt={`Reference: ${activeReference.name}`} /> : <p>Loading the reference…</p>}
+                <figcaption>Reference</figcaption></figure>
+              <figure>{matchShot ? <img src={matchShot} alt="Photo matched to the reference" /> : <p>Preparing the matched photo…</p>}<figcaption>Color Match</figcaption></figure>
+            </div>}
+            {(busy || loading || waiting) && <span className="studio-updating" role="status">Updating preview…</span>}
+          </> : edited && original ? <>
             <img src={view === 'original' ? original : (view === 'edited' && overlaid) || (proof ?? edited)} alt={view === 'original' ? 'Original photograph' : view === 'color' ? 'Colour-only photograph' : 'Edited photograph'} />
             {sketch && liquifyTool && <svg className="studio-sketch" aria-hidden="true"><polyline points={sketch.map(p => p.join(',')).join(' ')} fill="none" stroke="#fc5" strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" opacity={0.8} /></svg>}
             {sketch && maskTool && <svg className="studio-sketch" aria-hidden="true">
@@ -327,7 +370,8 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
           </> : <p>{problem ? 'Photo preview unavailable' : 'Loading your photograph…'}</p>}
         </div>
         {colorError && <p role="alert">Colour-only preview: {colorError}</p>}
-        <button type="button" aria-pressed={probing} disabled={!displayedRender || view === 'split'} onClick={() => { setProbing(!probing); setPicking(false); setMaskTool(null); setLiquifyTool(null); }}>Inspect RGB / Lab point</button>
+        {activeReference && (view === 'reference' || view === 'match') && referencePicture === activeReference.thumbnail && <p className="studio-reference-note">This reference was saved before sharp previews were kept. Upload it again for a sharper view; matching is unaffected.</p>}
+        <button type="button" aria-pressed={probing} disabled={!displayedRender || view === 'split' || view === 'reference' || view === 'match'} onClick={() => { setProbing(!probing); setPicking(false); setMaskTool(null); setLiquifyTool(null); }}>Inspect RGB / Lab point</button>
         {probing && <p className="lr-hint">Click the displayed photograph. Readout measures rendered sRGB and CIE Lab D65, not source RAW sensor values.</p>}
         {probe && <output aria-label="Photo colour readout">RGB {probe.rgb.join(', ')} · Lab {probe.lab.map(v => v.toFixed(2)).join(', ')}</output>}
         {view === 'split' && <label className="compare-control">Before / after<input type="range" min={0} max={100} value={split} onChange={event => setSplit(Number(event.target.value))} aria-label="Before and after divider" /></label>}
@@ -431,7 +475,7 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
         </div>
       </fieldset>
       <div hidden={!shows('references')} className="editor-reference-panel" aria-label="Reference matching panel">
-      <ColorMatchPanel key={`colour:${projectId}:${photoId}`} projectId={projectId} photoId={photoId} revision={recipe?.recipeHash} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)} onApply={write} />
+      <ColorMatchStudio key={`colour:${projectId}:${photoId}`} projectId={projectId} photoId={photoId} revision={recipe?.recipeHash} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)} onApply={write} onReferenceChange={referenceChanged} />
       <PairedReference key={`paired:${projectId}:${photoId}`} photoId={photoId} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)} onApply={write} />
       </div>
       </div>

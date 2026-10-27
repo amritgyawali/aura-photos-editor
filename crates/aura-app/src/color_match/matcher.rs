@@ -20,6 +20,9 @@ use super::{
 };
 
 const ENGINE_NAME: &str = "reference-grade-transfer-v3";
+/// New clipping a look fit may add, measured on a fitting-size render. Below the one per cent
+/// the full-resolution check allows, so the check confirms rather than cuts.
+const LOOK_CLIP_ALLOWANCE: f32 = 0.007;
 
 /// What a transfer session keeps between analysis and every later strength change.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -31,6 +34,34 @@ pub(super) struct TransferSession {
     /// The reference's measurement, kept so the session works after the reference is removed
     /// from the library.
     pub reference: transfer::GradeStats,
+    /// Fitted to follow the reference's look (one-click matching, ADR-0170) rather than the
+    /// conservative estimate. Checked with the look skin guard.
+    #[serde(default)]
+    pub look: bool,
+}
+
+/// What a session's checks compare against. A one-click look replaces any earlier reference
+/// look, so it is judged against the photograph without one; judging it against the earlier
+/// look would refuse a new reference for not improving on the old one's highlights.
+pub(super) fn guard_baseline(session: &Session) -> Recipe {
+    let mut baseline = session.baseline.clone();
+    if session.transfer.as_ref().is_some_and(|t| t.look) {
+        baseline.extra.remove(grade_model::KEY);
+    }
+    baseline
+}
+
+/// The skin check for this session: the look guard for a look fit, the strict guard otherwise.
+pub(super) fn skin_ok(
+    session: &Session,
+    before: &[appearance::Region],
+    after: &[appearance::Region],
+) -> bool {
+    if !session.reference_monochrome && session.transfer.as_ref().is_some_and(|t| t.look) {
+        appearance::skin_natural(before, after)
+    } else {
+        skin_guard(before, after, session.reference_monochrome)
+    }
 }
 
 /// How the transfer fit went, for the report and the panel.
@@ -47,11 +78,12 @@ pub struct TransferDiagnostics {
     pub replaced_earlier_match: bool,
 }
 
-fn measured(reference: &transfer::GradeStats, image: &Rgb8) -> transfer::Distance {
+pub(super) fn measured(reference: &transfer::GradeStats, image: &Rgb8) -> transfer::Distance {
     transfer::distance(reference, &transfer::measure_image(image))
 }
 
 /// Measure the photograph without any earlier reference grade and fit the reference onto it.
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)] // One analysis, two fits, one store.
 pub(super) fn prepare(
     state: &AppState,
     cancel: &CancelToken,
@@ -60,6 +92,7 @@ pub(super) fn prepare(
     reference: Reference,
     baseline: Recipe,
     reference_measurements: transfer::GradeStats,
+    look: bool,
 ) -> AuraResult<MatchReport> {
     let baseline_hash = aura_recipe::hash::recipe_hash(&baseline)?;
     let prior = grade_model::read(&baseline).ok().flatten();
@@ -70,14 +103,52 @@ pub(super) fn prepare(
     check_cancel(cancel)?;
     let target_regions = appearance::analyse(&plain)?;
     let similarity = content::similarity(&reference.small_rgb, &plain);
-    let mut fit = transfer::fit_with_checkpoint(
-        &reference_measurements,
-        &transfer::samples(&plain, transfer::TARGET_SAMPLES),
-        similarity,
-        || check_cancel(cancel),
-    )?;
+    // One-click matching needs a different photograph; refuse before anything is stored.
+    if look && similarity.is_some_and(|s| s >= super::one_click::DUPLICATE_SIMILARITY) {
+        return Err(invalid(format!(
+            "{}. Choose a different photo as the reference; nothing was changed.",
+            super::one_click::DUPLICATE
+        )));
+    }
+    let samples = transfer::samples(&plain, transfer::TARGET_SAMPLES);
+    let mut fit = if look {
+        transfer::fit_look(
+            &reference_measurements,
+            &samples,
+            &transfer::skin_samples(&plain, &target_regions),
+            &transfer::palette(&reference.small_rgb),
+            &transfer::LookOptions::default(),
+            || check_cancel(cancel),
+        )?
+    } else {
+        transfer::fit_with_checkpoint(&reference_measurements, &samples, similarity, || {
+            check_cancel(cancel)
+        })?
+    };
     let monochrome = reference_measurements.achromatic || reference.achromatic;
     let skin = transfer::review_skin(&mut fit.grade, &plain, &target_regions, monochrome);
+    if look && !monochrome {
+        // Hold each person's skin to the look guard with the guard's own readings, so the full
+        // look can be kept rather than turned down for one face.
+        transfer::settle(&mut fit.grade, &samples, &plain, &target_regions);
+        // The fit estimates clipping on finished pixels; the renderer applies the look inside
+        // its pipeline, where near-white sky behaves differently. Check on real renders at
+        // fitting size, the same instrument the one-click prediction uses, and ease until the
+        // look adds less than the full check's allowance.
+        let mut probe = ungraded.clone();
+        for _ in 0..10 {
+            check_cancel(cancel)?;
+            probe.extra.remove(grade_model::KEY);
+            grade_model::write(&mut probe, &fit.grade)?;
+            let (fresh, white, sectors) =
+                transfer::new_clipping(&fit.grade, &plain, &rendered(state, &frame, &probe)?);
+            if fresh <= LOOK_CLIP_ALLOWANCE {
+                break;
+            }
+            transfer::ease_highlights(&mut fit.grade, white, &sectors);
+            transfer::settle_skin(&mut fit.grade, &plain, &target_regions);
+        }
+    }
     check_cancel(cancel)?;
     // The renderer is the instrument: report what the stage drew, not what the fit predicted.
     let earlier;
@@ -147,6 +218,7 @@ pub(super) fn prepare(
             prior,
             fitted: fit.grade,
             reference: reference_measurements,
+            look,
         }),
     };
     let result = report(
@@ -185,7 +257,7 @@ fn scales(controls: &Controls) -> transfer::Scales {
 }
 
 /// The recipe these strengths produce from the session's baseline.
-fn candidate(
+pub(super) fn candidate(
     session: &Session,
     transfer: &TransferSession,
     controls: &Controls,
@@ -215,7 +287,7 @@ fn verified_distances(
     let frame =
         crate::photo_frames::CatalogFrames::new(state.clone()).frame(photo, RenderLevel::Full)?;
     check_cancel(cancel)?;
-    let baseline = rendered(state, &frame, &session.baseline)?;
+    let baseline = rendered(state, &frame, &guard_baseline(session))?;
     let before = measured(reference, &baseline);
     let before_regions = appearance::readings(&baseline, &session.target_regions);
     let before_clip = appearance::clipped(&baseline);
@@ -224,10 +296,10 @@ fn verified_distances(
     let image = rendered(state, &frame, candidate)?;
     let after = measured(reference, &image);
     if appearance::clipped(&image) > before_clip + 0.01
-        || !skin_guard(
+        || !skin_ok(
+            session,
             &before_regions,
             &appearance::readings(&image, &session.target_regions),
-            session.reference_monochrome,
         )
     {
         return Err(invalid(

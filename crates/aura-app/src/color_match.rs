@@ -31,6 +31,12 @@ mod grade;
 mod library;
 mod matcher;
 pub use matcher::TransferDiagnostics;
+mod one_click;
+pub use one_click::{
+    presets as color_match_presets, quick_match, recommend as recommend_references,
+    reference_preview, ColorMatchPreset, Limiter as ColorMatchLimiter, PresetInput,
+    QuickMatchInput, QuickMatchReport, RecommendInput, Recommendation,
+};
 mod refine;
 mod transfer;
 pub use library::{
@@ -375,6 +381,7 @@ fn persist_reference(
     check_cancel(cancel)?;
     let key = asset_key(&summary.id)?;
     transfer::remember(state, &summary.id, image)?;
+    one_click::remember_preview(state, &summary.id, image)?;
     if let Some(mut existing) = read::<Reference>(state, &key)? {
         if existing.engine == ENGINE {
             if existing.summary.thumbnail.is_some() {
@@ -544,6 +551,12 @@ fn treatment_proposal(
 // Keep the legacy recipe/hash/render checks in their existing cancellation scope.
 #[allow(clippy::too_many_lines)]
 pub fn prepare(state: &AppState, input: &PrepareInput) -> IpcResult<MatchReport> {
+    prepare_mode(state, input, false)
+}
+
+/// [`prepare`], fitting either the conservative estimate or, for one-click matching, the look.
+#[allow(clippy::too_many_lines)]
+fn prepare_mode(state: &AppState, input: &PrepareInput, look: bool) -> IpcResult<MatchReport> {
     job(state, &input.cancel_id, |cancel| {
         let photo = PhotoId::from_db(&input.photo_id).map_err(|_| invalid("Invalid photo."))?;
         let reference: Reference = read(state, &asset_key(&input.reference_id)?)?
@@ -555,7 +568,9 @@ pub fn prepare(state: &AppState, input: &PrepareInput) -> IpcResult<MatchReport>
         // A reference measured by this build is matched by distribution transfer (ADR-0160).
         // One imported before it keeps the slider fit below until it is imported again.
         if let Some(stats) = transfer::recall(state, &input.reference_id)? {
-            return matcher::prepare(state, cancel, input, photo, reference, baseline, stats);
+            return matcher::prepare(
+                state, cancel, input, photo, reference, baseline, stats, look,
+            );
         }
         let baseline_hash = aura_recipe::hash::recipe_hash(&baseline)?;
         // Fit reduced pixels from the native full decode. A camera's embedded thumbnail

@@ -80,7 +80,12 @@ pub(super) struct Sample {
 
 mod sampling;
 pub(super) use sampling::samples;
+mod look;
 mod neutral;
+pub(super) use look::{
+    ease_highlights, fit_look, new_clipping, palette, settle, settle_skin, skin_samples,
+    LookOptions,
+};
 use neutral::neutral_axis;
 
 /// What a photograph's colour and tone are, as the fit compares them.

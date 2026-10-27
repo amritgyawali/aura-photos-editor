@@ -357,7 +357,7 @@ export function App(): JSX.Element {
           </div>}
           <div hidden={workspace !== 'start' && workspace !== 'look'} className={workspace === 'start' ? 'start-reference' : undefined}>
             {workspace === 'look' && <header className="workspace-heading"><div><span className="eyebrow">REFERENCE COLOUR MATCHING</span><h1>Match a colour reference.</h1>
-              <p>Choose a photo below, upload an edited JPEG, PNG or TIFF, and analyse its tone, colour and warmth. Apply the strengths to preview the result; Undo keeps your earlier edit available.</p>
+              <p>Choose a photo below, then upload an edited JPEG, PNG or TIFF or pick a saved reference. The photo is matched as soon as you choose; Undo keeps your earlier edit available.</p>
               {!focusedPhoto && <p>Add your target photos in Photos to match a single reference.</p>}</div></header>}
             <details open={workspace === 'start'}><summary>Learn a style from a reference folder or Instagram export</summary>
             <InstagramStyle selection={reference} disabled={locked} onChange={changeReference} onBusyChange={setAnalysingReference}

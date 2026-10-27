@@ -13,11 +13,15 @@ pub(super) struct Region {
     pub appearance: LookAggregate,
 }
 
+/// Whole-image readings sample on a stride beyond this long edge. A 30-megapixel frame read
+/// pixel by pixel took about 17 s per check; every fourth pixel gives the same quantiles.
+const DESCRIBE_EDGE: u32 = 2048;
+
 fn describe(image: &Rgb8) -> LookAggregate {
     aggregate::fold(&[&measure::read_at(
         "colour-match",
         image,
-        image.width.max(image.height),
+        image.width.max(image.height).min(DESCRIBE_EDGE),
     )])
 }
 
@@ -172,6 +176,34 @@ pub(super) fn skin_preserved(before: &[Region], after: &[Region]) -> bool {
                 && a.appearance.high.distance(b.appearance.high) <= 5.0
                 && (a.appearance.chroma_p50 - b.appearance.chroma_p50).abs() * 128.0 <= 5.0
                 && (a.appearance.tone.p50 - b.appearance.tone.p50).abs() <= 0.12
+        })
+    })
+}
+
+/// The look fit's skin check (ADR-0170). Each person keeps their brightness and most of their
+/// colourfulness, and their skin does not turn toward green, grey or magenta. Warmth along the
+/// skin's own hue is allowed: that is what following a warm look means. Pilot limits.
+pub(super) fn skin_natural(before: &[Region], after: &[Region]) -> bool {
+    let turn = |p: aura_core::contract::look::ZoneTint, q: aura_core::contract::look::ZoneTint| {
+        if p.a.hypot(p.b) < 3.0 || q.a.hypot(q.b) < 3.0 {
+            return 0.0;
+        }
+        let d = q.b.atan2(q.a) - p.b.atan2(p.a);
+        let d = (d + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI;
+        d.abs().to_degrees()
+    };
+    before.iter().filter(|r| r.name.ends_with("skin")).all(|a| {
+        after.iter().find(|b| b.name == a.name).is_some_and(|b| {
+            let (x, y) = (&a.appearance, &b.appearance);
+            let ratio = if x.chroma_p50 > 1e-4 {
+                y.chroma_p50 / x.chroma_p50
+            } else {
+                1.0
+            };
+            (x.tone.p50 - y.tone.p50).abs() <= 0.06
+                && (0.7..=1.45).contains(&ratio)
+                && turn(x.mid, y.mid) <= 15.0
+                && turn(x.high, y.high) <= 20.0
         })
     })
 }
