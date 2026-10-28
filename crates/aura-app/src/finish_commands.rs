@@ -158,7 +158,29 @@ pub fn save_studio_finish(
             return Err(invalid("Background repair needs a detected subject and background. Add a missed face in Portrait regions, or use the Liquify Restore brush.").into());
         }
     }
+    // ADR-0185: the first time a tool needs the parse here, its faces are agreed with the learned
+    // face detector. Once only: a choice of faces made afterwards, every face included, is kept.
+    finish.faces_reconciled |= previous.faces_reconciled;
+    let mut agreed = None;
+    if !finish.faces_reconciled && finish.faces.is_empty() && finish.needs_parse() {
+        match crate::studio_faces::reconcile(state, &input.project_id, photo, &base) {
+            Ok(agreement) => {
+                if let Some(a) = &agreement {
+                    finish.faces.clone_from(&a.chosen);
+                }
+                agreed = agreement;
+                finish.faces_reconciled = true;
+            }
+            // Never a reason to refuse the save; the next one tries again.
+            Err(e) => {
+                tracing::warn!(target: "studio.faces", error = %e.user_message, "faces were not compared");
+            }
+        }
+    }
     let mut proposal = base.clone();
+    if let Some(a) = &agreed {
+        crate::studio_faces::write_hints(&mut proposal, a);
+    }
     studio_finish::write(&mut proposal, &finish)?;
     let (merged, changes) = schema::merge(&base, &proposal, EditSource::User)?;
     schema::Validation::check(&merged)?;
@@ -175,8 +197,12 @@ pub fn save_studio_finish(
         .recipe_store()
         .save(&project, &photo, &merged, &changes.changed, &label)?;
     let saved = studio_finish::read(&merged)?;
+    let mut notes = person_notes(state, photo, &merged, &saved);
+    if let Some(a) = &agreed {
+        notes.insert(0, a.note());
+    }
     Ok(StudioFinishDto {
-        notes: person_notes(state, photo, &merged, &saved),
+        notes,
         finish: saved,
         recipe: crate::develop_commands::recipe_dto(&input.photo_id, &merged),
     })

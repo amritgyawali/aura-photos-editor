@@ -233,11 +233,16 @@ fn auto_light_measures_the_face_proposes_a_light_and_stores_nothing() {
         },
     )
     .expect("save");
+    // The light is stored as given; the save also records that its faces were compared with the
+    // learned detector (ADR-0185), which on this painted portrait changes nothing else.
     assert_eq!(
         finish_commands::studio_finish(&f.state, &ids)
             .expect("read")
             .finish,
-        finish
+        StudioFinish {
+            faces_reconciled: true,
+            ..finish
+        }
     );
     assert_ne!(render(&f), before, "the light did not reach the render");
 }
@@ -288,11 +293,15 @@ fn background_repair_is_saved_rendered_and_undoable_without_changing_the_origina
     let warped = render(&f);
     finish.background_repair = 100.0;
     save(&finish);
+    // Saved as given, plus the record that its faces were compared once (ADR-0185).
     assert_eq!(
         finish_commands::studio_finish(&f.state, &ids)
             .unwrap()
             .finish,
-        finish
+        StudioFinish {
+            faces_reconciled: true,
+            ..finish.clone()
+        }
     );
     let repaired = render(&f);
     assert_ne!(

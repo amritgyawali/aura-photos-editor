@@ -343,6 +343,11 @@ pub struct StudioFinish {
     /// on every machine. Absent where the model is not installed; the parse is used then.
     #[serde(default)]
     pub subject_matte: Option<Matte>,
+    /// ADR-0185: the faces above were agreed between the portrait parse and the learned face
+    /// detector the first time a tool needed the parse here. Once set it stays set, so a
+    /// photographer who then chooses every face again keeps that choice.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub faces_reconciled: bool,
 }
 
 impl FaceShape {
