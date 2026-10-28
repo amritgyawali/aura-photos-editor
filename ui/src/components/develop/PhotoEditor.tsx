@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, asIpcError, develop, photoAutoEdit } from '../../ipc/client';
 import type { HistoryDto, PhotoAutoEditDto, RecipeDto, RenderDto } from '../../ipc/types';
-import { rgbDataUrl } from './rgbImage';
+import { renderImageUrl } from './rgbImage';
 
 const controls = [
   ['global.exposure', 'Exposure (stops)', -5, 5, 0.1],
@@ -18,13 +18,15 @@ export function PhotoEditor({ projectId, photoId, onChanged, render, recipe, his
 }): JSX.Element {
   const [original, setOriginal] = useState<string | null>(null);
   const [answer, setAnswer] = useState<PhotoAutoEditDto | null>(null);
+  /** Auto edit decided the photograph needed nothing: said in words, so it never looks broken. */
+  const [unchanged, setUnchanged] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [before, setBefore] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const stopped = useRef(false);
   const activeJob = useRef<string | null>(null);
-  const editedSrc = useMemo(() => render ? rgbDataUrl(render) : null, [render]);
+  const editedSrc = useMemo(() => renderImageUrl(render), [render]);
 
   const reload = useCallback(async () => {
     const preview = await api.getPreview({ projectId, photoId, level: 'proxy', priority: 'interactive' });
@@ -69,7 +71,10 @@ export function PhotoEditor({ projectId, photoId, onChanged, render, recipe, his
           const result = await photoAutoEdit({ projectId, photoId: id, jobId });
           completed++;
           if (result.source === 'local_fallback') local++;
-          if (id === photoId) setAnswer(result);
+          if (id === photoId) {
+            setAnswer(result);
+            setUnchanged(result.recipe.recipeHash === recipe?.recipeHash);
+          }
         } catch (e) {
           if (!stopped.current) failures.push(asIpcError(e).message);
         } finally { activeJob.current = null; }
@@ -96,7 +101,9 @@ export function PhotoEditor({ projectId, photoId, onChanged, render, recipe, his
       {(before ? original : editedSrc) ? <img src={(before ? original : editedSrc) ?? ''} alt={before ? 'Original photograph' : 'Edited photograph'} /> : <p>{error ? 'Preview unavailable.' : 'Loading photograph…'}</p>}
       <span>{before ? 'Original' : 'Edited'}</span>
     </div>
-    {answer && <div role="status"><strong>{answer.source === 'local_fallback' ? 'Local enhancement' : `AI edit · ${answer.model}`}</strong><p>{answer.reasons.join(' ')}</p></div>}
+    {answer && <div role="status"><strong>{answer.source === 'local_fallback' ? 'Local enhancement' : `AI edit · ${answer.model}`}</strong>
+      {unchanged && <p>Nothing changed: AURA judged this photograph already balanced.</p>}
+      <p>{answer.reasons.join(' ')}</p></div>}
     <fieldset disabled={busy || !recipe} className="photo-editor__controls">
       <legend>Fine-tune your edit</legend>
       {controls.map(([path, label, min, max, step]) => {

@@ -133,7 +133,10 @@ export const POLISHED_WEDDING_SETTINGS: RetouchSettings = {
 export const POLISHED_WEDDING_RETOUCH: AutoRetouchOptions = {
   ...polishedWedding, scope: 'face_and_body', settings: POLISHED_WEDDING_SETTINGS,
 };
-export const DEFAULT_SKIN: SkinSettings = { tolerance: .08, edgeProtection: .8, connected: true };
+/** 0.08 matched only a quarter to two fifths of a real cheek - its own shading and blush fell
+ * outside - so the sampled-skin tools barely acted; 0.15 matches most of it, and `connected`
+ * still keeps a skin-coloured background the skin does not touch out of the selection. */
+export const DEFAULT_SKIN: SkinSettings = { tolerance: .15, edgeProtection: .8, connected: true };
 export const isSampledSkinTool = (tool: RetouchTool) => ['skin_smooth', 'skin_uniformity', 'portrait_dodge_burn'].includes(tool);
 /** What the lens-reflection search found. */
 export type FindGlareResult = {

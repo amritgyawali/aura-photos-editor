@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api, asIpcError, develop, inTauri, portrait } from '../../ipc/client';
 import type { PortraitAnalysis, PortraitRetouch as PortraitSettings, RegionAdjustment } from '../../ipc/client';
-import { rgbDataUrl } from './rgbImage';
+import type { RenderDto } from '../../ipc/types';
+import { renderImageUrl } from './rgbImage';
 import {
   DEFAULT_OVERLAY,
   OPERATOR_GROUPS,
@@ -265,7 +266,9 @@ export function PortraitRetouch({ projectId, photoId, disabled, onBusyChange }: 
   const [strengths, setStrengths] = useState<Record<string, number>>({});
   const [adjustments, setAdjustments] = useState<RegionAdjustment[]>([]);
   const [selected, setSelected] = useState<string>('');
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  // The render is kept, not just its URL: the picture is released when its render is.
+  const [imageRender, setImageRender] = useState<RenderDto | null>(null);
+  const imageUrl = useMemo(() => renderImageUrl(imageRender), [imageRender]);
   const [originalUrl, setOriginalUrl] = useState<string | null>(null);
   const [comparing, setComparing] = useState(false);
   const [overlay, setOverlay] = useState<string[]>(DEFAULT_OVERLAY);
@@ -286,7 +289,7 @@ export function PortraitRetouch({ projectId, photoId, disabled, onBusyChange }: 
 
   const renderNow = useCallback(async () => {
     const render = await develop.renderImage({ photoId, level: 'screen', screen: [1400, 1000], purpose: 'interactive' });
-    setImageUrl(rgbDataUrl(render));
+    setImageRender(render);
   }, [photoId]);
 
   const analyseNow = useCallback(async () => {
@@ -295,7 +298,7 @@ export function PortraitRetouch({ projectId, photoId, disabled, onBusyChange }: 
 
   useEffect(() => {
     let active = true;
-    setAnalysis(null); setSettings(null); setImageUrl(null); setOriginalUrl(null); setError(null); setExplanation([]);
+    setAnalysis(null); setSettings(null); setImageRender(null); setOriginalUrl(null); setError(null); setExplanation([]);
     if (!inTauri()) return;
     void Promise.all([
       portrait.analyse(photoId), portrait.settings(photoId),
@@ -303,7 +306,7 @@ export function PortraitRetouch({ projectId, photoId, disabled, onBusyChange }: 
       api.getPreview({ projectId, photoId, level: 'proxy', priority: 'interactive' }),
     ]).then(([nextAnalysis, nextSettings, render, preview]) => {
       if (!active) return;
-      setAnalysis(nextAnalysis); adopt(nextSettings); setImageUrl(rgbDataUrl(render)); setOriginalUrl(preview.dataUrl);
+      setAnalysis(nextAnalysis); adopt(nextSettings); setImageRender(render); setOriginalUrl(preview.dataUrl);
     }).catch((cause) => { if (active) setError(asIpcError(cause).message); });
     return () => { active = false; };
   }, [adopt, photoId, projectId]);

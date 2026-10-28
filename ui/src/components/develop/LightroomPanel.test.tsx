@@ -121,3 +121,11 @@ it('does not save empty numbers, duplicate commits, or values from disabled labe
   fireEvent.doubleClick(screen.getByText('Exposure', { selector: 'span' }));
   expect(onSetParam).toHaveBeenCalledOnce();
 });
+
+it('says when the lens switches have nothing to apply, and not when they do', () => {
+  const note = /No lens profile or measured correction for this photograph yet/;
+  const { rerender } = render(<LightroomPanel {...props({ recipe: recipe([{ path: 'lens.coefficients', value: null }]) })} />);
+  expect(screen.getByText(note)).toBeTruthy();
+  rerender(<LightroomPanel {...props({ recipe: recipe([{ path: 'lens.coefficients.k1', value: -0.02 }]) })} />);
+  expect(screen.queryByText(note)).toBeNull();
+});

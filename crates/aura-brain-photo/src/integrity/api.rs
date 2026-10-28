@@ -438,8 +438,7 @@ impl IntegrityPass {
                 context.exif.megapixels,
             );
             if !calibration.measured {
-                let body = format!("{} {}", context.exif.make, context.exif.model);
-                let body = body.trim().to_string();
+                let body = body_name(&context.exif.make, &context.exif.model);
                 if !body.is_empty() {
                     *uncalibrated.entry(body).or_insert(0) += 1;
                 }
@@ -609,5 +608,42 @@ impl IntegrityPass {
             .and_then(|people| people.hierarchy(*project).ok())
             .map(|hierarchy| hierarchy.primary)
             .unwrap_or_default()
+    }
+}
+
+/// A camera body as a photographer names it. Canon, Nikon and others repeat the make inside
+/// the model ("Canon" + "Canon EOS 5D Mark IV"), and joining the two blindly printed the
+/// maker twice.
+fn body_name(make: &str, model: &str) -> String {
+    let (make, model) = (make.trim(), model.trim());
+    if !make.is_empty()
+        && model
+            .get(..make.len())
+            .is_some_and(|start| start.eq_ignore_ascii_case(make))
+    {
+        model.to_string()
+    } else {
+        format!("{make} {model}").trim().to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::body_name;
+
+    #[test]
+    fn a_body_names_its_maker_once() {
+        assert_eq!(
+            body_name("Canon", "Canon EOS 5D Mark IV"),
+            "Canon EOS 5D Mark IV"
+        );
+        assert_eq!(
+            body_name("NIKON CORPORATION", "NIKON CORPORATION D850"),
+            "NIKON CORPORATION D850"
+        );
+        assert_eq!(body_name("SONY", "DSC-HX9V"), "SONY DSC-HX9V");
+        assert_eq!(body_name("Apple", "iPhone 7"), "Apple iPhone 7");
+        assert_eq!(body_name("", "X100V"), "X100V");
+        assert_eq!(body_name("FUJIFILM", ""), "FUJIFILM");
     }
 }

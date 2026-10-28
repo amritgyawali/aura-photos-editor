@@ -926,3 +926,81 @@ fn evening_runs_to_the_edge_of_a_selection_without_flattening_its_shading() {
         );
     }
 }
+
+/// One colour per half of a frame, in linear light: left `a`, right `b`.
+fn halves(w: usize, h: usize, a: [f32; 3], b: [f32; 3]) -> Vec<f32> {
+    (0..w * h)
+        .flat_map(|i| if i % w < w / 2 { a } else { b })
+        .collect()
+}
+
+fn centre(pixels: &[f32], w: usize, h: usize, right: bool) -> [f32; 3] {
+    let x = if right { w * 3 / 4 } else { w / 4 };
+    let i = ((h / 2) * w + x) * 3;
+    [pixels[i], pixels[i + 1], pixels[i + 2]]
+}
+
+#[test]
+fn teeth_whitening_whitens_teeth_and_leaves_the_lips_their_colour() {
+    // sRGB (180, 90, 90) lip and (225, 210, 175) tooth, in linear light.
+    let (lip, tooth) = ([0.456, 0.102, 0.102], [0.753, 0.644, 0.429]);
+    let (w, h) = (40, 20);
+    let mut pixels = halves(w, h, lip, tooth);
+    let mut op = edit(Tool::Teeth);
+    op.region = [0.5, 0.5, 0.6, 0.6];
+    op.amount = 1.0;
+    aura_render::retouch_tools::apply(&mut pixels, w, h, &[op]);
+    assert_eq!(centre(&pixels, w, h, false), lip, "a lip is not a tooth");
+    let after = centre(&pixels, w, h, true);
+    assert!(
+        after[2] > tooth[2] + 0.05,
+        "the tooth loses its yellow: {after:?}"
+    );
+    assert!(
+        after[2] <= (after[0] + after[1]) * 0.5 + 1e-6,
+        "and never turns blue: {after:?}"
+    );
+}
+
+#[test]
+fn red_eye_correction_leaves_red_brown_eyeshadow_alone() {
+    // sRGB (200, 30, 40) flash red-eye and (150, 90, 80) red-brown eyeshadow, in linear light.
+    let (retina, shadow) = ([0.578, 0.013, 0.021], [0.305, 0.102, 0.080]);
+    let (w, h) = (40, 20);
+    let mut pixels = halves(w, h, retina, shadow);
+    let mut op = edit(Tool::RedEye);
+    op.region = [0.5, 0.5, 0.6, 0.6];
+    op.amount = 1.0;
+    aura_render::retouch_tools::apply(&mut pixels, w, h, &[op]);
+    assert!(
+        centre(&pixels, w, h, false)[0] < 0.1,
+        "the red pupil is darkened"
+    );
+    assert_eq!(
+        centre(&pixels, w, h, true),
+        shadow,
+        "eyeshadow is not a pupil"
+    );
+}
+
+#[test]
+fn eye_redness_reduction_takes_red_out_of_a_vein_and_not_out_of_eyeshadow() {
+    // sRGB (210, 140, 140) vein on the white of the eye and (150, 90, 80) eyeshadow.
+    let (vein, shadow) = ([0.644, 0.262, 0.262], [0.305, 0.102, 0.080]);
+    let (w, h) = (40, 20);
+    let mut pixels = halves(w, h, vein, shadow);
+    let mut op = edit(Tool::EyeClean);
+    op.region = [0.5, 0.5, 0.6, 0.6];
+    op.amount = 1.0;
+    aura_render::retouch_tools::apply(&mut pixels, w, h, &[op]);
+    let after = centre(&pixels, w, h, false);
+    assert!(
+        after[0] / after[1] < vein[0] / vein[1] - 0.3,
+        "the vein is less red: {after:?}"
+    );
+    assert_eq!(
+        centre(&pixels, w, h, true),
+        shadow,
+        "eyeshadow keeps its colour"
+    );
+}

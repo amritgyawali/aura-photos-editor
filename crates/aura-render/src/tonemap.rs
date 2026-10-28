@@ -306,23 +306,50 @@ pub fn to_hsv(rgb: [f32; 3]) -> (f32, f32, f32) {
     (hue / 6.0, delta / max, max)
 }
 
+/// Where each of the eight bands is centred, as a hue in the working space (turns).
+///
+/// The colours the sliders are named for - sRGB hues 0, 30, 60, 120, 180, 240, 280 and 320
+/// degrees, phase 16's centres and Lightroom's - at 70 % saturation, carried into linear
+/// Rec.2020, where this module measures hue. Spacing them evenly in this space instead put
+/// photographic green under the Yellow slider, yellow under Orange and magenta under Purple.
+pub const HSL_CENTRES: [f32; 8] = [
+    5.2 / 360.0,
+    28.7 / 360.0,
+    62.2 / 360.0,
+    102.6 / 360.0,
+    185.2 / 360.0,
+    242.2 / 360.0,
+    262.4 / 360.0,
+    317.9 / 360.0,
+];
+
 /// The eight-band weights a hue falls into.
 ///
-/// Bands overlap: a colour halfway between orange and yellow is affected by both, weighted,
-/// which is what stops an HSL adjustment producing a visible edge in a gradient. The centres
-/// are evenly spaced in hue, which is Adobe's arrangement and the one photographers'
-/// muscle memory is built on.
+/// Bands overlap: a colour between two centres is shared by those two bands, weighted by how
+/// close it is to each, which is what stops an HSL adjustment producing a visible edge in a
+/// gradient. Each band reaches exactly to its neighbours' centres, so the two weights at any
+/// hue add up to one however unevenly the centres are spaced.
 #[must_use]
 pub fn band_weights(hue: f32) -> [f32; 8] {
     let mut out = [0.0f32; 8];
     let mut total = 0.0f32;
-    for (index, slot) in out.iter_mut().enumerate() {
-        let centre = index as f32 / 8.0;
-        let mut d = (hue - centre).abs();
-        if d > 0.5 {
-            d = 1.0 - d;
-        }
-        let w = (1.0 - d * 8.0).max(0.0);
+    // Each centre with the one before it and the one after it, round the wheel.
+    let previous = HSL_CENTRES.iter().cycle().skip(7);
+    let next = HSL_CENTRES.iter().cycle().skip(1);
+    for (((slot, centre), previous), next) in
+        out.iter_mut().zip(HSL_CENTRES).zip(previous).zip(next)
+    {
+        let below = (centre - previous).rem_euclid(1.0);
+        let above = (next - centre).rem_euclid(1.0);
+        let ahead = (hue - centre).rem_euclid(1.0);
+        let behind = 1.0 - ahead;
+        let w = if ahead <= above {
+            1.0 - ahead / above
+        } else if behind <= below {
+            1.0 - behind / below
+        } else {
+            0.0
+        };
         *slot = w * w * (3.0 - 2.0 * w);
         total += *slot;
     }
@@ -658,6 +685,39 @@ mod tests {
         assert!((hsl_presence(0.8) - 1.0).abs() < 1e-6);
         // And the ramp is continuous.
         assert!(hsl_presence(0.09) > 0.3 && hsl_presence(0.09) < 0.7);
+    }
+
+    #[test]
+    fn each_slider_moves_the_colour_it_is_named_for() {
+        // The sRGB colour each band is named for, at the saturation the centres were set at,
+        // falls in that band before any other - green foliage under Green, not Yellow.
+        for (index, degrees) in [0.0_f32, 30.0, 60.0, 120.0, 180.0, 240.0, 280.0, 320.0]
+            .into_iter()
+            .enumerate()
+        {
+            let h = degrees / 60.0;
+            let x = 1.0 - (h % 2.0 - 1.0).abs();
+            let (c, m) = (0.7 * 0.8, 0.8 - 0.7 * 0.8);
+            let [r, g, b] = match h as u32 {
+                0 => [c, c * x, 0.0],
+                1 => [c * x, c, 0.0],
+                2 => [0.0, c, c * x],
+                3 => [0.0, c * x, c],
+                4 => [c * x, 0.0, c],
+                _ => [c, 0.0, c * x],
+            };
+            let working = crate::output::display_srgb_to_working([r + m, g + m, b + m]);
+            let (hue, _, _) = to_hsv(working);
+            let weights = band_weights(hue);
+            let strongest = (0..8)
+                .max_by(|a, b| weights[*a].total_cmp(&weights[*b]))
+                .unwrap_or(9);
+            assert_eq!(strongest, index, "sRGB {degrees} deg: {weights:?}");
+            assert!(
+                weights[index] > 0.95,
+                "sRGB {degrees} deg sits near its centre: {weights:?}"
+            );
+        }
     }
 
     #[test]

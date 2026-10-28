@@ -2,6 +2,18 @@
 
 All notable changes to AURA. One entry per phase, newest first.
 
+## The window no longer fills memory while you edit - 2026-10-27
+
+- **Previews are handed to the window as image files, not text.** A full-quality preview of a
+  30-megapixel photograph was turned into a 120 MB text string, and the window kept every one it
+  had shown: measured in the desktop window, each new preview added 120 MB that a forced clean-up
+  did not return, and a slider session on CR3 files reached 4.4 GB and stopped answering clicks.
+  Previews and the coverage, changes and clipping overlays are now blob images, made once per
+  preview and released with it; building one takes under a second instead of 7-24 s. The window's
+  security policy allows `blob:` images (images only).
+- **The in-app test switches the key light and the relight on** before testing where they come
+  from, so those checks measure the control instead of a light that is off.
+
 ## Cloud TLS on `ring`; the photographer is told when body tools have no person - 2026-10-27
 
 - **AI provider connections use rustls's standard `ring` crypto** instead of the alpha-stage,
