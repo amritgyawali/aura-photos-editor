@@ -245,7 +245,59 @@ pub fn sky(rgb: &[u8], width: u32, height: u32) -> Result<Option<Matte>, String>
     let (values, pw, ph) = plane(&outputs, false)?;
     // A probability already; anything the model is unsure of stays soft.
     let found = matte(&values, pw, ph, w, h);
-    Ok(plausible_sky(&found).then_some(found))
+    Ok((plausible_sky(&found) && sky_coloured(rgb, w, h, &found)).then_some(found))
+}
+
+/// Whether the pixels under a sky matte look like sky: bright for this frame, or bluish (a dusk
+/// or night sky), and smooth next to everything else in it. The model also answers "sky" for dark
+/// foliage behind a portrait and for a printed banner over a stage - shapes that pass
+/// [`plausible_sky`] because they reach the top and stop above the people.
+fn sky_coloured(rgb: &[u8], w: usize, h: usize, m: &Matte) -> bool {
+    let (mw, mh) = (m.width, m.height);
+    if mw < 2 || mh < 2 {
+        return false;
+    }
+    // The photograph at the matte's own cells, as encoded 0..1 values.
+    let cell = |x: usize, y: usize| -> [f32; 3] {
+        let px = ((x * 2 + 1) * w / (mw * 2)).min(w - 1);
+        let py = ((y * 2 + 1) * h / (mh * 2)).min(h - 1);
+        let i = (py * w + px) * 3;
+        [rgb[i], rgb[i + 1], rgb[i + 2]].map(|v| f32::from(v) / 255.0)
+    };
+    let luma = |p: [f32; 3]| 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2];
+    let lumas: Vec<f32> = (0..mw * mh).map(|i| luma(cell(i % mw, i / mw))).collect();
+    let (mut sky, mut rest) = ((0.0_f64, 0_usize), (0.0_f64, 0_usize));
+    let mut colour = [0.0_f64; 3];
+    for y in 0..mh - 1 {
+        for x in 0..mw - 1 {
+            let i = y * mw + x;
+            let step = (lumas[i + 1] - lumas[i]).abs() + (lumas[i + mw] - lumas[i]).abs();
+            if m.alpha[i] > 127 {
+                sky = (sky.0 + f64::from(step), sky.1 + 1);
+                let p = cell(x, y);
+                for c in 0..3 {
+                    colour[c] += f64::from(p[c]);
+                }
+            } else {
+                rest = (rest.0 + f64::from(step), rest.1 + 1);
+            }
+        }
+    }
+    if sky.1 == 0 {
+        return false;
+    }
+    let n = sky.1 as f64;
+    let [r, g, b] = colour.map(|v| (v / n) as f32);
+    let mean = luma([r, g, b]);
+    let mut sorted = lumas.clone();
+    sorted.sort_by(f32::total_cmp);
+    let median = sorted[sorted.len() / 2];
+    let bright = mean >= 0.42 || mean >= median * 1.15;
+    let bluish = b >= r.max(g) + 0.02;
+    let texture = (sky.0 / n) as f32;
+    let smooth =
+        texture <= 0.015 || rest.1 == 0 || texture <= 0.65 * (rest.0 / rest.1 as f64) as f32;
+    (bright || bluish) && smooth
 }
 
 /// Whether what the sky model found is open sky: some of it, reaching the top of the frame,
@@ -397,6 +449,49 @@ mod tests {
         // A patch in the middle of the frame is not sky.
         assert!(!plausible_sky(&grid(100, 60, |x, y| (40..60).contains(&x)
             && (20..30).contains(&y))));
+    }
+
+    /// A frame whose top 40 % is `top(x, y)` and whose rest is a textured, mid-grey ground.
+    fn frame(w: usize, h: usize, top: impl Fn(usize, usize) -> [u8; 3]) -> Vec<u8> {
+        (0..w * h)
+            .flat_map(|i| {
+                let (x, y) = (i % w, i / w);
+                if y < h * 2 / 5 {
+                    top(x, y)
+                } else {
+                    let v = if (x / 3 + y / 3) % 2 == 0 { 70 } else { 150 };
+                    [v, v, v]
+                }
+            })
+            .collect()
+    }
+
+    #[test]
+    fn sky_is_bright_or_blue_and_smooth_never_dark_foliage() {
+        let (w, h) = (120, 80);
+        let shape = grid(w, h, |_, y| y < h * 2 / 5);
+        // A clear blue sky, an overcast white one and a night sky all pass.
+        let clear = frame(w, h, |_, y| [110, 160, (230 - y) as u8]);
+        assert!(sky_coloured(&clear, w, h, &shape));
+        let overcast = frame(w, h, |_, _| [215, 215, 220]);
+        assert!(sky_coloured(&overcast, w, h, &shape));
+        let night = frame(w, h, |_, _| [12, 18, 45]);
+        assert!(sky_coloured(&night, w, h, &shape));
+        // Dark, leafy trees behind a bride: neither bright nor blue, and full of texture.
+        let foliage = frame(w, h, |x, y| {
+            let leaf = ((x * 7 + y * 13) % 5) as u8 * 12;
+            [25 + leaf / 2, 45 + leaf, 20 + leaf / 3]
+        });
+        assert!(!sky_coloured(&foliage, w, h, &shape));
+        // A printed banner: bright, but as busy as the ground below it.
+        let banner = frame(w, h, |x, y| {
+            if (x / 3 + y / 3) % 2 == 0 {
+                [235, 230, 225]
+            } else {
+                [120, 40, 30]
+            }
+        });
+        assert!(!sky_coloured(&banner, w, h, &shape));
     }
 
     #[test]

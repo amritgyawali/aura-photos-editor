@@ -205,12 +205,12 @@ impl Stage {
 
     /// True when the interactive path may skip it until the photographer zooms in.
     ///
-    /// Section 6.3 names restoration and heavy retouch. Clarity and dehaze are here too:
-    /// both are wide-radius blurs whose cost dominates a 2048 px proxy re-render and whose
-    /// effect at that size is a few pixels of local contrast.
+    /// Section 6.3 names restoration and heavy retouch. Dehaze was here too while it was a
+    /// wide-radius blur; since ADR-0126 it reads the small frame-wide base Clarity reads and runs
+    /// on the interactive path (see `plan`), so listing it would describe a skip that never happens.
     #[must_use]
     pub const fn is_heavy(self) -> bool {
-        matches!(self, Self::Restoration | Self::Retouch | Self::Dehaze)
+        matches!(self, Self::Restoration | Self::Retouch)
     }
 }
 
@@ -771,7 +771,7 @@ pub fn render_hash(
 #[must_use]
 pub fn engine_string() -> String {
     format!(
-        "{}+profiles.{}+portrait.{}+display.{}+local.{}+raw.{}+clear.{}+matte.{}+undereye.{}+boundary.{}+skin.{}+labs.selected-v5+calibrated.2+hsl.2+faceless.1+background-repair.2+glare.3+people-gate.1",
+        "{}+profiles.{}+portrait.{}+display.{}+local.{}+raw.{}+clear.{}+matte.{}+undereye.{}+boundary.{}+skin.{}+labs.selected-v5+calibrated.2+hsl.3+faceless.1+background-repair.2+glare.3+people-gate.1",
         ENGINE,
         crate::profiles::PROFILES_VER,
         aura_portrait::PARSE_VER,
@@ -1034,7 +1034,7 @@ mod tests {
         assert!(engine.contains("+labs.selected-v5+"));
         // The calibrated look and the background repair are stages whose pixels it decides too.
         assert!(engine.contains("+calibrated.2+"));
-        assert!(engine.contains("+hsl.2+faceless.1+"));
+        assert!(engine.contains("+hsl.3+faceless.1+"));
         assert!(engine.contains("+background-repair.2+"));
         assert!(engine.ends_with("+glare.3+people-gate.1"));
         assert!(engine.contains(&format!("+clear.{}+", crate::retouch_clear::VERSION)));

@@ -118,7 +118,7 @@ fn streak(rgb: &mut [f32], frame: Frame, edit: &Edit, coverage: &Coverage) {
         return;
     };
     let length = (edit.radius * 20.0 * frame.short()).clamp(8.0, frame.width as f32) as usize;
-    let threshold = 0.5 + (1.0 - edit.tone.clamp(0.0, 1.0)) * 1.5;
+    let threshold = super::light_threshold(edit.tone);
     let colour = edit
         .target_color
         .map_or([0.35, 0.55, 1.0], crate::retouch_color::to_working);
@@ -300,5 +300,30 @@ mod tests {
         let side = px(&out, w, 55, 20)[2];
         let up = px(&out, w, 40, 8)[2];
         assert!(side > 0.05 && up < 0.021, "side {side} up {up}");
+    }
+
+    #[test]
+    fn anamorphic_streak_reaches_a_white_light_in_an_ordinary_photograph_at_its_defaults() {
+        // A display-referred frame tops out at 1: a lamp is 1, not 10.
+        let (w, h) = (80, 40);
+        let base = fill(w, h, |x, y| {
+            if (38..43).contains(&x) && (19..22).contains(&y) {
+                [1.0; 3]
+            } else {
+                [0.05; 3]
+            }
+        });
+        let mut e = edit(Tool::AnamorphicStreak, [0.5, 0.5, 0.6, 0.6]);
+        // The window's defaults for this tool.
+        e.radius = 0.02;
+        e.tone = 0.5;
+        e.amount = 0.8;
+        let mut out = base.clone();
+        run(&mut out, w, h, &e);
+        let lift = |x| px(&out, w, x, 20)[2] - px(&base, w, x, 20)[2];
+        assert!(
+            lift(48) > 0.02 && lift(48) > lift(55) && lift(55) > 0.0,
+            "a streak reaches sideways and fades"
+        );
     }
 }

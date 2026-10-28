@@ -111,6 +111,14 @@ pub(crate) fn apply(
     }
 }
 
+/// The linear brightness a "reaches dimmer lights" slider (`tone`) starts at: 0.95 at 0 %,
+/// 0.65 at the default 50 %, 0.35 at 100 %. Always below white, because the photographs these
+/// tools are placed on are display-referred and nothing in them is brighter than 1 - a range
+/// that started above 1 left streaks and bokeh doing nothing at their default settings.
+pub(super) fn light_threshold(tone: f32) -> f32 {
+    0.95 - 0.6 * tone.clamp(0.0, 1.0)
+}
+
 #[derive(Clone, Copy)]
 pub(super) struct Frame {
     pub width: usize,

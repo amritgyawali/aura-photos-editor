@@ -659,7 +659,7 @@ it('requires a skin sample and saves range, detail and edge controls with full-f
   expect(screen.getByText('Pick skin sample on photo')).toBeTruthy();
   fireEvent.change(screen.getByLabelText('Source X (%)'),{target:{value:'45'}});
   fireEvent.change(screen.getByLabelText('Source Y (%)'),{target:{value:'40'}});
-  fireEvent.change(screen.getByLabelText('Skin color tolerance (8%)'),{target:{value:'0.12'}});
+  fireEvent.change(screen.getByLabelText('Skin color tolerance (15%)'),{target:{value:'0.12'}});
   fireEvent.change(screen.getByLabelText('Edge protection (80%)'),{target:{value:'0.9'}});
   fireEvent.change(screen.getByLabelText(/Fine detail \(100%\)/),{target:{value:'1.1'}});
   fireEvent.click(screen.getByText('Use full photo selection'));

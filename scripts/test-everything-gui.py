@@ -11,7 +11,15 @@ own errors. Output: `.work-checks/everything/` - `results.json`, `report.md`, sc
     python scripts/test-everything-gui.py [--port 9373] [--only group,group]
 
 Inputs are copied from `AURA_TEST_SOURCES` (default `F:/AURA-Indian-Wedding-Test/source`, licensed
-Wikimedia Commons wedding photographs and Canon CR2 files) and, when present, one FiveK DNG.
+Wikimedia Commons wedding photographs and Canon CR2 files) and, when present, one FiveK DNG. The
+Commons "bride" photographs rarely hold a usable face, so `AURA_TEST_PORTRAITS` - a folder of real
+portraits, e.g. `H:/AURA EDIT` - adds up to three of its files; the portrait tools are then tested
+on the largest face found. ONNX Runtime and the learned models are attached as the installed app
+has them (`AURA_ORT_DYLIB`, `AURA_MODELS_DIR`) when they exist, so AI selections are the real ones.
+
+The licence state lives in the run's own folder (`AURA_LICENCE_DIR`): a fresh trial for the
+isolated catalogue, so export can be tested, and the machine's own licence file is never read or
+written.
 """
 import argparse
 import base64
@@ -35,6 +43,11 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / '.work-checks/everything'
 SOURCES = Path(os.environ.get('AURA_TEST_SOURCES', 'F:/AURA-Indian-Wedding-Test/source'))
 FIVEK = Path(os.environ.get('AURA_FIVEK_DNG', 'C:/Users/Admin/Documents/project/.work-checks/fivek/dng'))
+PORTRAITS = os.environ.get('AURA_TEST_PORTRAITS')
+ORT = os.environ.get('AURA_ORT_DYLIB', 'F:/AURA-Indian-Wedding-Test/app/onnxruntime.dll')
+MODELS = os.environ.get('AURA_MODELS_DIR', 'F:/AURA-Indian-Wedding-Test/app/models')
+# Photographs a face can be looked for in, RAW files included: the real portraits are usually RAW.
+PHOTO_EXT = ('.jpg', '.jpeg', '.png', '.cr2', '.cr3', '.dng', '.nef', '.arw')
 
 report = {'cases': [], 'pageErrors': [], 'started': time.strftime('%Y-%m-%d %H:%M:%S')}
 
@@ -90,6 +103,9 @@ def prepare_inputs():
     dng = sorted(FIVEK.glob('*.dng'))[:1] if FIVEK.exists() else []
     for raw in dng:
         shutil.copy2(raw, inputs / raw.name)
+    if PORTRAITS and Path(PORTRAITS).is_dir():
+        for portrait in sorted(p for p in Path(PORTRAITS).iterdir() if p.is_file())[:3]:
+            shutil.copy2(portrait, inputs / portrait.name)
     # One PNG, made from the first bride photograph.
     with Image.open(inputs / chosen[0]) as im:
         ImageOps.exif_transpose(im).convert('RGB').save(inputs / 'bride-as-png.png')
@@ -171,7 +187,13 @@ def launch(exe, port):
     env = dict(os.environ,
                WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=f'--remote-debugging-port={port}',
                WEBVIEW2_USER_DATA_FOLDER=str(OUT / 'webview'),
-               AURA_TEST_CATALOG=str(OUT / 'catalog' / 'catalog.sqlite'))
+               AURA_TEST_CATALOG=str(OUT / 'catalog' / 'catalog.sqlite'),
+               AURA_LICENCE_DIR=str(OUT / 'licence'))
+    # The learned masks, as the installed app has them; without them every AI selection silently
+    # tests the measured fallback instead.
+    if Path(ORT).is_file() and Path(MODELS).is_dir():
+        env.setdefault('AURA_ORT_DYLIB', ORT)
+        env.setdefault('AURA_MODELS_DIR', MODELS)
     (OUT / 'catalog').mkdir(parents=True, exist_ok=True)
     proc = subprocess.Popen([str(exe)], cwd=str(ROOT), env=env)
     # Wait for this app's own page, not merely for a debugging port: another AURA on the machine
@@ -641,7 +663,7 @@ def run(pw, port, inputs, chosen, only):
         # first "bride" in the source manifest is not always a person.
         sizes = {}
         for fname, pid in by_name.items():
-            if fname.lower().endswith(('.jpg', '.png')) and fname != 'colour-chart.png':
+            if fname.lower().endswith(PHOTO_EXT) and fname != 'colour-chart.png':
                 try:
                     found = call('analyse_portrait', photoId=pid).get('faces', [])
                 except Exception:  # noqa: BLE001 - a photo that cannot be parsed has no usable face
@@ -745,7 +767,7 @@ def run(pw, port, inputs, chosen, only):
         # face (retouch tools act on skin, eyes and the light on a person, not on open water).
         best, spot = None, [.5, .35, .08, .06]
         for fname, pid in by_name.items():
-            if not fname.lower().endswith(('.jpg', '.png')) or fname == 'colour-chart.png':
+            if not fname.lower().endswith(PHOTO_EXT) or fname == 'colour-chart.png':
                 continue
             try:
                 found = call('analyse_portrait', photoId=pid).get('faces', [])
@@ -764,9 +786,12 @@ def run(pw, port, inputs, chosen, only):
         quiet = {'red_eye', 'eye_glow_fix', 'eye_clean', 'teeth', 'auto_blemish', 'acne_clear', 'frequency_heal',
                  'defringe', 'vein_reduce', 'glare', 'stretch_marks', 'texture_graft', 'mattify', 'lip_gloss', 'halation',
                  'under_eye', 'chroma_key', 'local_white_balance', 'body_hair_soften', 'shadow_remove'}
-        # Tools for scenery rather than people act on smooth gradients, a colour spill or bright
-        # highlights: tried on open water.
-        scenery = {'deband', 'color_despill', 'highlight_compress'}
+        # Tools for scenery rather than people act on smooth gradients, a colour spill, bright
+        # highlights, glints, sky, dust or runs of mid-tones - none of which a face has, and teal and
+        # orange holds skin at its own colour by design: tried on open water.
+        scenery = {'deband', 'color_despill', 'highlight_compress', 'highlight_glow', 'bokeh_highlights',
+                   'anamorphic_streak', 'sparkle', 'god_rays', 'clipped_highlight_repair', 'sky_blue',
+                   'dust_scratches', 'pixel_sort', 'teal_orange'}
         water = bride
         history(water, 'reset_original')
         call('native_retouch_edit', projectId=project, photoId=water, action='clear', edits=[], id=None)
@@ -837,7 +862,7 @@ def run(pw, port, inputs, chosen, only):
         report['presets'] = presets
         faces = {}
         for fname, pid in by_name.items():
-            if fname.lower().endswith(('.jpg', '.png')):
+            if fname.lower().endswith(PHOTO_EXT):
                 try:
                     faces[fname] = len(call('analyse_portrait', photoId=pid).get('faces', []))
                 except Exception:  # noqa: BLE001

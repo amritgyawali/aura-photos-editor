@@ -252,6 +252,12 @@ export function LightroomPanel({ recipe, disabled, aspect, profiles, onSetParam,
         onChange={event => onSetParam('lens.distortion', event.target.checked, 'Distortion correction')} /> Profile distortion correction</label>
       <label className="lr-toggle"><input type="checkbox" disabled={disabled} checked={paramValue(recipe, 'lens.ca') === true}
         onChange={event => onSetParam('lens.ca', event.target.checked, 'Chromatic aberration')} /> Remove chromatic aberration</label>
+      {/* With no coefficients the renderer skips both (LensProfileAbsent): say so, so a ticked
+          box that changes nothing never reads as a broken one. Present coefficients flatten into
+          their own leaves, so only an explicit null means none. */}
+      {paramValue(recipe, 'lens.coefficients') === null && <p className="lr-hint">
+        No lens profile or measured correction for this photograph yet, so these two change nothing. Run Geometry (Advanced) or use Defringe in Retouch for colour fringes.
+      </p>}
     </Section>
     </>}
 

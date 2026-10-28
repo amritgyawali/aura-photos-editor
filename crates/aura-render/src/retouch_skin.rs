@@ -9,7 +9,7 @@ mod connectivity;
 
 const EPSILON: f32 = 1e-6;
 /// Included in persistent render-cache identities whenever sampled-skin pixels change.
-pub(crate) const REFERENCE_VERSION: &str = "robust-patch-v3-pixel-connectivity";
+pub(crate) const REFERENCE_VERSION: &str = "robust-patch-v4-band-inside-selection";
 const MAX_EXPOSURE_STOPS: f32 = 0.5;
 const MAX_COLOR_DELTA: f32 = 0.35;
 
@@ -525,6 +525,18 @@ fn bands(
         .unzip()
 }
 
+/// The narrow band's radius in pixels, for a frame whose short side is `short` and a selection
+/// whose short side is `span`.
+///
+/// The wide band reads three radii out. A selection narrower than that is all edge to `bands`,
+/// whose edge-shading correction then takes back the whole band, and the tool changed nothing at
+/// all - on a cheek of an ordinary group photograph at the default radius. So the wide band is
+/// kept inside the selection.
+fn band_radius(edit: &Edit, short: usize, span: usize) -> usize {
+    let asked = (edit.radius * short as f32).round().max(1.0) as usize;
+    asked.min((span / 6).max(1))
+}
+
 pub(crate) fn apply(rgb: &mut [f32], w: usize, h: usize, edit: &Edit, coverage: &Coverage) {
     let Some(point) = edit.source else {
         return;
@@ -538,7 +550,7 @@ pub(crate) fn apply(rgb: &mut [f32], w: usize, h: usize, edit: &Edit, coverage: 
     if luma(sample) <= EPSILON {
         return;
     }
-    let radius = (edit.radius * w.min(h) as f32).round().max(1.0) as usize;
+    let radius = band_radius(edit, w.min(h), (x1 - x0).min(y1 - y0));
     // Guided output has two neighborhood passes; include both, plus the narrow band.
     let margin = radius * 8;
     let bx = x0.saturating_sub(margin);

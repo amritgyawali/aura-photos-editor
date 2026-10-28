@@ -7,6 +7,7 @@ use crate::{
 use aura_core::{AuraResult, PhotoId};
 use aura_recipe::{retouch_tools, Recipe};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -24,6 +25,11 @@ pub(crate) struct Report {
     pub clipped_after: Option<f32>,
     pub reasons: Vec<String>,
     pub scope: String,
+    /// Faces (numbered from 1) that no automatic operation touched and that were too small or
+    /// too incomplete to measure. Recorded, never a reason: a guest at the back of a crowd that
+    /// nothing was done to cannot have been damaged by the retouch.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub unchecked_faces: Vec<usize>,
 }
 
 impl Report {
@@ -52,6 +58,23 @@ fn baseline(recipe: &Recipe) -> AuraResult<(Recipe, usize)> {
     Ok((before, count))
 }
 
+/// Faces with at least one enabled automatic operation: `auto-portrait-v1-{face}-{name}`.
+/// Scene-wide operations (`auto-portrait-v1-backdrop`) name no face and add none.
+fn retouched_faces(recipe: &Recipe) -> AuraResult<BTreeSet<usize>> {
+    Ok(retouch_tools::read(recipe)?
+        .iter()
+        .filter(|edit| edit.enabled && edit.amount > 0.0)
+        .filter_map(|edit| {
+            edit.id
+                .strip_prefix(portrait_auto::PREFIX)?
+                .split('-')
+                .next()?
+                .parse()
+                .ok()
+        })
+        .collect())
+}
+
 pub(crate) fn check(state: &AppState, photo: PhotoId, recipe: &Recipe) -> AuraResult<Report> {
     let mut report = Report {
         version: "portrait-boundary-preflight-v2-regions".into(),
@@ -64,6 +87,7 @@ pub(crate) fn check(state: &AppState, photo: PhotoId, recipe: &Recipe) -> AuraRe
         analysis_width: 0, analysis_height: 0, status: "incomplete".into(),
         contours: Vec::new(), clipped_before: None, clipped_after: None, reasons: Vec::new(),
         scope: "Screen-resolution face/adjacent-neck and landmark-estimated eye, nose, mouth and chin regions: seams and clipping only. Native-resolution appearance, skin semantics, body boundaries and Evoto equivalence are not measured.".into(),
+        unchecked_faces: Vec::new(),
     };
     let (before, operations) = baseline(recipe)?;
     if operations == 0 {
@@ -86,8 +110,21 @@ pub(crate) fn check(state: &AppState, photo: PhotoId, recipe: &Recipe) -> AuraRe
         );
         return Ok(report);
     }
-    let (before, w, h) = crate::advanced_retouch::qc_render(state, photo, &before)?;
-    let (after, aw, ah) = crate::advanced_retouch::qc_render(state, photo, recipe)?;
+    // Every face a retouch touched must be measured, so the render grows until the smallest of
+    // them is large enough to measure - a guest retouched at the back of a crowd is checked at
+    // the resolution the check needs, not refused for being small. A face nothing touched is
+    // still measured when it can be - a seam beside it is still a seam - but one too small to
+    // measure cannot hold back a crowd photograph it was never part of.
+    let required = retouched_faces(recipe)?;
+    let touched: Vec<_> = faces
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| required.contains(index))
+        .map(|(_, face)| face.clone())
+        .collect();
+    let ((before, w, h), size) =
+        crate::advanced_retouch::qc_render_for_faces(state, photo, &before, &touched)?;
+    let (after, aw, ah) = crate::advanced_retouch::qc_render_at(state, photo, recipe, size)?;
     report.analysis_width = w;
     report.analysis_height = h;
     if (w, h) != (aw, ah) || w == 0 || h == 0 || before.len() != after.len() {
@@ -98,25 +135,31 @@ pub(crate) fn check(state: &AppState, photo: PhotoId, recipe: &Recipe) -> AuraRe
     for (index, face) in faces.iter().enumerate() {
         if let Some(reading) = quality::contour(&before, &after, w, h, face, index) {
             report.contours.push(reading);
-        } else {
+        } else if required.contains(&index) {
             report.reasons.push(format!(
                 "Face {} has insufficient geometry or resolution for the contour check.",
                 index + 1
             ));
+        } else {
+            report.unchecked_faces.push(index + 1);
         }
     }
-    finish(&mut report, faces.len());
+    finish(&mut report, &required);
     Ok(report)
 }
 
-fn finish(report: &mut Report, expected: usize) {
-    if expected == 0
-        || report.contours.len() != expected
+fn finish(report: &mut Report, required: &BTreeSet<usize>) {
+    let measured = |face: usize| {
+        report
+            .contours
+            .iter()
+            .any(|c| c.face == face && c.complete())
+    };
+    if !required.iter().all(|&face| measured(face))
         || !report
             .contours
             .iter()
-            .enumerate()
-            .all(|(i, c)| c.face == i && c.complete())
+            .all(quality::ContourReading::complete)
         || !report.clipped_before.is_some_and(f32::is_finite)
         || !report.clipped_after.is_some_and(f32::is_finite)
         || report.analysis_width == 0
@@ -176,11 +219,27 @@ mod tests {
             clipped_after: Some(0.0),
             reasons: Vec::new(),
             scope: "test".into(),
+            unchecked_faces: Vec::new(),
         };
-        finish(&mut report, 1);
+        let first = BTreeSet::from([0]);
+        finish(&mut report, &first);
         assert!(!report.eligible());
-        report.contours.push(quality::ContourReading {
-            face: 0,
+        report.contours.push(reading(0));
+        report.reasons.clear();
+        finish(&mut report, &first);
+        assert!(report.eligible());
+        report.contours[0].review = true;
+        finish(&mut report, &first);
+        assert!(!report.eligible());
+        report.contours[0].review = false;
+        report.clipped_after = Some(f32::NAN);
+        finish(&mut report, &first);
+        assert_eq!(report.status, "incomplete");
+    }
+
+    fn reading(face: usize) -> quality::ContourReading {
+        quality::ContourReading {
+            face,
             sampled_pairs: 1000,
             new_seam_pairs: 0,
             source_edge_pairs: 100,
@@ -197,17 +256,61 @@ mod tests {
                     review: false,
                 })
                 .into(),
-        });
+        }
+    }
+
+    #[test]
+    fn a_face_nothing_touched_cannot_hold_back_a_crowd_photograph() {
+        let mut report = Report {
+            version: "test".into(),
+            recipe_hash: "revision".into(),
+            photo_id: "test".into(),
+            source_hash_at_import: None,
+            renderer: "test".into(),
+            analysis_width: 1600,
+            analysis_height: 1200,
+            status: "incomplete".into(),
+            // The retouched bride is measured; two guests at the back were too small to measure.
+            contours: vec![reading(0)],
+            clipped_before: Some(0.0),
+            clipped_after: Some(0.0),
+            reasons: Vec::new(),
+            scope: "test".into(),
+            unchecked_faces: vec![2, 3],
+        };
+        finish(&mut report, &BTreeSet::from([0]));
+        assert!(report.eligible(), "{:?}", report.reasons);
+        // The same photograph with the second face retouched and unmeasured is still held.
         report.reasons.clear();
-        finish(&mut report, 1);
-        assert!(report.eligible());
-        report.contours[0].review = true;
-        finish(&mut report, 1);
-        assert!(!report.eligible());
-        report.contours[0].review = false;
-        report.clipped_after = Some(f32::NAN);
-        finish(&mut report, 1);
+        finish(&mut report, &BTreeSet::from([0, 1]));
         assert_eq!(report.status, "incomplete");
+    }
+
+    #[test]
+    fn only_face_numbered_operations_name_a_retouched_face() {
+        let mut recipe = aura_recipe::fixtures::neutral("test", "test");
+        let edit = |id: String, enabled: bool| {
+            let mut e = crate::advanced_retouch::base_edit(
+                id,
+                retouch_tools::Tool::Dodge,
+                [0.5, 0.5, 0.1, 0.1],
+                0.3,
+            );
+            e.enabled = enabled;
+            e
+        };
+        retouch_tools::write(
+            &mut recipe,
+            &[
+                edit(format!("{}0-skin", portrait_auto::PREFIX), true),
+                edit(format!("{}3-teeth", portrait_auto::PREFIX), true),
+                edit(format!("{}5-eyes", portrait_auto::PREFIX), false),
+                edit(format!("{}backdrop", portrait_auto::PREFIX), true),
+                edit("manual-7-heal".into(), true),
+            ],
+        )
+        .unwrap();
+        assert_eq!(retouched_faces(&recipe).unwrap(), BTreeSet::from([0, 3]));
     }
 
     #[test]

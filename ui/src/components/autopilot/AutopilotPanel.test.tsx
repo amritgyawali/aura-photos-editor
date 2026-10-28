@@ -115,3 +115,9 @@ it('sends the selected photo IDs to editing and prevents an empty batch', async 
   fireEvent.click(screen.getByText('Clear selection'));
   expect((screen.getByRole('button', { name: 'Auto edit 0 selected photos' }) as HTMLButtonElement).disabled).toBe(true);
 });
+it('says before a run that nothing will be decided while AURA is uncalibrated', async () => {
+  const client = await import('../../ipc/client');
+  (client as unknown as { explain: unknown }).explain = { ledgerStatus: vi.fn().mockResolvedValue({ calibrationVer: 0 }) };
+  render(<AutopilotPanel projectId="p" onError={vi.fn()} />);
+  expect(await screen.findByText(/AURA is not yet calibrated on your weddings/)).toBeTruthy();
+});

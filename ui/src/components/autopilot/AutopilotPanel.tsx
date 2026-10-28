@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { asIpcError, api as jobs, autopilot as api } from '../../ipc/client';
+import { asIpcError, api as jobs, autopilot as api, explain } from '../../ipc/client';
 import type {
   AutopilotEventDto,
   AutopilotPreflightDto,
@@ -88,6 +88,19 @@ export function AutopilotPanel({ projectId, onError, onBusyChange, automaticRequ
   const [preparation, setPreparation] = useState<string | null>(null);
   const [prepared, setPrepared] = useState<PreparedPhoto[]>([]);
   const [selected, setSelected] = useState<string[] | null>(null);
+  /** No calibration yet: every deciding step will wait for review rather than act (ADR-0027). */
+  const [uncalibrated, setUncalibrated] = useState(false);
+  useEffect(() => {
+    setUncalibrated(false);
+    if (!projectId) return;
+    let live = true;
+    // A ledger that cannot be read leaves the notice off rather than raising a second banner.
+    void Promise.resolve()
+      .then(() => explain.ledgerStatus(projectId))
+      .then(ledger => { if (live) setUncalibrated(ledger.calibrationVer === 0); })
+      .catch(() => undefined);
+    return () => { live = false; };
+  }, [projectId]);
   useEffect(() => () => {
     stopPreparation.current = true;
     if (preparationJob.current) void jobs.cancelJob(preparationJob.current).catch(error => preparationError.current(toBanner(error)));
@@ -293,6 +306,9 @@ export function AutopilotPanel({ projectId, onError, onBusyChange, automaticRequ
     </section>}
     <details className="advanced-tools" open={progress !== null || preflight !== null ? true : undefined}>
     <summary>Advanced wedding workflow &amp; analysis</summary>
+    {uncalibrated && <p className="lr-notice" role="note">
+      AURA is not yet calibrated on your weddings, so the steps that decide - culling, tone, colour, retouch, the album and the export - stop and wait for your review instead of acting on their own. A run prepares and measures everything; nothing is chosen or delivered until you approve it.
+    </p>}
     <fieldset className="autopilot-lock" disabled={starting}>
     <Autopilot
       status={status}

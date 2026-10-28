@@ -747,29 +747,46 @@ fn apply_one(
                         value = old.map(|v| v * (1.0 - highlight * 0.35));
                     }
                     Tool::Teeth => {
-                        // Reduce yellow chroma rather than replacing teeth with flat white.
+                        // Reduce yellow chroma rather than replacing teeth with flat white - but
+                        // only on what is a tooth. An ellipse over a mouth always holds lips, and
+                        // "yellow" measured on a lip is its red: adding it to blue turns the lip
+                        // magenta. Teeth are pale and near-neutral, lips and skin are not.
+                        let tooth = tooth_likelihood(old);
+                        if tooth <= 0.0 {
+                            continue;
+                        }
                         let yellow = ((old[0] + old[1]) * 0.5 - old[2]).max(0.0);
-                        value = [
-                            old[0] - yellow * 0.15,
-                            old[1] - yellow * 0.15,
-                            old[2] + yellow * 0.7,
-                        ];
-                        value = value.map(|v| v * 1.06);
+                        let red = old[0] - yellow * 0.15;
+                        let green = old[1] - yellow * 0.15;
+                        // Toward neutral, never past it: a whitened tooth is never blue.
+                        let blue = (old[2] + yellow * 0.7).min((red + green) * 0.5);
+                        value = [red, green, blue].map(|v| v * 1.06);
+                        value = std::array::from_fn(|c| old[c] + tooth * (value[c] - old[c]));
                     }
                     Tool::EyeClean => {
+                        let sclera = sclera_likelihood(old);
+                        if sclera <= 0.0 {
+                            continue;
+                        }
                         value[0] -= (old[0] - (old[1] + old[2]) * 0.5).max(0.0) * 0.7;
                         let new_luma = luma(value).max(0.00001);
                         value = value.map(|v| v * lum / new_luma);
+                        value = std::array::from_fn(|c| old[c] + sclera * (value[c] - old[c]));
                     }
                     Tool::EyeDetail => {
                         for c in 0..3 {
                             value[c] += (old[c] - low[c]) * 0.65;
                         }
                     }
-                    // Red-eye red has green and blue about equal. Brown irises, skin and lips have
-                    // much less blue than green and are left alone.
-                    Tool::RedEye if old[0] > old[1].max(old[2]) * 1.5 && old[2] >= old[1] * 0.5 => {
-                        value[0] = (old[1] + old[2]) * 0.5;
+                    // Red-eye red is almost pure: green and blue about equal and both tiny next to
+                    // red. Brown irises, skin, lips and red-brown eyeshadow carry far more green
+                    // and are left alone - the old 1.5x test turned bridal eyeshadow olive.
+                    Tool::RedEye => {
+                        let retina = red_eye_likelihood(old);
+                        if retina <= 0.0 {
+                            continue;
+                        }
+                        value[0] = old[0] + retina * ((old[1] + old[2]) * 0.5 - old[0]);
                     }
                     // Rendered by their own modules before this function is reached: patch heal,
                     // reshape, frequency heal, acne clear, texture graft, auto blemish, stretch
@@ -786,6 +803,45 @@ fn apply_one(
     for (i, value) in rows.into_iter().flatten() {
         rgb[i..i + 3].copy_from_slice(&value);
     }
+}
+
+/// How much a linear pixel looks like a tooth, `0..=1`: green close to red (pale, at most a
+/// little yellow) and not strongly saturated. Teeth sit near 0.8 green-to-red, skin near 0.55,
+/// lips and gums near 0.2; gold jewellery passes the hue test and fails the saturation one.
+fn tooth_likelihood(p: [f32; 3]) -> f32 {
+    use crate::retouch_planes::smoothstep;
+    if p[0] <= 1e-5 {
+        return 0.0;
+    }
+    // Saturation on square roots - close to how far apart the channels look, where linear
+    // light makes every warm colour look saturated.
+    let g = p.map(|v| v.max(0.0).sqrt());
+    let top = g[0].max(g[1]).max(g[2]).max(1e-5);
+    let saturation = (top - g[0].min(g[1]).min(g[2])) / top;
+    smoothstep(0.62, 0.74, p[1] / p[0])
+        * (1.0 - smoothstep(0.45, 0.6, saturation))
+        * smoothstep(0.02, 0.06, luma(p))
+}
+
+/// How much a linear pixel looks like flash red-eye, `0..=1`: red with almost no green or blue,
+/// and blue not far below green. Retinal red measures under 0.1 for the larger of green and blue
+/// against red; red-brown eyeshadow about 0.33, lips about 0.22.
+fn red_eye_likelihood(p: [f32; 3]) -> f32 {
+    if p[0] <= 1e-5 || p[2] < p[1] * 0.5 {
+        return 0.0;
+    }
+    1.0 - crate::retouch_planes::smoothstep(0.12, 0.2, p[1].max(p[2]) / p[0])
+}
+
+/// How much a linear pixel looks like the white of an eye or a red vein on it, `0..=1`: blue
+/// close to green (pink or neutral) and not dark. Brown eyeshadow and skin have blue well below
+/// green, so taking red out of them would turn them green.
+fn sclera_likelihood(p: [f32; 3]) -> f32 {
+    use crate::retouch_planes::smoothstep;
+    if p[1] <= 1e-5 {
+        return 0.0;
+    }
+    smoothstep(0.8, 0.9, p[2] / p[1]) * smoothstep(0.03, 0.08, luma(p))
 }
 
 fn auto_spots(rgb: &mut [f32], w: usize, h: usize, edit: &Edit, coverage: &Coverage) {
