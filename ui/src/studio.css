@@ -429,6 +429,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .cull-top { position: absolute; top: 8px; left: 8px; padding: 3px 7px; border-radius: 12px; font-size: 11px; background: #000a; color: #f0d58a; }
 .cull-card-body { display: flex; flex-direction: column; gap: 6px; padding: 9px 10px 10px; font-size: 12px; }
 .cull-select { display: flex; gap: 6px; align-items: center; color: var(--text); overflow: hidden; }
+.cull-select input { flex: none; }
 .cull-select span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cull-reason { color: var(--muted); }
 .cull-by { color: var(--accent); }

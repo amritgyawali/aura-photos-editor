@@ -212,7 +212,10 @@ def main():
                 page.screenshot(path=str(OUT / '2b-moment.png'))
                 panel.get_by_role('button', name=re.compile('^Deliver this instead of ')).click()
                 instead = swappable['keptInstead']
-                expect(page.get_by_role('tab', name=f'Left out ({left})', exact=True)).to_be_visible()
+                # A swap leaves the count alone - one in, one out - so wait for the frame it
+                # put in the left-out list to be there.
+                instead_name = next(p['fileName'] for p in review['photos'] if p['photoId'] == instead)
+                expect(page.get_by_role('article', name=instead_name, exact=True)).to_be_visible()
                 swapped = raw('photo_cull_review', projectId=project)
                 after = {p['photoId']: p for p in swapped['photos']}
                 check('deliver this instead swaps the two frames',
