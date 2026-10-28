@@ -10,6 +10,8 @@ import { SnapshotPanel } from './SnapshotPanel';
 import { SyncSettingsPanel } from './SyncSettingsPanel';
 import { NativeRetouchWorkspace } from './NativeRetouchWorkspace';
 import { PortraitAutoReport } from './PortraitAutoReport';
+import { PhotoPassPanel } from './PhotoPassPanel';
+import { photoPass } from '../../ipc/photoPass';
 import { MasksPanel, type BrushSettings, type MaskTool } from './MasksPanel';
 import { coverageImageUrl } from './rgbImage';
 import { PairedReference } from '../look/PairedReference';
@@ -380,6 +382,8 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
         </div>
         <p hidden={!shows('develop')}><strong>Auto enhance</strong> measures light, colour, noise and the scene, detects faces, then retouches skin, heals temporary blemishes and finishes eyes and teeth where it measures a need. Each stage is saved as its own step, so you can go back to any of them and edit by hand; your manual adjustments are protected.</p>
         <div hidden={!shows('develop') && !shows('finish')}><PortraitAutoReport recipe={recipe}/></div>
+        <div hidden={!shows('develop')}><PhotoPassPanel recipe={recipe} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)}
+          onRun={() => void write(() => photoPass.run(projectId, photoId))}/></div>
         <details className="lr-section" hidden={!shows('masks')} open={panel === 'masks' || masks.length > 0 || maskTool !== null}><summary>Masking{masks.length ? ` (${masks.length})` : ''}</summary><div className="lr-section-body">
           <MasksPanel masks={masks} selected={selectedMask} disabled={disabled || busy || loading || waiting || !recipe || Boolean(problem)}
             message={maskMessage} tool={maskTool} brush={brush} overlay={maskOverlay}
@@ -429,7 +433,7 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
               setNotice(`Settings synced to ${report.synced} photos.${report.failed.length ? ` Failed: ${report.failed.join('; ')}` : ''}`);
             })} />}
           onSetParam={(path, value, label) => void write(() => develop.setParam({ projectId, photoId, path, value, label }))}
-          onAuto={() => void write(async () => { await develop.enhancePhoto({ photoId }); setPosition(null); })}
+          onAuto={() => void write(async () => { await develop.enhancePhoto({ photoId }); await photoPass.run(projectId, photoId); setPosition(null); })}
           onApplyProfile={(profileId, strength) => void write(async () => {
             const report = await editProfiles.apply(photoId, profileId, strength);
             setNotice(report.adaptations.length ? report.adaptations.join(' ') : `Applied ${profiles.find(p => p.id === profileId)?.name ?? profileId}.`);
