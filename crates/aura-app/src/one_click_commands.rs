@@ -145,7 +145,8 @@ fn measured_cull(
                 .collect();
             std::fs::write(
                 &report_path,
-                serde_json::to_vec_pretty(&review).map_err(|e| error(&e.to_string()))?,
+                serde_json::to_vec_pretty(&review.for_export())
+                    .map_err(|e| error(&e.to_string()))?,
             )
             .map_err(|e| aura_core::errors::io::from_io(&e, &report_path))?;
             note(
@@ -181,14 +182,16 @@ fn measured_cull(
     else {
         return Ok(None);
     };
-    let report = crate::measured_cull::decide(&frames);
+    let frames = crate::photo_cull::as_stored(frames);
+    let (report, levels) =
+        crate::photo_cull::decide_all(&frames, crate::photo_cull::last_strictness(state, project));
     std::fs::write(
         &report_path,
         serde_json::to_vec_pretty(&report).map_err(|e| error(&e.to_string()))?,
     )
     .map_err(|e| aura_core::errors::io::from_io(&e, &report_path))?;
     // The Cull screen shows this run's decision, so a left-out photograph can be brought back.
-    if let Err(err) = crate::photo_cull::save(state, project, &report) {
+    if let Err(err) = crate::photo_cull::save(state, project, &report, &frames, levels) {
         note(
             job,
             format!("The cull could not be saved for review: {}", err.message),

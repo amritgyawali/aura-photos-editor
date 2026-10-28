@@ -4,8 +4,9 @@
 
 Copies `--count` photographs from the folder, adds a defocused, a dark and a smeared copy of
 three of them, imports them into an isolated catalogue, and drives the Cull screen by clicking:
-cull, read both lists, open a photograph's hundred checks, bring one back, keep every photo,
-undo every choice. Uses the debug build (`AURA_EXE`, default
+cull, read both lists, switch strictness, filter by reason, open a photograph's hundred checks
+and the rest of its moment, swap the delivered frame, walk the list with the keyboard, bring one
+back, keep every photo, undo every choice. Uses the debug build (`AURA_EXE`, default
 `target/desktop-launch/debug/aura-desktop.exe`) so `AURA_TEST_CATALOG` is honoured; your own
 catalogue is never opened. Writes screenshots and `report.json` to `.work-checks/cull-gui/`.
 """
@@ -155,15 +156,76 @@ def main():
             for photo_name, kind in damaged.items():
                 p = by_name.get(photo_name)
                 original = by_name.get(photo_name.replace(f'-{kind}', ''))
-                check(f'the {kind} copy is left out or scores well below its original',
-                      p is not None and (not p['keep'] or (original and p['score'] is not None
-                                                           and original['score'] - p['score'] >= 12)),
+                check(f'the {kind} copy is left out and its original delivered',
+                      p is not None and not p['keep'] and original is not None and original['keep'],
                       f"{p and p['reasonLabel']} {p and p['score']} vs {original and original['score']}")
             left = review['leftOut']
             check('the left-out list is not empty', left > 0, f'{left} left out')
 
+            # Strictness: what each level delivers is shown, and switching measures nothing.
+            levels = {level['strictness']: level for level in review['levels']}
+            check('every level says what it delivers, gentlest keeping most',
+                  list(levels) == ['gentle', 'balanced', 'strict']
+                  and levels['gentle']['best'] >= levels['balanced']['best'] >= levels['strict']['best'],
+                  ', '.join(f"{k} {v['best']}" for k, v in levels.items()))
+            started = time.monotonic()
+            page.get_by_role('radio', name=re.compile('^Strict')).click()
+            expect(page.get_by_role('radio', name=re.compile('^Strict'))).to_have_attribute('aria-checked', 'true')
+            switched = round(time.monotonic() - started, 1)
+            strict = raw('photo_cull_review', projectId=project)
+            check('strict delivers what it promised, without culling again',
+                  strict['strictness'] == 'strict' and strict['best'] == levels['strict']['best']
+                  and strict['measuredAt'] == review['measuredAt'], f"{strict['best']} best in {switched}s")
+            page.screenshot(path=str(OUT / '1b-strict.png'))
+            page.get_by_role('radio', name=re.compile('^Balanced')).click()
+            expect(page.get_by_role('radio', name=re.compile('^Balanced'))).to_have_attribute('aria-checked', 'true')
+            again = raw('photo_cull_review', projectId=project)
+            check('back at balanced the decision is the same as before',
+                  [(p['photoId'], p['keep']) for p in again['photos']] == [(p['photoId'], p['keep']) for p in review['photos']])
+
             page.get_by_role('tab', name=f'Left out ({left})', exact=True).click()
             page.screenshot(path=str(OUT / '2-left-out.png'))
+            chips = page.get_by_role('group', name='Show only')
+            if chips.count() > 0:
+                chip = chips.get_by_role('button').nth(1)
+                label = chip.inner_text()
+                chip.click()
+                wanted = int(re.search(r'\((\d+)\)$', label).group(1))
+                expect(page.locator('.cull-card')).to_have_count(wanted)
+                check('a reason button shows only that reason', True, label)
+                chips.get_by_role('button', name='All', exact=True).click()
+                expect(page.locator('.cull-card')).to_have_count(left)
+
+            # A left-out frame with a delivered sibling: its moment is shown and it can be swapped in.
+            swappable = next((p for p in review['photos'] if not p['keep'] and p['keptInstead']
+                              and by_name.get(next((q['fileName'] for q in review['photos']
+                                                    if q['photoId'] == p['keptInstead']), ''), {}).get('keep')), None)
+            if swappable:
+                card = page.get_by_role('article', name=swappable['fileName'], exact=True)
+                card.get_by_title('Show its hundred checks').click()
+                panel = page.get_by_role('complementary', name=f"Checks for {swappable['fileName']}")
+                expect(panel).to_be_visible()
+                strip = panel.get_by_role('region', name=re.compile('^Same (burst|moment)$'))
+                expect(strip).to_be_visible()
+                check('a left-out frame shows the rest of its moment', strip.get_by_role('button').count() >= 2,
+                      f"{strip.get_by_role('button').count()} frames")
+                page.screenshot(path=str(OUT / '2b-moment.png'))
+                panel.get_by_role('button', name=re.compile('^Deliver this instead of ')).click()
+                instead = swappable['keptInstead']
+                expect(page.get_by_role('tab', name=f'Left out ({left})', exact=True)).to_be_visible()
+                swapped = raw('photo_cull_review', projectId=project)
+                after = {p['photoId']: p for p in swapped['photos']}
+                check('deliver this instead swaps the two frames',
+                      after[swappable['photoId']]['keep'] and not after[instead]['keep'], swappable['fileName'])
+                raw('set_photo_cull_choice', input={'projectId': project, 'photoIds': [swappable['photoId'], instead], 'choice': 'auto'})
+                page.get_by_role('button', name='Close').click()
+                page.reload()
+                page.wait_for_function('() => !!window.__TAURI_INTERNALS__')
+                page.get_by_role('button', name=re.compile(re.escape(name))).first.click()
+                page.get_by_role('button', name='Cull Best photos & left out', exact=True).click()
+                page.get_by_role('tab', name=f'Left out ({left})', exact=True).click()
+            else:
+                check('a left-out frame shows the rest of its moment', False, 'no left-out frame with a delivered sibling')
             first = page.locator('.cull-card').first
             first_name = first.get_attribute('aria-label')
             first.get_by_title('Show its hundred checks').click()
@@ -174,7 +236,8 @@ def main():
             check('a photo opens with all 100 checks', True, first_name)
             page.screenshot(path=str(OUT / '3-checks.png'))
 
-            first.get_by_role('button', name='Bring back', exact=True).click()
+            # The keyboard: K brings the open photograph back.
+            page.keyboard.press('k')
             expect(page.get_by_role('tab', name=f'Left out ({left - 1})', exact=True)).to_be_visible()
             again = raw('photo_cull_review', projectId=project)
             back = next(p for p in again['photos'] if p['fileName'] == first_name)

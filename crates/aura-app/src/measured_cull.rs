@@ -20,6 +20,12 @@
 //!
 //! The best-scoring fifth of what is delivered is marked as top picks. ADR-0185.
 //!
+//! Frames of one shot are found by their difference hash and, because a darker, brighter or
+//! softer copy of a shot has a different hash, by the layout of light and dark in the frame,
+//! which exposure and focus do not change. How hard the cull is - whether weaker shots of a
+//! moment go at all, how close to the best a shot must be to stay, where the low-score line
+//! sits - is one of three [`Strictness`] levels the photographer picks.
+//!
 //! It only ever errs toward keeping. A frame a person edited by hand is never rejected, a
 //! frame that cannot be measured is kept, a run in which the technical rules would discard
 //! an implausible share of the wedding withdraws them, and nothing is deleted: a rejected
@@ -84,6 +90,12 @@ const MOMENT_WINDOW: usize = 12;
 const MOMENT_MARGIN: f32 = 12.0;
 /// Below this score out of 100 a frame's checks say almost nothing in it worked.
 const LOW_SCORE: f32 = 25.0;
+/// The gentle level's low-score line: a frame this low has failed outright.
+const GENTLE_LOW_SCORE: f32 = 15.0;
+/// The strict level's low-score line.
+const STRICT_LOW_SCORE: f32 = 50.0;
+/// The strict level keeps a second shot of a moment only this close to the best.
+const STRICT_MOMENT_MARGIN: f32 = 6.0;
 /// The share of delivered frames marked as top picks, and the score a top pick must reach.
 const TOP_SHARE: f32 = 0.20;
 const TOP_FLOOR: f32 = 60.0;
@@ -94,6 +106,89 @@ const UNIQUENESS_WINDOW: usize = 25;
 /// A gap longer than this, or a picture this different, opens a new scene.
 const SCENE_GAP_MS: i64 = 120_000;
 const SCENE_BITS: u32 = 24;
+/// Side of the grid a frame's shape - its layout of light and dark - is read on.
+const SHAPE_GRID: usize = 24;
+/// Two frames whose shapes correlate at least this much are one shot, whatever their
+/// exposure or focus. On 1,000 distinct wedding photographs the closest two different
+/// photographs correlated at 0.90; every copy darkened tenfold or defocused correlated at
+/// 0.99 or more with its original.
+const SAME_SHOT: f32 = 0.97;
+
+/// How hard the cull is. Every level keeps the hard rules, the burst rule and the
+/// photographer's own choices; they differ in how much of the rest is left out.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Strictness {
+    /// Only clear mistakes and near-identical frames are left out.
+    Gentle,
+    /// Also the clearly weaker shots of a moment, and very low scores.
+    #[default]
+    Balanced,
+    /// Keeps only the strongest shots of a moment and leaves out weak photographs.
+    Strict,
+}
+
+/// What one strictness level means in numbers.
+#[derive(Debug, Clone, Copy)]
+struct Policy {
+    /// A frame whose own checks add up to less is left out.
+    low_score: f32,
+    /// Weaker shots of a moment are left out at all.
+    moments: bool,
+    /// A shot within this many points of its moment's best is kept beside it...
+    moment_margin: f32,
+    /// ...up to this share of the moment, rounded up.
+    moment_share: f32,
+    /// Frames kept from bursts of up to 5, up to 12, and longer.
+    burst_keepers: [usize; 3],
+}
+
+impl Strictness {
+    /// Every level, gentlest first.
+    pub const ALL: [Self; 3] = [Self::Gentle, Self::Balanced, Self::Strict];
+
+    /// The stable name, as the wire and the stored review spell it.
+    #[must_use]
+    pub fn slug(self) -> &'static str {
+        match self {
+            Self::Gentle => "gentle",
+            Self::Balanced => "balanced",
+            Self::Strict => "strict",
+        }
+    }
+
+    /// The level a slug names; `None` for anything else.
+    #[must_use]
+    pub fn parse(slug: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|level| level.slug() == slug)
+    }
+
+    fn policy(self) -> Policy {
+        match self {
+            Self::Gentle => Policy {
+                low_score: GENTLE_LOW_SCORE,
+                moments: false,
+                moment_margin: 0.0,
+                moment_share: 1.0,
+                burst_keepers: [1, 2, 3],
+            },
+            Self::Balanced => Policy {
+                low_score: LOW_SCORE,
+                moments: true,
+                moment_margin: MOMENT_MARGIN,
+                moment_share: 0.5,
+                burst_keepers: [1, 2, 3],
+            },
+            Self::Strict => Policy {
+                low_score: STRICT_LOW_SCORE,
+                moments: true,
+                moment_margin: STRICT_MOMENT_MARGIN,
+                moment_share: 1.0 / 3.0,
+                burst_keepers: [1, 1, 2],
+            },
+        }
+    }
+}
 
 /// Why a frame was kept or left out. The slug is stable; the sentence is for people.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -139,7 +234,7 @@ impl Reason {
 }
 
 /// What was measured in one frame's pixels.
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Measure {
     /// Strongest edges over the frame's contrast; higher is sharper.
@@ -161,11 +256,16 @@ pub struct Measure {
     /// Share of the frame at pure white.
     pub blown: f32,
     /// 64-bit difference hash, for near-duplicate frames.
-    #[serde(serialize_with = "hex")]
+    #[serde(serialize_with = "hex", deserialize_with = "unhex")]
     pub dhash: u64,
+    /// The layout of light and dark on a 24x24 grid, mean removed and scaled to fill an
+    /// `i8`. Exposure and focus leave it unchanged, so a darker or softer copy of a shot
+    /// still matches; empty for a flat frame.
+    #[serde(default, skip_serializing_if = "Vec::is_empty", with = "shape_hex")]
+    pub shape: Vec<i8>,
     /// The hundred checks' raw values, in [`crate::cull_checks::CHECKS`] order; empty when they
     /// were not measured. The ten collection checks are filled by [`decide`].
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub checks: Vec<Option<f32>>,
 }
 
@@ -175,8 +275,91 @@ fn hex<S: serde::Serializer>(value: &u64, serializer: S) -> Result<S::Ok, S::Err
     serializer.serialize_str(&format!("{value:016x}"))
 }
 
+fn unhex<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<u64, D::Error> {
+    let text = String::deserialize(deserializer)?;
+    u64::from_str_radix(&text, 16).map_err(serde::de::Error::custom)
+}
+
+/// A shape as two hex digits a cell: a third the size of a JSON array of numbers.
+mod shape_hex {
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    // The signature is serde's.
+    #[allow(clippy::ptr_arg)]
+    pub(super) fn serialize<S: Serializer>(
+        shape: &Vec<i8>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        let mut text = String::with_capacity(shape.len() * 2);
+        for byte in shape.iter().flat_map(|cell| cell.to_ne_bytes()) {
+            for nibble in [byte >> 4, byte & 0x0f] {
+                text.push(char::from_digit(u32::from(nibble), 16).unwrap_or('0'));
+            }
+        }
+        serializer.serialize_str(&text)
+    }
+
+    pub(super) fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Vec<i8>, D::Error> {
+        let text = String::deserialize(deserializer)?;
+        text.as_bytes()
+            .chunks(2)
+            .map(|pair| {
+                std::str::from_utf8(pair)
+                    .ok()
+                    .and_then(|digits| u8::from_str_radix(digits, 16).ok())
+                    .map(|byte| i8::from_ne_bytes([byte]))
+                    .ok_or_else(|| serde::de::Error::custom("a shape is pairs of hex digits"))
+            })
+            .collect()
+    }
+}
+
+/// A frame's shape: the grid of mean luminance, mean removed, scaled so the largest cell is
+/// 127. Empty for a frame with no layout to speak of.
+fn shape(values: &[f32], width: usize, height: usize) -> Vec<i8> {
+    let cells =
+        aura_vision::embed::descriptors::box_resize(values, width, height, SHAPE_GRID, SHAPE_GRID);
+    let Some(middle) = mean(&cells) else {
+        return Vec::new();
+    };
+    let peak = cells
+        .iter()
+        .map(|v| (v - middle).abs())
+        .fold(0.0_f32, f32::max);
+    if peak < 1e-3 {
+        return Vec::new();
+    }
+    cells
+        .iter()
+        .map(|v| ((v - middle) / peak * 127.0).round().clamp(-127.0, 127.0) as i8)
+        .collect()
+}
+
+/// How alike two shapes are: their correlation, `-1..=1`. `None` when either is missing.
+fn shape_correlation(a: &[i8], b: &[i8]) -> Option<f32> {
+    if a.is_empty() || a.len() != b.len() {
+        return None;
+    }
+    let (mut ab, mut aa, mut bb) = (0_i64, 0_i64, 0_i64);
+    for (x, y) in a.iter().zip(b) {
+        let (x, y) = (i64::from(*x), i64::from(*y));
+        ab += x * y;
+        aa += x * x;
+        bb += y * y;
+    }
+    (aa > 0 && bb > 0).then(|| ab as f32 / ((aa as f32).sqrt() * (bb as f32).sqrt()))
+}
+
+/// Whether two frames are one shot by their shape alone.
+fn same_shot(a: &Measure, b: &Measure) -> bool {
+    shape_correlation(&a.shape, &b.shape).is_some_and(|c| c >= SAME_SHOT)
+}
+
 /// One frame as the decision sees it.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Frame {
     /// The photograph.
     pub photo_id: String,
@@ -258,6 +441,8 @@ pub struct Counts {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Report {
+    /// How hard this cull was.
+    pub strictness: Strictness,
     /// What the numbers below were judged against.
     pub thresholds: BTreeMap<&'static str, f32>,
     /// The check each position of `checks` and `measure.checks` holds.
@@ -515,6 +700,7 @@ pub fn measure_pixels(
         brightest: levels.percentile(0.99),
         blown: white as f32 / plane.values.len().max(1) as f32,
         dhash: aura_vision::embed::hash::dhash(&plane.values, plane.width, plane.height),
+        shape: shape(&plane.values, plane.width, plane.height),
         checks: Vec::new(),
     })
 }
@@ -670,9 +856,10 @@ fn together(a: &Frame, b: &Frame, grouping: Grouping) -> bool {
     let bits = (first.dhash ^ second.dhash).count_ones();
     match (a.time_ms, b.time_ms) {
         (Some(earlier), Some(later)) => {
-            bits <= grouping.bits && (later - earlier).abs() <= grouping.gap_ms
+            (later - earlier).abs() <= grouping.gap_ms
+                && (bits <= grouping.bits || same_shot(first, second))
         }
-        _ => bits <= grouping.bits_untimed,
+        _ => bits <= grouping.bits_untimed || same_shot(first, second),
     }
 }
 
@@ -761,16 +948,29 @@ fn find_groups(frames: &[Frame], verdicts: &[Verdict], grouping: Grouping) -> Ve
             if (!timed && second != first + 1) || !together(earlier, later, grouping) {
                 continue;
             }
-            let (keep, merge) = (
-                labels.get(first).copied().unwrap_or(first),
-                labels.get(second).copied().unwrap_or(second),
-            );
-            if keep != merge {
-                for label in &mut labels {
-                    if *label == merge {
-                        *label = keep;
-                    }
-                }
+            join(&mut labels, first, second);
+        }
+    }
+    // A frame without a camera time has no place in the timeline to be near anything, so a
+    // copy of it - darker, softer, exported again - can sit anywhere. Those are matched by
+    // shape across the whole collection.
+    for first in 0..candidates.len() {
+        for second in first + 1..candidates.len() {
+            let pair = candidates
+                .get(first)
+                .zip(candidates.get(second))
+                .and_then(|(a, b)| frames.get(*a).zip(frames.get(*b)));
+            let Some((a, b)) = pair else { continue };
+            if a.time_ms.is_some() && b.time_ms.is_some() {
+                continue;
+            }
+            let shot = a
+                .measure
+                .as_ref()
+                .zip(b.measure.as_ref())
+                .is_some_and(|(x, y)| same_shot(x, y));
+            if shot && labels.get(first) != labels.get(second) {
+                join(&mut labels, first, second);
             }
         }
     }
@@ -786,6 +986,21 @@ fn find_groups(frames: &[Frame], verdicts: &[Verdict], grouping: Grouping) -> Ve
         .collect()
 }
 
+/// Put `second`'s group into `first`'s.
+fn join(labels: &mut [usize], first: usize, second: usize) {
+    let (keep, merge) = (
+        labels.get(first).copied().unwrap_or(first),
+        labels.get(second).copied().unwrap_or(second),
+    );
+    if keep != merge {
+        for label in labels.iter_mut() {
+            if *label == merge {
+                *label = keep;
+            }
+        }
+    }
+}
+
 /// Keep the best of one burst and leave the rest out, naming the frame delivered instead.
 fn settle_burst(
     frames: &[Frame],
@@ -793,6 +1008,7 @@ fn settle_burst(
     number: usize,
     members: &[usize],
     totals: &[Option<f32>],
+    policy: Policy,
 ) {
     let measures: Vec<(usize, &Measure)> = members
         .iter()
@@ -828,10 +1044,11 @@ fn settle_burst(
             .then(b.1.total_cmp(&a.1))
             .then(a.0.cmp(&b.0))
     });
+    let [short, medium, long] = policy.burst_keepers;
     let keepers = match members.len() {
-        0..=5 => 1,
-        6..=12 => 2,
-        _ => 3,
+        0..=5 => short,
+        6..=12 => medium,
+        _ => long,
     };
     let Some(&(best, best_quality)) = ranked.first() else {
         return;
@@ -1053,14 +1270,28 @@ fn with_context(
 
 /// A frame whose own checks add up to almost nothing is left out, unless a person edited it
 /// or a harder rule already named it.
-fn drop_low_scores(verdicts: &mut [Verdict], pixel: &[Option<f32>]) {
+fn drop_low_scores(verdicts: &mut [Verdict], pixel: &[Option<f32>], line: f32) {
     for (verdict, score) in verdicts.iter_mut().zip(pixel) {
         let Some(score) = score else { continue };
-        if verdict.reason == Reason::Keep && *score < LOW_SCORE {
+        if verdict.reason == Reason::Keep && *score < line {
             verdict.keep = false;
             verdict.reason = Reason::LowScore;
             verdict.detail = format!(
-                "Very low score: its hundred checks add up to {score:.0} of 100 (below {LOW_SCORE:.0}). Open its checks to see which groups failed."
+                "Low score: its hundred checks add up to {score:.0} of 100 (below {line:.0}). Open its checks to see which groups failed."
+            );
+        }
+    }
+}
+
+/// A gentler level than balanced hands back the low scores the balanced line took.
+fn restore_above(verdicts: &mut [Verdict], pixel: &[Option<f32>], line: f32) {
+    for (verdict, score) in verdicts.iter_mut().zip(pixel) {
+        let Some(score) = score else { continue };
+        if verdict.reason == Reason::LowScore && *score >= line {
+            verdict.keep = true;
+            verdict.reason = Reason::Keep;
+            verdict.detail = format!(
+                "Delivered at this strictness: its hundred checks add up to {score:.0} of 100."
             );
         }
     }
@@ -1074,6 +1305,7 @@ fn settle_moment(
     number: usize,
     members: &[usize],
     totals: &[Option<f32>],
+    policy: Policy,
 ) {
     let alive: Vec<usize> = members
         .iter()
@@ -1085,7 +1317,8 @@ fn settle_moment(
             verdict.moment = Some(number);
         }
     }
-    if alive.len() < 2
+    if !policy.moments
+        || alive.len() < 2
         || alive
             .iter()
             .any(|i| totals.get(*i).copied().flatten().is_none())
@@ -1101,14 +1334,14 @@ fn settle_moment(
     let Some(&(best, best_score)) = ranked.first() else {
         return;
     };
-    let cap = alive.len().div_ceil(2).max(1);
+    let cap = ((alive.len() as f32 * policy.moment_share).ceil() as usize).max(1);
     let best_name = frames
         .get(best)
         .map(|f| f.file_name.clone())
         .unwrap_or_default();
     let best_id = frames.get(best).map(|f| f.photo_id.clone());
     for (rank, (index, own)) in ranked.iter().enumerate() {
-        let close = best_score - own <= MOMENT_MARGIN;
+        let close = best_score - own <= policy.moment_margin;
         if rank == 0 || edited(*index) || (close && rank < cap) {
             continue;
         }
@@ -1147,17 +1380,30 @@ fn mark_top_picks(verdicts: &mut [Verdict]) -> usize {
     marked
 }
 
-/// Decide the whole collection. `frames` is in timeline order.
+/// Decide the whole collection at the balanced level. `frames` is in timeline order.
 #[must_use]
 pub fn decide(frames: &[Frame]) -> Report {
+    decide_with(frames, Strictness::Balanced)
+}
+
+/// Decide the whole collection at one strictness. `frames` is in timeline order.
+#[must_use]
+pub fn decide_with(frames: &[Frame], strictness: Strictness) -> Report {
+    let policy = strictness.policy();
     let mut verdicts = first_verdicts(frames);
     let own = own_values(frames);
     let pixel: Vec<Option<f32>> = scored(&own)
         .iter()
         .map(|s| s.as_ref().map(|s| s.overall))
         .collect();
-    drop_low_scores(&mut verdicts, &pixel);
+    // Whether the rules describe a style is judged at the balanced line whatever the level,
+    // so a stricter level can never withdraw them and end up keeping more.
+    drop_low_scores(&mut verdicts, &pixel, LOW_SCORE);
     let rules_withdrawn = withdraw_if_implausible(&mut verdicts);
+    if !rules_withdrawn {
+        restore_above(&mut verdicts, &pixel, policy.low_score);
+        drop_low_scores(&mut verdicts, &pixel, policy.low_score);
+    }
     let bursts = find_groups(frames, &verdicts, BURST);
     let moments = find_groups(frames, &verdicts, MOMENT);
     let full = with_context(frames, &own, &pixel, &bursts, &moments);
@@ -1167,10 +1413,10 @@ pub fn decide(frames: &[Frame]) -> Report {
         .map(|s| s.as_ref().map(|s| s.overall))
         .collect();
     for (number, members) in bursts.iter().enumerate() {
-        settle_burst(frames, &mut verdicts, number + 1, members, &totals);
+        settle_burst(frames, &mut verdicts, number + 1, members, &totals, policy);
     }
     for (number, members) in moments.iter().enumerate() {
-        settle_moment(frames, &mut verdicts, number + 1, members, &totals);
+        settle_moment(frames, &mut verdicts, number + 1, members, &totals, policy);
     }
     for (verdict, (scores, values)) in verdicts.iter_mut().zip(final_scores.into_iter().zip(full)) {
         if let Some(scores) = scores {
@@ -1199,6 +1445,7 @@ pub fn decide(frames: &[Frame]) -> Report {
         rules_withdrawn,
     };
     Report {
+        strictness,
         thresholds: BTreeMap::from([
             ("analysisEdge", ANALYSIS_EDGE as f32),
             ("defocus", DEFOCUS),
@@ -1213,8 +1460,9 @@ pub fn decide(frames: &[Frame]) -> Report {
             ("momentBits", MOMENT_BITS as f32),
             ("momentBitsUntimed", MOMENT_BITS_UNTIMED as f32),
             ("momentGapMs", MOMENT_GAP_MS as f32),
-            ("momentMargin", MOMENT_MARGIN),
-            ("lowScore", LOW_SCORE),
+            ("momentMargin", policy.moment_margin),
+            ("lowScore", policy.low_score),
+            ("sameShot", SAME_SHOT),
             ("topShare", TOP_SHARE),
             ("topFloor", TOP_FLOOR),
             ("implausibleShare", IMPLAUSIBLE_SHARE),
@@ -1487,13 +1735,133 @@ mod tests {
         assert_eq!(report.counts.bursts, 1);
         assert_eq!(report.counts.burst_duplicates, 2);
         assert_eq!(report.counts.out_of_focus, 1);
-        // Frames the camera did not time are only a burst when they are neighbours.
+        // Frames the camera did not time have no place in the timeline, so one shot is found
+        // anywhere by its shape - and a different photograph in between is left alone.
         let untimed = [
             frame("a", &scene(1, 0, 0), None),
             frame("between", &scene(7, 0, 0), None),
             frame("b", &scene(1, 1, 1), None),
         ];
-        assert_eq!(decide(&untimed).counts.bursts, 0);
+        let report = decide(&untimed);
+        assert_eq!(report.counts.bursts, 1);
+        assert_eq!(report.verdicts[1].burst, None);
+        assert!(report.verdicts[1].keep);
+    }
+
+    /// A frame with its hundred checks, as the cull measures one.
+    fn checked(name: &str, rgb: &[u8], time_ms: Option<i64>) -> Frame {
+        let mut frame = frame(name, rgb, time_ms);
+        if let Some(measure) = frame.measure.as_mut() {
+            measure.checks = crate::cull_checks::measure(&crate::cull_checks::Sample {
+                rgb,
+                width: 640,
+                height: 480,
+                faces: &[],
+                settings: crate::cull_checks::Settings::default(),
+            })
+            .expect("checked");
+        }
+        frame
+    }
+
+    #[test]
+    fn a_darker_or_softer_copy_is_the_same_shot_wherever_it_sits() {
+        let dark: Vec<u8> = scene(1, 0, 0).iter().map(|v| v / 10).collect();
+        let original = measure_pixels(&scene(1, 0, 0), 640, 480, &[]).expect("measured");
+        let copy = measure_pixels(&dark, 640, 480, &[]).expect("measured");
+        let soft = measure_pixels(&scene(1, 3, 3), 640, 480, &[]).expect("measured");
+        let other = measure_pixels(&scene(2, 0, 0), 640, 480, &[]).expect("measured");
+        // On real photographs a tenfold darker copy moves the difference hash by up to 22
+        // bits; its shape does not move.
+        assert!(
+            same_shot(&original, &copy),
+            "{:?}",
+            shape_correlation(&original.shape, &copy.shape)
+        );
+        assert!(same_shot(&original, &soft));
+        assert!(
+            !same_shot(&original, &other),
+            "{:?}",
+            shape_correlation(&original.shape, &other.shape)
+        );
+        // A camera original and an untimed dark copy far down the collection: one shot, and
+        // the copy is the one left out.
+        let frames = [
+            checked("original", &scene(1, 0, 0), Some(1_000)),
+            checked("next", &scene(2, 0, 0), Some(90_000)),
+            checked("later", &scene(3, 0, 0), Some(400_000)),
+            checked("copy", &dark, None),
+        ];
+        let report = decide(&frames);
+        let copy = &report.verdicts[3];
+        assert!(!copy.keep, "{copy:?}");
+        assert_eq!(copy.kept_instead.as_deref(), Some("original"));
+        assert!(report.verdicts[..3].iter().all(|v| v.keep));
+    }
+
+    #[test]
+    fn a_shape_survives_the_stored_review() {
+        let measure = measure_pixels(&scene(1, 0, 0), 640, 480, &[]).expect("measured");
+        assert_eq!(measure.shape.len(), SHAPE_GRID * SHAPE_GRID);
+        let text = serde_json::to_string(&measure).expect("json");
+        let back: Measure = serde_json::from_str(&text).expect("read back");
+        assert_eq!(back, measure);
+        // A flat frame has no shape and matches nothing.
+        let flat = measure_pixels(&vec![128_u8; 640 * 480 * 3], 640, 480, &[]).expect("measured");
+        assert!(flat.shape.is_empty());
+        assert!(!same_shot(&flat, &flat));
+    }
+
+    #[test]
+    fn a_stricter_level_never_delivers_more() {
+        let frames = [
+            checked("a", &scene(1, 0, 0), Some(0)),
+            checked("a2", &scene(1, 1, 1), Some(4_000)),
+            checked("a3", &scene(1, 2, 2), Some(8_000)),
+            checked("b", &scene(2, 0, 0), Some(90_000)),
+            checked("soft", &scene(3, 6, 6), Some(200_000)),
+            checked("c", &scene(4, 0, 0), Some(400_000)),
+        ];
+        let kept: Vec<usize> = Strictness::ALL
+            .iter()
+            .map(|level| decide_with(&frames, *level).counts.kept)
+            .collect();
+        assert!(kept[0] >= kept[1] && kept[1] >= kept[2], "{kept:?}");
+        assert_eq!(decide(&frames), decide_with(&frames, Strictness::Balanced));
+        assert_eq!(
+            decide_with(&frames, Strictness::Strict).strictness,
+            Strictness::Strict
+        );
+        for level in Strictness::ALL {
+            assert_eq!(Strictness::parse(level.slug()), Some(level));
+        }
+        assert_eq!(Strictness::parse("harsh"), None);
+    }
+
+    #[test]
+    fn each_level_reads_a_moment_its_own_way() {
+        let frames: Vec<Frame> = (0..6).map(|i| plain(&i.to_string(), false)).collect();
+        let totals: Vec<Option<f32>> = [80.0, 77.0, 74.0, 71.0, 60.0, 50.0]
+            .iter()
+            .map(|v| Some(*v))
+            .collect();
+        let kept = |level: Strictness| {
+            let mut verdicts: Vec<Verdict> = (0..6).map(|i| kept(&i.to_string())).collect();
+            settle_moment(
+                &frames,
+                &mut verdicts,
+                1,
+                &[0, 1, 2, 3, 4, 5],
+                &totals,
+                level.policy(),
+            );
+            verdicts.iter().filter(|v| v.keep).count()
+        };
+        // Gentle leaves a moment alone; balanced keeps those within 12 points, up to half;
+        // strict those within 6, up to a third.
+        assert_eq!(kept(Strictness::Gentle), 6);
+        assert_eq!(kept(Strictness::Balanced), 3);
+        assert_eq!(kept(Strictness::Strict), 2);
     }
 
     #[test]
@@ -1579,7 +1947,8 @@ mod tests {
         ];
         let mut verdicts: Vec<Verdict> = ["a", "b", "c", "d"].iter().map(|n| kept(n)).collect();
         let totals = [Some(80.0), Some(75.0), Some(50.0), Some(30.0)];
-        settle_moment(&frames, &mut verdicts, 1, &[0, 1, 2, 3], &totals);
+        let balanced = Strictness::Balanced.policy();
+        settle_moment(&frames, &mut verdicts, 1, &[0, 1, 2, 3], &totals, balanced);
         let keeps: Vec<bool> = verdicts.iter().map(|v| v.keep).collect();
         // b is within the margin; c is not; d is weak but a person edited it.
         assert_eq!(keeps, [true, true, false, true]);
@@ -1588,7 +1957,14 @@ mod tests {
         assert!(verdicts.iter().all(|v| v.moment == Some(1)));
         // Without scores for every frame nothing is decided by score.
         let mut unscored: Vec<Verdict> = ["a", "b"].iter().map(|n| kept(n)).collect();
-        settle_moment(&frames, &mut unscored, 2, &[0, 1], &[Some(90.0), None]);
+        settle_moment(
+            &frames,
+            &mut unscored,
+            2,
+            &[0, 1],
+            &[Some(90.0), None],
+            balanced,
+        );
         assert!(unscored.iter().all(|v| v.keep));
     }
 
@@ -1597,7 +1973,15 @@ mod tests {
         let frames: Vec<Frame> = (0..6).map(|i| plain(&i.to_string(), false)).collect();
         let mut verdicts: Vec<Verdict> = (0..6).map(|i| kept(&i.to_string())).collect();
         let totals: Vec<Option<f32>> = (0..6).map(|i| Some(80.0 - i as f32)).collect();
-        settle_moment(&frames, &mut verdicts, 1, &[0, 1, 2, 3, 4, 5], &totals);
+        let balanced = Strictness::Balanced.policy();
+        settle_moment(
+            &frames,
+            &mut verdicts,
+            1,
+            &[0, 1, 2, 3, 4, 5],
+            &totals,
+            balanced,
+        );
         assert_eq!(verdicts.iter().filter(|v| v.keep).count(), 3);
     }
 
@@ -1605,10 +1989,15 @@ mod tests {
     fn a_very_low_score_is_left_out_but_never_a_hand_edited_frame() {
         let mut verdicts = vec![kept("a"), kept("b"), kept("c")];
         verdicts[1].reason = Reason::EditedByHand;
-        drop_low_scores(&mut verdicts, &[Some(10.0), Some(10.0), Some(70.0)]);
+        let scores = [Some(10.0), Some(10.0), Some(70.0)];
+        drop_low_scores(&mut verdicts, &scores, LOW_SCORE);
         assert_eq!(verdicts[0].reason, Reason::LowScore);
         assert!(!verdicts[0].keep);
         assert!(verdicts[1].keep && verdicts[2].keep);
+        // A gentler line hands it back.
+        restore_above(&mut verdicts, &scores, 5.0);
+        assert!(verdicts[0].keep);
+        assert_eq!(verdicts[0].reason, Reason::Keep);
     }
 
     #[test]
@@ -1628,20 +2017,6 @@ mod tests {
 
     #[test]
     fn every_checked_frame_gets_a_hundred_scores_and_its_neighbours_are_read() {
-        let checked = |name: &str, rgb: &[u8], time_ms: Option<i64>| {
-            let mut frame = frame(name, rgb, time_ms);
-            if let Some(measure) = frame.measure.as_mut() {
-                measure.checks = crate::cull_checks::measure(&crate::cull_checks::Sample {
-                    rgb,
-                    width: 640,
-                    height: 480,
-                    faces: &[],
-                    settings: crate::cull_checks::Settings::default(),
-                })
-                .expect("checked");
-            }
-            frame
-        };
         let frames = [
             checked("a", &scene(1, 0, 0), Some(0)),
             checked("b", &scene(2, 0, 0), Some(60_000)),

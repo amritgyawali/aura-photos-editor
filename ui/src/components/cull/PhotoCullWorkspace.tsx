@@ -10,6 +10,7 @@ import {
   photoCullStatus,
   pickImportPaths,
   setPhotoCullChoice,
+  setPhotoCullStrictness,
   startPhotoCull,
 } from '../../ipc/client';
 import type { PhotoCullCheckDto, PhotoCullPhotoDto, PhotoCullReviewDto, PhotoCullStatusDto } from '../../ipc/types';
@@ -24,6 +25,11 @@ import { useThumbnails } from '../../stores/thumbnailStore';
  * shown; anything left out is one click from coming back; "Keep every photo" overrules the
  * whole cull; and every choice made here is what Finish Folder and Export deliver. Nothing
  * on this screen deletes, moves or edits a photograph.
+ *
+ * Strictness moves between gentle, balanced and strict without measuring anything again, and
+ * says what each would deliver first. A photograph's panel shows the rest of its burst or
+ * moment, so the frame AURA chose can be swapped for another in one click; the arrow keys
+ * walk the list, K keeps, X leaves out, U undoes and Esc closes.
  */
 
 export type CullTab = 'best' | 'left';
@@ -46,11 +52,42 @@ export function cullSummary(review: PhotoCullReviewDto): string {
   return `${review.frames} photos checked: ${parts.join(' · ')}.`;
 }
 
-/** The photographs one tab shows, best first or in shooting order. */
-export function photosFor(review: PhotoCullReviewDto, tab: CullTab, sort: CullSort, topOnly = false): PhotoCullPhotoDto[] {
-  const shown = review.photos.filter((photo) => (tab === 'best' ? photo.keep : !photo.keep) && (!topOnly || photo.topPick));
+/** The photographs one tab shows, best first or in shooting order, optionally of one reason. */
+export function photosFor(review: PhotoCullReviewDto, tab: CullTab, sort: CullSort, topOnly = false, reason: string | null = null): PhotoCullPhotoDto[] {
+  const shown = review.photos.filter((photo) => (tab === 'best' ? photo.keep : !photo.keep)
+    && (!topOnly || photo.topPick) && (reason === null || photo.reason === reason));
   if (sort === 'time') return shown;
   return [...shown].sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
+}
+
+/** The reasons in one tab and how many photos each holds, most first. */
+export function reasonCounts(review: PhotoCullReviewDto, tab: CullTab): { reason: string; label: string; count: number }[] {
+  const counts = new Map<string, { reason: string; label: string; count: number }>();
+  for (const photo of review.photos) {
+    if ((tab === 'best') !== photo.keep) continue;
+    const entry = counts.get(photo.reason) ?? { reason: photo.reason, label: photo.reasonLabel, count: 0 };
+    entry.count += 1;
+    counts.set(photo.reason, entry);
+  }
+  return [...counts.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+
+/** Every photograph of the same burst or moment, itself included, in shooting order; empty when it stands alone. */
+export function siblingsOf(review: PhotoCullReviewDto, photo: PhotoCullPhotoDto): PhotoCullPhotoDto[] {
+  const together = review.photos.filter((other) => (photo.burst !== null && other.burst === photo.burst)
+    || (photo.moment !== null && other.moment === photo.moment));
+  return together.length > 1 ? together : [];
+}
+
+/** The photograph `step` places from `id` in the list shown; the first one when `id` has left the list. */
+export function stepFrom(shown: PhotoCullPhotoDto[], id: string, step: number): string | null {
+  const at = shown.findIndex((photo) => photo.photoId === id);
+  if (at < 0) return shown[0]?.photoId ?? null;
+  return shown[at + step]?.photoId ?? null;
+}
+
+function typing(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName));
 }
 
 /** Who decided, in words. */
@@ -129,12 +166,16 @@ function Card({ projectId, photo, selected, disabled, onToggle, onOpen, onChoose
   );
 }
 
-function Detail({ projectId, photo, review, onClose, onOpen }: {
+function Detail({ projectId, photo, review, disabled, onClose, onOpen, onSelect, onChoose, onSwap }: {
   projectId: string;
   photo: PhotoCullPhotoDto;
   review: PhotoCullReviewDto;
+  disabled: boolean;
   onClose: () => void;
   onOpen?: (photoId: string) => void;
+  onSelect: (photoId: string) => void;
+  onChoose: (choice: string) => void;
+  onSwap: (deliver: string, leaveOut: string) => void;
 }): JSX.Element {
   const [checks, setChecks] = useState<PhotoCullCheckDto[] | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
@@ -148,6 +189,9 @@ function Detail({ projectId, photo, review, onClose, onOpen }: {
     return () => { live = false; };
   }, [projectId, photo.photoId]);
   const instead = photo.keptInstead ? review.photos.find((p) => p.photoId === photo.keptInstead) : undefined;
+  const siblings = siblingsOf(review, photo);
+  const action = actionFor(photo);
+  const by = choiceLabel(photo);
   return (
     <aside className="cull-detail" aria-label={`Checks for ${photo.fileName}`}>
       <header>
@@ -156,8 +200,34 @@ function Detail({ projectId, photo, review, onClose, onOpen }: {
       </header>
       <div className="cull-detail-image"><Thumb projectId={projectId} photoId={photo.photoId} /></div>
       <p className="cull-detail-reason"><strong>{photo.reasonLabel}.</strong> {photo.detail}</p>
+      {by && <p className="cull-by">{by}.</p>}
+      <div className="cull-detail-actions">
+        <button type="button" className="is-primary" disabled={disabled} onClick={() => onChoose(action.choice)}
+          title={action.choice === 'keep' ? 'K' : action.choice === 'leave_out' ? 'X' : 'U'}>{action.label}</button>
+        {!photo.keep && instead && instead.keep && (
+          <button type="button" disabled={disabled} onClick={() => onSwap(photo.photoId, instead.photoId)}>
+            Deliver this instead of {instead.fileName}
+          </button>
+        )}
+        {onOpen && <button type="button" onClick={() => onOpen(photo.photoId)}>Open in the editor</button>}
+      </div>
       {instead && <p className="studio-footnote">Delivered instead: {instead.fileName}.</p>}
-      {onOpen && <button type="button" onClick={() => onOpen(photo.photoId)}>Open in the editor</button>}
+      {siblings.length > 0 && (
+        <section className="cull-moment" aria-label={photo.burst !== null ? 'Same burst' : 'Same moment'}>
+          <h4>{photo.burst !== null ? 'Same burst' : 'Same moment'} <small>{siblings.length} photos</small></h4>
+          <div>
+            {siblings.map((other) => (
+              <button key={other.photoId} type="button" aria-label={other.fileName} aria-current={other.photoId === photo.photoId}
+                className={`${other.keep ? 'is-kept' : 'is-out'}${other.photoId === photo.photoId ? ' is-current' : ''}`}
+                onClick={() => onSelect(other.photoId)} title={`${other.fileName}: ${other.reasonLabel}`}>
+                <Thumb projectId={projectId} photoId={other.photoId} />
+                <span>{other.score !== null ? Math.round(other.score) : '—'} · {other.keep ? 'Best' : 'Left out'}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+      <p className="studio-footnote cull-keys">← → next photo · K keep · X leave out · U undo · Esc close</p>
       <ul className="cull-groups" aria-label="Score by group">
         {review.groups.map((group, index) => {
           const score = photo.categories[index] ?? null;
@@ -191,6 +261,7 @@ export function PhotoCullWorkspace({ projectId, disabled, onError, onOpen }: Pho
   const [tab, setTab] = useState<CullTab>('best');
   const [sort, setSort] = useState<CullSort>('score');
   const [topOnly, setTopOnly] = useState(false);
+  const [reason, setReason] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [detail, setDetail] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -263,6 +334,31 @@ export function PhotoCullWorkspace({ projectId, disabled, onError, onOpen }: Pho
     }
   }, [projectId, onError]);
 
+  const restrict = useCallback(async (strictness: string) => {
+    setSaving(true);
+    try {
+      setReview(await setPhotoCullStrictness({ projectId, strictness }));
+      setSelected(new Set());
+      setReason(null);
+    } catch (err) {
+      onError(asIpcError(err));
+    } finally {
+      setSaving(false);
+    }
+  }, [projectId, onError]);
+
+  const swap = useCallback(async (deliver: string, leaveOut: string) => {
+    setSaving(true);
+    try {
+      await setPhotoCullChoice({ projectId, photoIds: [deliver], choice: 'keep' });
+      setReview(await setPhotoCullChoice({ projectId, photoIds: [leaveOut], choice: 'leave_out' }));
+    } catch (err) {
+      onError(asIpcError(err));
+    } finally {
+      setSaving(false);
+    }
+  }, [projectId, onError]);
+
   const finish = useCallback(async (onlyPhotos: string[]) => {
     if (!inTauri() || automaticBusy(useAutomatic.getState())) return;
     useAutomatic.setState({ starting: true });
@@ -275,8 +371,29 @@ export function PhotoCullWorkspace({ projectId, disabled, onError, onOpen }: Pho
     }
   }, [projectId, destination, onError]);
 
-  const shown = useMemo(() => (review ? photosFor(review, tab, sort, topOnly) : []), [review, tab, sort, topOnly]);
+  const shown = useMemo(() => (review ? photosFor(review, tab, sort, topOnly, reason) : []), [review, tab, sort, topOnly, reason]);
+  const reasons = useMemo(() => (review ? reasonCounts(review, tab) : []), [review, tab]);
   const detailPhoto = review && detail ? review.photos.find((p) => p.photoId === detail) : undefined;
+
+  useEffect(() => {
+    if (!detailPhoto) return undefined;
+    const onKey = (event: KeyboardEvent) => {
+      if (typing(event.target) || event.ctrlKey || event.metaKey || event.altKey) return;
+      const key = event.key.toLowerCase();
+      if (key === 'escape') setDetail(null);
+      else if (key === 'arrowright' || key === 'arrowleft') {
+        const next = stepFrom(shown, detailPhoto.photoId, key === 'arrowright' ? 1 : -1);
+        if (next) setDetail(next);
+      } else if (locked) return;
+      else if (key === 'k' && !detailPhoto.keep) void choose([detailPhoto.photoId], 'keep');
+      else if (key === 'x' && detailPhoto.keep) void choose([detailPhoto.photoId], 'leave_out');
+      else if (key === 'u' && detailPhoto.choice) void choose([detailPhoto.photoId], 'auto');
+      else return;
+      event.preventDefault();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [detailPhoto, shown, locked, choose]);
   const leftOutIds = review ? review.photos.filter((p) => !p.keep).map((p) => p.photoId) : [];
   const chosenIds = review ? review.photos.filter((p) => p.choice).map((p) => p.photoId) : [];
   const broughtBack = review ? review.photos.filter((p) => p.keep && !p.cullKeep).map((p) => p.photoId) : [];
@@ -309,11 +426,32 @@ export function PhotoCullWorkspace({ projectId, disabled, onError, onOpen }: Pho
       {review && (
         <>
           <p className="photo-cull-summary">{cullSummary(review)}</p>
+          {review.levels.length > 0 ? (
+            <div className="photo-cull-levels" role="radiogroup" aria-label="Strictness">
+              {review.levels.map((level) => (
+                <button key={level.strictness} type="button" role="radio" aria-checked={review.strictness === level.strictness}
+                  disabled={locked} title={level.description} onClick={() => { if (review.strictness !== level.strictness) void restrict(level.strictness); }}>
+                  <strong>{level.label}</strong>
+                  <span>{level.best} best · {level.leftOut} left out</span>
+                </button>
+              ))}
+            </div>
+          ) : <p className="studio-footnote" role="note">Cull again once to choose how strict the cull is.</p>}
+          {review.levels.length > 0 && <p className="studio-footnote">{review.levels.find((l) => l.strictness === review.strictness)?.description} Changing it measures nothing again and keeps every choice you made.</p>}
           {review.notCulled > 0 && <p className="studio-footnote" role="note">{review.notCulled} photo(s) were added after this cull and are not in it. Cull again to include them.</p>}
           <div className="photo-cull-tabs" role="tablist" aria-label="Cull result">
-            <button type="button" role="tab" aria-selected={tab === 'best'} onClick={() => { setTab('best'); setSelected(new Set()); }}>Best ({review.best})</button>
-            <button type="button" role="tab" aria-selected={tab === 'left'} onClick={() => { setTab('left'); setSelected(new Set()); }}>Left out ({review.leftOut})</button>
+            <button type="button" role="tab" aria-selected={tab === 'best'} onClick={() => { setTab('best'); setSelected(new Set()); setReason(null); }}>Best ({review.best})</button>
+            <button type="button" role="tab" aria-selected={tab === 'left'} onClick={() => { setTab('left'); setSelected(new Set()); setReason(null); }}>Left out ({review.leftOut})</button>
           </div>
+          {reasons.length > 1 && (
+            <div className="photo-cull-reasons" role="group" aria-label="Show only">
+              <button type="button" aria-pressed={reason === null} onClick={() => setReason(null)}>All</button>
+              {reasons.map((entry) => (
+                <button key={entry.reason} type="button" aria-pressed={reason === entry.reason}
+                  onClick={() => setReason(reason === entry.reason ? null : entry.reason)}>{entry.label} ({entry.count})</button>
+              ))}
+            </div>
+          )}
           <div className="photo-cull-toolbar">
             <label>Order <select value={sort} onChange={(e) => setSort(e.currentTarget.value as CullSort)}><option value="score">Best score first</option><option value="time">Shooting order</option></select></label>
             {tab === 'best' && <label><input type="checkbox" checked={topOnly} onChange={(e) => setTopOnly(e.currentTarget.checked)} /> Top picks only</label>}
@@ -332,7 +470,10 @@ export function PhotoCullWorkspace({ projectId, disabled, onError, onOpen }: Pho
                   onChoose={(choice) => void choose([photo.photoId], choice)} />
               ))}
             </div>
-            {detailPhoto && <Detail projectId={projectId} photo={detailPhoto} review={review} onClose={() => setDetail(null)} onOpen={onOpen} />}
+            {detailPhoto && (
+              <Detail projectId={projectId} photo={detailPhoto} review={review} disabled={locked} onClose={() => setDetail(null)} onOpen={onOpen}
+                onSelect={setDetail} onChoose={(choice) => void choose([detailPhoto.photoId], choice)} onSwap={(deliver, leaveOut) => void swap(deliver, leaveOut)} />
+            )}
           </div>
           <footer className="photo-cull-finish">
             <label>Export into <input type="text" value={destination} placeholder="Pictures\AURA Exports (default)" disabled={locked} onChange={(e) => setDestination(e.currentTarget.value)} aria-label="Export into" /></label>

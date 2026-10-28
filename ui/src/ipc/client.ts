@@ -2,7 +2,7 @@ import { invoke as rawInvoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import type { InternalAiStatus } from './internalAi';
 import type { AutomaticStartDto, AutomaticStartInput, PhotoAnalysisDto, PhotoAutoEditInput, PhotoAutoEditDto, OneClickFinishInput, OneClickFinishDto, OneClickStatusDto } from './types';
-import type { PhotoCullInput, PhotoCullJobDto, PhotoCullStatusDto, PhotoCullReviewDto, PhotoCullChecksInput, PhotoCullCheckDto, SetPhotoCullChoiceInput } from './types';
+import type { PhotoCullInput, PhotoCullJobDto, PhotoCullStatusDto, PhotoCullReviewDto, PhotoCullChecksInput, PhotoCullCheckDto, SetPhotoCullChoiceInput, SetPhotoCullStrictnessInput } from './types';
 
 import { audit, drainAuditBatch, isQuietIpc } from '../audit/log';
 
@@ -140,6 +140,10 @@ export const photoCullChecks = (input: PhotoCullChecksInput): Promise<PhotoCullC
 /** Bring back (`keep`), leave out, or hand back to the cull (`auto`). */
 export const setPhotoCullChoice = (input: SetPhotoCullChoiceInput): Promise<PhotoCullReviewDto> =>
   invoke<PhotoCullReviewDto>('set_photo_cull_choice', { input });
+
+/** Re-decide the last cull at `gentle`, `balanced` or `strict`, without measuring again. */
+export const setPhotoCullStrictness = (input: SetPhotoCullStrictnessInput): Promise<PhotoCullReviewDto> =>
+  invoke<PhotoCullReviewDto>('set_photo_cull_strictness', { input });
 
 export async function pickImportPaths(directory: boolean): Promise<string[]> {
   const result = await invoke<string | string[] | null>('plugin:dialog|open', {

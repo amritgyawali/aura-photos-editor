@@ -5080,7 +5080,21 @@ export type OneClickFinishInput = {
 };
 
 /** ADR-0185. Cull a whole collection on its own, before anything is edited. */
-export type PhotoCullInput = { projectId: string };
+export type PhotoCullInput = {
+  projectId: string;
+  /** `gentle` | `balanced` | `strict`; omitted keeps the collection's last level. */
+  strictness?: string | null;
+};
+/** ADR-0185. Re-decide the last cull at another strictness, without measuring again. */
+export type SetPhotoCullStrictnessInput = { projectId: string; strictness: string };
+/** ADR-0185. What one strictness level would deliver, with the photographer's choices applied. */
+export type PhotoCullLevelDto = {
+  strictness: string;
+  label: string;
+  description: string;
+  best: number;
+  leftOut: number;
+};
 export type PhotoCullJobDto = { jobId: string };
 export type PhotoCullStatusDto = {
   jobId: string;
@@ -5126,6 +5140,10 @@ export type PhotoCullReviewDto = {
   /** Photographs added since this cull, so not in it. */
   notCulled: number;
   groups: string[];
+  /** The strictness this review was decided at. */
+  strictness: string;
+  /** Every level and what it would deliver; empty for a review that predates them. */
+  levels: PhotoCullLevelDto[];
   photos: PhotoCullPhotoDto[];
 };
 export type PhotoCullChecksInput = { projectId: string; photoId: string };

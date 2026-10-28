@@ -264,7 +264,7 @@ pub use one_click_commands::{
 };
 pub use photo_cull::{
     photo_cull_cancel, photo_cull_checks, photo_cull_review, photo_cull_status,
-    set_photo_cull_choice, start_photo_cull,
+    set_photo_cull_choice, set_photo_cull_strictness, start_photo_cull,
 };
 pub use story_commands::{
     classify_scenes, image_scene, merge_chapters, move_chapter_boundary, scene_profiles,

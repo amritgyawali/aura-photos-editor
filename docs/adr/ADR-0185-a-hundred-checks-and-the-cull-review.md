@@ -143,19 +143,67 @@ synthetic frames and on the decision tests, not on a real burst of a real weddin
 against a photographer's own picks has been run. The thresholds are a starting point that real
 collections should move, and every one of them is in one table in `cull_checks.rs`.
 
+## 6. Strictness, the same shot by its shape, and Canon's capture times
+
+Added after the first version was reviewed on real files.
+
+* **Three strictness levels** (`measured_cull::Strictness`). Every level keeps the hard rules,
+  the burst rule and the photographer's choices. Gentle leaves weaker shots of a moment alone and
+  draws the low-score line at 15; balanced is section 3 unchanged; strict keeps a second shot of
+  a moment only within 6 points of the best and at most a third of it, one frame of a burst of up
+  to twelve, and draws the line at 50. Whether the rules describe a style (the 40% guard) is
+  always judged at the balanced line, so a stricter level can never trip the guard and end up
+  keeping more. On the calibration set's 60 photographs and their damaged copies, the share under
+  each line was:
+
+  | Line | As shot | Defocused | Smeared | Three stops under | Blown out |
+  |---|---|---|---|---|---|
+  | 25 | 0% | 0% | 0% | 0% | 2% |
+  | 45 | 0% | 25% | 7% | 2% | 5% |
+  | **50 (strict)** | **0%** | **37%** | **20%** | **8%** | **13%** |
+  | 55 | 2% | 48% | 35% | 33% | 22% |
+
+  Strict sits at 50, the highest line that left out none of the photographs as shot. A level is chosen after a cull and costs nothing:
+  the stored review now keeps each frame's measurements (`Stored::frames`), so
+  `set_photo_cull_strictness` re-decides from them, and the review carries what every level
+  would leave out so the screen can say so before the photographer picks. A review stored before
+  this change has no frames; the screen asks for one more cull.
+* **The same shot by its shape.** The window test left a three-stops-dark copy of a photograph in
+  Best: it had no camera time, so it was compared only with its neighbours, and darkening moved its
+  difference hash by up to 22 bits. `Measure::shape` is the frame's mean luminance on a 24x24 grid,
+  mean removed - a layout exposure and focus do not change. Over 1,000 distinct photographs of the
+  test wedding the four pairs correlating at 0.97 or more were all one shot (two duplicates, two
+  burst siblings), the next closest different pair correlated at 0.91, and every tenfold-darkened
+  or defocused copy correlated at 0.99 or more with its original. Two frames at 0.97 or more are
+  one burst when they are timed within its gap, and anywhere in the collection when either has no
+  camera time.
+* **Canon CR3 imported without a capture time.** The EXIF reader does not open ISO media files,
+  so every CR3 came in with no time, ISO, shutter speed, focal length or flash - and no burst or
+  moment a Canon body shot could be found. `aura-ingest::exif` now reads `CMT1` (IFD0) and `CMT2`
+  (the EXIF directory, given an IFD0 that points at it) when the container reader fails. On 27 real
+  CR3 frames of one wedding every frame now has its time; the cull keeps 26, leaving out one group
+  photo taken 9.5 seconds after a near-identical one that scored 12 points higher. Those 27 were the
+  photographer's own selects, so keeping nearly all of them is the expected answer; no full card has
+  been culled.
+* **Reviewing a moment.** A photograph's panel shows the rest of its burst or moment;
+  "Deliver this instead" is two `cull_override` rows (keep this, leave out the other); arrow keys
+  walk the list and K, X, U and Esc decide; the Left out list filters by reason.
+
 ## Blast radius of the contract change
 
 Additive only: no existing field, command or type changed shape.
 
-* `crates/aura-app/src/contract/ipc.rs` - seven new DTOs (`PhotoCull*`, `SetPhotoCullChoiceInput`)
-  and `OneClickFinishInput::only_photos`, `#[serde(default)]`, so every existing caller's payload
-  still parses.
+* `crates/aura-app/src/contract/ipc.rs` - nine new DTOs (`PhotoCull*`, `SetPhotoCullChoiceInput`,
+  `SetPhotoCullStrictnessInput`, `PhotoCullLevelDto`), `OneClickFinishInput::only_photos`,
+  `PhotoCullInput::strictness` and `PhotoCullReviewDto::{strictness, levels}`, all
+  `#[serde(default)]` where an existing caller could omit them, so every existing payload still
+  parses.
 * `grep -rn "OneClickFinishInput {" crates ui/src-tauri` - five struct literals, all updated:
   `one_click_commands.rs` (`automatic_start`), `tests/one_click.rs` (three), `tests/ingest_recovery.rs`.
 * `ui/src/ipc/types.ts` - the same seven types and an optional `onlyPhotos?` on
   `OneClickFinishInput`; `grep -rn "oneClickFinish(" ui/src` - `OneClickRunner.tsx` (unchanged, the
   field is optional) and `PhotoCullWorkspace.tsx`.
-* `scripts/check-ipc-surface.sh` - 360 = 360 = 360 with the six new commands.
+* `scripts/check-ipc-surface.sh` - 361 = 361 = 361 with the seven new commands.
 
 ## Consequences
 

@@ -223,6 +223,26 @@ A photo you edited by hand, or one AURA could not read, is never left out. If th
 out more than 40% of a collection, they are describing your style rather than mistakes, and they
 are switched off for that collection.
 
+A darker, brighter or softer copy of a photo - an export dropped back into the folder, a frame
+where the flash did not fire - is recognised as the same shot even when it has no camera time, and
+only the better of the two is delivered.
+
+### How strict
+
+Above the lists, three buttons say how hard the cull is and what each would deliver:
+
+* **Gentle** leaves out only mistakes - black, blown, out of focus, smeared - and near-identical
+  frames. Every distinct shot of a moment stays.
+* **Balanced**, the starting point, also leaves out a shot of a moment that scored more than 12
+  points below the best, keeping at most half of a moment's close shots, and a photo scoring under
+  25.
+* **Strict** keeps a second shot of a moment only within 6 points of the best and at most a third
+  of the moment, keeps one frame of a burst of up to twelve, and leaves out a photo scoring under
+  50.
+
+Switching measures nothing again: it takes a moment, and every photo you brought back or left out
+stays where you put it.
+
 ### Your word is final
 
 * **Bring back** puts a left-out photo in the best set. **Leave out** does the opposite.
@@ -235,7 +255,11 @@ run, the Cull screen shows what it left out, and **Edit & export only the ones b
 finishes just those without redoing the rest.
 
 Click any photo to see its score, its ten group scores, why it is where it is, and all one hundred
-checks with what each measured.
+checks with what each measured. When it belongs to a burst or a moment, the panel shows the other
+frames beside it; **Deliver this instead of ...** swaps the frame AURA chose for the one you are
+looking at. With the panel open, **←** and **→** move through the list, **K** keeps, **X** leaves
+out, **U** undoes your choice and **Esc** closes. In the Left out list, the reason buttons show one
+kind at a time - only the out-of-focus frames, say.
 
 ### How the checks were set
 

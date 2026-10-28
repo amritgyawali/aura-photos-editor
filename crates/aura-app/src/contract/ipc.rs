@@ -8774,6 +8774,37 @@ pub struct OneClickFinishDto {
 pub struct PhotoCullInput {
     /// The collection.
     pub project_id: String,
+    /// `gentle`, `balanced` or `strict`; absent keeps the collection's last level, or
+    /// balanced for a collection never culled.
+    #[serde(default)]
+    pub strictness: Option<String>,
+}
+
+/// Re-decide a collection's last cull at another strictness, from the measurements already
+/// taken. Nothing is measured again and no choice is touched.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetPhotoCullStrictnessInput {
+    /// The collection.
+    pub project_id: String,
+    /// `gentle`, `balanced` or `strict`.
+    pub strictness: String,
+}
+
+/// What one strictness level would deliver, with the photographer's choices applied.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PhotoCullLevelDto {
+    /// `gentle`, `balanced` or `strict`.
+    pub strictness: String,
+    /// The level in a word.
+    pub label: String,
+    /// What it means, in a sentence.
+    pub description: String,
+    /// Photographs it delivers.
+    pub best: u64,
+    /// Photographs it leaves out.
+    pub left_out: u64,
 }
 
 /// The cull just started, or the one already running for that collection.
@@ -8828,6 +8859,13 @@ pub struct PhotoCullReviewDto {
     pub not_culled: u64,
     /// The ten check groups, in the order `categories` holds them.
     pub groups: Vec<String>,
+    /// The strictness this review was decided at.
+    #[serde(default)]
+    pub strictness: String,
+    /// Every level and what it would deliver; empty when the review predates them and the
+    /// collection must be culled again to change level.
+    #[serde(default)]
+    pub levels: Vec<PhotoCullLevelDto>,
     /// Every photograph, in timeline order.
     pub photos: Vec<PhotoCullPhotoDto>,
 }

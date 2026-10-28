@@ -9,11 +9,11 @@ use std::time::{Duration, Instant};
 
 use aura_app::contract::ipc::{
     CreateProjectInput, PhotoCullChecksInput, PhotoCullInput, PhotoCullReviewDto,
-    SetPhotoCullChoiceInput,
+    SetPhotoCullChoiceInput, SetPhotoCullStrictnessInput,
 };
 use aura_app::{
     create_project, photo_cull_checks, photo_cull_review, photo_cull_status, set_photo_cull_choice,
-    start_photo_cull, AppState,
+    set_photo_cull_strictness, start_photo_cull, AppState,
 };
 use aura_cloud::keys::MemoryKeyStore;
 use aura_core::progress::{CancelToken, NullProgress};
@@ -109,6 +109,7 @@ fn a_cull_is_reviewed_corrected_and_remembered() {
         &state,
         PhotoCullInput {
             project_id: project.id.clone(),
+            strictness: None,
         },
     )
     .expect("started");
@@ -140,6 +141,46 @@ fn a_cull_is_reviewed_corrected_and_remembered() {
         assert!(kept.keep, "{kept:?}");
         assert!(kept.score.is_some());
     }
+    // Every level is counted, and moving between them measures nothing again.
+    assert_eq!(review.strictness, "balanced");
+    let levels: Vec<&str> = review
+        .levels
+        .iter()
+        .map(|l| l.strictness.as_str())
+        .collect();
+    assert_eq!(levels, ["gentle", "balanced", "strict"]);
+    assert!(review.levels.windows(2).all(|w| w[0].best >= w[1].best));
+    let strict = set_photo_cull_strictness(
+        &state,
+        SetPhotoCullStrictnessInput {
+            project_id: project.id.clone(),
+            strictness: "strict".into(),
+        },
+    )
+    .expect("strict");
+    assert_eq!(strict.strictness, "strict");
+    assert_eq!(strict.measured_at, review.measured_at);
+    assert_eq!(strict.best, review.levels[2].best);
+    let back = set_photo_cull_strictness(
+        &state,
+        SetPhotoCullStrictnessInput {
+            project_id: project.id.clone(),
+            strictness: "balanced".into(),
+        },
+    )
+    .expect("balanced");
+    assert_eq!(
+        back.photos, review.photos,
+        "the same level is the same decision"
+    );
+    assert!(set_photo_cull_strictness(
+        &state,
+        SetPhotoCullStrictnessInput {
+            project_id: project.id.clone(),
+            strictness: "harsh".into(),
+        },
+    )
+    .is_err());
     let checks = photo_cull_checks(
         &state,
         PhotoCullChecksInput {

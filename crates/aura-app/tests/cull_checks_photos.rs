@@ -191,6 +191,28 @@ fn the_hundred_checks_on_real_photographs() {
                 overall.iter().filter(|s| **s < 25.0).count()
             );
         }
+        // The share of each kind under each candidate line: a strictness level's low-score
+        // line should catch damage without leaving out photographs as shot.
+        for line in [15.0_f32, 25.0, 35.0, 45.0, 50.0, 55.0] {
+            let shares: Vec<String> = DAMAGE
+                .iter()
+                .enumerate()
+                .map(|(kind, label)| {
+                    let of_kind: Vec<f32> = damaged_scores
+                        .iter()
+                        .zip(&kinds)
+                        .filter(|(_, k)| **k == kind)
+                        .map(|(s, _)| s.overall)
+                        .collect();
+                    let under = of_kind.iter().filter(|s| **s < line).count();
+                    format!(
+                        "{label} {:.0}%",
+                        under as f32 * 100.0 / of_kind.len().max(1) as f32
+                    )
+                })
+                .collect();
+            println!("under {line:.0}: {}", shares.join(", "));
+        }
     }
     println!(
         "{} photographs, {} with a face",

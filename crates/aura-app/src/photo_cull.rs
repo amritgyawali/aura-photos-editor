@@ -12,6 +12,9 @@
 //!   phase 12's `cull_override` rows - the table every cull in the product already obeys - so a
 //!   choice survives a fresh cull and nothing in the product can overrule it. Clearing a choice
 //!   hands the photograph back to the measured decision.
+//! * **Strictness without measuring again.** The review keeps every frame's measurements, so
+//!   moving between gentle, balanced and strict re-decides in a moment, and the review says
+//!   what each level would deliver before the photographer picks one.
 //!
 //! Nothing here deletes, moves or edits a photograph. A left-out photograph stays in the
 //! collection, is shown in its own list, and is one click from being delivered.
@@ -27,11 +30,11 @@ use serde::{Deserialize, Serialize};
 use crate::commands::IpcResult;
 use crate::contract::ipc::{
     ImageRowLite, IpcError, ListImagesInput, PhotoCullCheckDto, PhotoCullChecksInput,
-    PhotoCullInput, PhotoCullJobDto, PhotoCullPhotoDto, PhotoCullReviewDto, PhotoCullStatusDto,
-    SetPhotoCullChoiceInput,
+    PhotoCullInput, PhotoCullJobDto, PhotoCullLevelDto, PhotoCullPhotoDto, PhotoCullReviewDto,
+    PhotoCullStatusDto, SetPhotoCullChoiceInput, SetPhotoCullStrictnessInput,
 };
 use crate::cull_checks::{Category, CHECKS};
-use crate::measured_cull::{Frame, Reason, Report};
+use crate::measured_cull::{Frame, Reason, Report, Strictness};
 use crate::AppState;
 
 /// The `setting` row a collection's review lives in. Versioned, so a later layout is read as
@@ -67,6 +70,17 @@ pub(crate) struct Stored {
     pub(crate) measured_at: String,
     pub(crate) summary: String,
     pub(crate) photos: Vec<StoredPhoto>,
+    /// The level this review was decided at.
+    #[serde(default)]
+    pub(crate) strictness: Strictness,
+    /// Every frame as the decision read it, without the checks (`photos[].values` holds
+    /// those), so another level can be decided without measuring again. Empty in a review
+    /// written before strictness existed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) frames: Vec<Frame>,
+    /// The photographs each level leaves out, before anybody's choices.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) levels: Vec<(Strictness, Vec<String>)>,
 }
 
 /// Four significant figures are more than any threshold here can tell apart.
@@ -81,11 +95,69 @@ fn rounded(value: f32) -> f32 {
     (value * scale).round() / scale
 }
 
+/// Frames rounded as the review stores them, so a decision made now and one made later from
+/// the stored review are the same decision.
+pub(crate) fn as_stored(frames: Vec<Frame>) -> Vec<Frame> {
+    frames
+        .into_iter()
+        .map(|mut frame| {
+            if let Some(measure) = frame.measure.as_mut() {
+                for value in measure.checks.iter_mut().flatten() {
+                    *value = rounded(*value);
+                }
+            }
+            frame
+        })
+        .collect()
+}
+
+/// Decide `frames` at `strictness`, and note what every level would leave out.
+pub(crate) fn decide_all(frames: &[Frame], strictness: Strictness) -> (Report, Levels) {
+    let report = crate::measured_cull::decide_with(frames, strictness);
+    let levels = Strictness::ALL
+        .iter()
+        .map(|level| {
+            let left: Vec<String> = if *level == strictness {
+                report
+                    .verdicts
+                    .iter()
+                    .filter(|v| !v.keep)
+                    .map(|v| v.photo_id.clone())
+                    .collect()
+            } else {
+                crate::measured_cull::decide_with(frames, *level)
+                    .verdicts
+                    .into_iter()
+                    .filter(|v| !v.keep)
+                    .map(|v| v.photo_id)
+                    .collect()
+            };
+            (*level, left)
+        })
+        .collect();
+    (report, levels)
+}
+
+/// What each strictness level leaves out.
+pub(crate) type Levels = Vec<(Strictness, Vec<String>)>;
+
 impl Stored {
-    fn from_report(report: &Report, measured_at: String) -> Self {
+    fn from_report(report: &Report, measured_at: String, frames: &[Frame], levels: Levels) -> Self {
         Self {
             measured_at,
             summary: report.summary(),
+            strictness: report.strictness,
+            frames: frames
+                .iter()
+                .map(|frame| {
+                    let mut frame = frame.clone();
+                    if let Some(measure) = frame.measure.as_mut() {
+                        measure.checks.clear();
+                    }
+                    frame
+                })
+                .collect(),
+            levels,
             photos: report
                 .verdicts
                 .iter()
@@ -111,15 +183,71 @@ impl Stored {
                 .collect(),
         }
     }
+
+    /// The frames as the decision read them, checks restored; `None` when the review
+    /// predates stored frames or does not line up with its photographs.
+    pub(crate) fn frames(&self) -> Option<Vec<Frame>> {
+        if self.frames.is_empty() || self.frames.len() != self.photos.len() {
+            return None;
+        }
+        self.frames
+            .iter()
+            .zip(&self.photos)
+            .map(|(frame, photo)| {
+                (frame.photo_id == photo.photo_id).then(|| {
+                    let mut frame = frame.clone();
+                    if let Some(measure) = frame.measure.as_mut() {
+                        // The frame's own ninety, as a fresh measurement has them: the ten
+                        // collection checks are the decision's to fill, and a stored copy of
+                        // them would score the frame against its last decision.
+                        measure.checks = photo
+                            .values
+                            .iter()
+                            .take(crate::cull_checks::CONTEXT)
+                            .copied()
+                            .collect();
+                        if !measure.checks.is_empty() {
+                            measure.checks.resize(crate::cull_checks::COUNT, None);
+                        }
+                    }
+                    frame
+                })
+            })
+            .collect()
+    }
+
+    /// The review as an export folder's `photo-cull.json` carries it: the decision, not the
+    /// measurements kept for re-deciding.
+    pub(crate) fn for_export(&self) -> Self {
+        Self {
+            frames: Vec::new(),
+            ..self.clone()
+        }
+    }
 }
 
-/// Keep a collection's review in its catalog, replacing the last one.
+/// Keep a collection's review in its catalog, replacing the last one. `frames` are the ones
+/// `report` was decided from, and `levels` what each strictness leaves out.
 ///
 /// # Errors
 /// The catalog write failing.
-pub(crate) fn save(state: &AppState, project: &str, report: &Report) -> IpcResult<()> {
+pub(crate) fn save(
+    state: &AppState,
+    project: &str,
+    report: &Report,
+    frames: &[Frame],
+    levels: Levels,
+) -> IpcResult<()> {
     let now = aura_catalog::rfc3339(state.clock().now_utc());
-    let stored = Stored::from_report(report, now.clone());
+    write(
+        state,
+        project,
+        &Stored::from_report(report, now, frames, levels),
+    )
+}
+
+fn write(state: &AppState, project: &str, stored: &Stored) -> IpcResult<()> {
+    let now = aura_catalog::rfc3339(state.clock().now_utc());
     let encoded = serde_json::to_string(&stored).map_err(|e| error(&e.to_string()))?;
     let key = setting_key(project);
     state.catalog().writer().transact(move |conn| {
@@ -289,6 +417,11 @@ fn cancelled(job: &str) -> bool {
 pub fn start_photo_cull(state: &AppState, input: PhotoCullInput) -> IpcResult<PhotoCullJobDto> {
     let project = input.project_id;
     aura_core::ProjectId::from_db(&project).map_err(|_| error("Invalid project id."))?;
+    let strictness = match input.strictness.as_deref() {
+        Some(slug) => Strictness::parse(slug)
+            .ok_or_else(|| error(&format!("`{slug}` is not gentle, balanced or strict.")))?,
+        None => last_strictness(state, &project),
+    };
     if !crate::list_projects(state)?.iter().any(|p| p.id == project) {
         return Err(error("This collection no longer exists."));
     }
@@ -323,7 +456,7 @@ pub fn start_photo_cull(state: &AppState, input: PhotoCullInput) -> IpcResult<Ph
         .name("aura-cull".into())
         .spawn(move || {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                run(&worker, &worker_job, &project)
+                run(&worker, &worker_job, &project, strictness)
             }))
             .unwrap_or_else(|_| Err(error("The cull stopped unexpectedly. Nothing was changed.")));
             update(&worker_job, |s| match result {
@@ -350,8 +483,17 @@ pub fn start_photo_cull(state: &AppState, input: PhotoCullInput) -> IpcResult<Ph
     Ok(PhotoCullJobDto { job_id: job })
 }
 
+/// The level a collection was last culled at; balanced when it never was.
+pub(crate) fn last_strictness(state: &AppState, project: &str) -> Strictness {
+    stored(state, project)
+        .ok()
+        .flatten()
+        .map(|review| review.strictness)
+        .unwrap_or_default()
+}
+
 /// `Ok(false)` when stopped.
-fn run(state: &AppState, job: &str, project: &str) -> IpcResult<bool> {
+fn run(state: &AppState, job: &str, project: &str, strictness: Strictness) -> IpcResult<bool> {
     let photos = all_photos(state, project)?;
     if photos.is_empty() {
         return Err(error("This collection has no photos to cull yet."));
@@ -370,8 +512,9 @@ fn run(state: &AppState, job: &str, project: &str) -> IpcResult<bool> {
     update(job, |s| {
         s.label = "Choosing the best of every moment.".into();
     });
-    let report = crate::measured_cull::decide(&frames);
-    save(state, project, &report)?;
+    let frames = as_stored(frames);
+    let (report, levels) = decide_all(&frames, strictness);
+    save(state, project, &report, &frames, levels)?;
     Ok(true)
 }
 
@@ -478,7 +621,50 @@ fn review_dto(
             .filter(|id| !seen.contains(id.as_str()))
             .count() as u64,
         groups: Category::ALL.iter().map(|c| c.label().to_owned()).collect(),
+        strictness: review.strictness.slug().into(),
+        levels: review
+            .levels
+            .iter()
+            .map(|(level, left)| {
+                let left: BTreeSet<&str> = left.iter().map(String::as_str).collect();
+                let best = photos
+                    .iter()
+                    .filter(|p| {
+                        choices
+                            .get(&p.photo_id)
+                            .copied()
+                            .unwrap_or(!left.contains(p.photo_id.as_str()))
+                    })
+                    .count() as u64;
+                let (label, description) = level_words(*level);
+                PhotoCullLevelDto {
+                    strictness: level.slug().into(),
+                    label: label.into(),
+                    description: description.into(),
+                    best,
+                    left_out: photos.len() as u64 - best,
+                }
+            })
+            .collect(),
         photos,
+    }
+}
+
+/// A level in a word and a sentence.
+fn level_words(level: Strictness) -> (&'static str, &'static str) {
+    match level {
+        Strictness::Gentle => (
+            "Gentle",
+            "Leaves out only mistakes - black, blown, out of focus, smeared - and near-identical frames.",
+        ),
+        Strictness::Balanced => (
+            "Balanced",
+            "Also leaves out clearly weaker shots of the same moment and very low scores.",
+        ),
+        Strictness::Strict => (
+            "Strict",
+            "Keeps only the strongest shots of every moment and leaves out weak photos.",
+        ),
     }
 }
 
@@ -536,6 +722,40 @@ pub fn photo_cull_checks(
             weight: check.weight,
         })
         .collect())
+}
+
+/// Re-decide a collection's last cull at another strictness, from the measurements already
+/// taken: nothing is measured again, and every choice the photographer made still stands.
+///
+/// # Errors
+/// An unknown level, a collection never culled, or a review from before stored measurements
+/// (cull again once to change level).
+pub fn set_photo_cull_strictness(
+    state: &AppState,
+    input: SetPhotoCullStrictnessInput,
+) -> IpcResult<PhotoCullReviewDto> {
+    aura_core::ProjectId::from_db(&input.project_id).map_err(|_| error("Invalid project id."))?;
+    let level = Strictness::parse(&input.strictness).ok_or_else(|| {
+        error(&format!(
+            "`{}` is not gentle, balanced or strict.",
+            input.strictness
+        ))
+    })?;
+    let review = stored(state, &input.project_id)?
+        .ok_or_else(|| error("This collection has not been culled yet."))?;
+    if review.strictness != level {
+        let frames = review.frames().ok_or_else(|| {
+            error(
+                "This cull was made before strictness levels. Cull again once to change the level.",
+            )
+        })?;
+        let (report, levels) = decide_all(&frames, level);
+        let mut next = Stored::from_report(&report, review.measured_at.clone(), &frames, levels);
+        next.measured_at = review.measured_at;
+        write(state, &input.project_id, &next)?;
+    }
+    photo_cull_review(state, &input.project_id)?
+        .ok_or_else(|| error("This collection has not been culled yet."))
 }
 
 /// Bring photographs back, leave them out, or hand them back to the cull (`keep`,
@@ -605,7 +825,62 @@ mod tests {
             measured_at: "2026-10-28T00:00:00Z".into(),
             summary: String::new(),
             photos: vec![photo("a", true), photo("b", false), photo("c", true)],
+            strictness: Strictness::Balanced,
+            frames: Vec::new(),
+            levels: vec![
+                (Strictness::Gentle, vec![]),
+                (Strictness::Balanced, vec!["b".into()]),
+                (Strictness::Strict, vec!["b".into(), "c".into()]),
+            ],
         }
+    }
+
+    #[test]
+    fn each_level_is_counted_with_the_choices_applied() {
+        let choices = BTreeMap::from([("c".to_string(), true)]);
+        let ids: BTreeSet<String> = ["a", "b", "c"].iter().map(ToString::to_string).collect();
+        let dto = review_dto("p", &review(), &choices, &ids);
+        assert_eq!(dto.strictness, "balanced");
+        let counts: Vec<(String, u64, u64)> = dto
+            .levels
+            .iter()
+            .map(|l| (l.strictness.clone(), l.best, l.left_out))
+            .collect();
+        // Strict would leave c out, but the photographer kept it.
+        assert_eq!(
+            counts,
+            [
+                ("gentle".to_string(), 3, 0),
+                ("balanced".to_string(), 2, 1),
+                ("strict".to_string(), 2, 1)
+            ]
+        );
+    }
+
+    #[test]
+    fn a_review_without_frames_cannot_be_re_decided_and_exports_without_them() {
+        assert!(review().frames().is_none());
+        let frame = |id: &str| Frame {
+            photo_id: id.into(),
+            file_name: format!("{id}.jpg"),
+            measure: Some(crate::measured_cull::Measure::default()),
+            time_ms: Some(5),
+            edited_by_hand: false,
+        };
+        let mut with = review();
+        with.photos[0].values = vec![Some(0.5); 3];
+        with.frames = vec![frame("a"), frame("b"), frame("c")];
+        let frames = with.frames().expect("frames");
+        let mut restored = vec![Some(0.5); 3];
+        restored.resize(crate::cull_checks::COUNT, None);
+        assert_eq!(frames[0].measure.as_ref().unwrap().checks, restored);
+        assert!(with.for_export().frames.is_empty());
+        // A stored review read back is the same review.
+        let text = serde_json::to_string(&with).expect("json");
+        assert_eq!(serde_json::from_str::<Stored>(&text).expect("read"), with);
+        // Frames out of line with the photos are not trusted.
+        with.frames.swap(0, 1);
+        assert!(with.frames().is_none());
     }
 
     #[test]
@@ -645,6 +920,64 @@ mod tests {
         let a = dto.photos.iter().find(|p| p.photo_id == "a").unwrap();
         assert!(!a.keep && !a.top_pick);
         assert_eq!(dto.left_out_by_you, 1);
+    }
+
+    /// A frame of large blocks, as `measured_cull`'s tests paint them, measured as the cull
+    /// measures one. `soft` widens each block's edge.
+    // Block coordinates are under 16 and a value is reduced below 256 before its cast.
+    #[allow(clippy::cast_possible_truncation)]
+    fn painted(id: &str, seed: u32, soft: usize, time_ms: i64) -> Frame {
+        let (width, height) = (640_usize, 480_usize);
+        let rgb: Vec<u8> = (0..width * height)
+            .flat_map(|i| {
+                let (x, y) = (i % width, i / width);
+                let (x, y) = (x - x % (soft + 1), y - y % (soft + 1));
+                let cell = (x / 64) as u32 * 31 + (y / 64) as u32 * 17 + seed * 7919;
+                let value = (cell.wrapping_mul(2_654_435_761).rotate_left(13) % 200 + 30) as u8;
+                [value; 3]
+            })
+            .collect();
+        let mut measure = crate::measured_cull::measure_pixels(&rgb, width, height, &[]).unwrap();
+        measure.checks = crate::cull_checks::measure(&crate::cull_checks::Sample {
+            rgb: &rgb,
+            width,
+            height,
+            faces: &[],
+            settings: crate::cull_checks::Settings::default(),
+        })
+        .unwrap();
+        Frame {
+            photo_id: id.into(),
+            file_name: format!("{id}.jpg"),
+            measure: Some(measure),
+            time_ms: Some(time_ms),
+            edited_by_hand: false,
+        }
+    }
+
+    #[test]
+    fn a_stored_review_re_decides_exactly_as_it_was_decided() {
+        let frames = as_stored(vec![
+            painted("a", 1, 0, 0),
+            painted("a2", 1, 1, 3_000),
+            painted("a3", 1, 3, 6_000),
+            painted("b", 2, 0, 90_000),
+            painted("c", 3, 0, 400_000),
+        ]);
+        let summary = |r: &Report| -> Vec<(String, bool, Reason, Option<f32>)> {
+            r.verdicts
+                .iter()
+                .map(|v| (v.photo_id.clone(), v.keep, v.reason, v.score))
+                .collect()
+        };
+        for level in Strictness::ALL {
+            let (report, levels) = decide_all(&frames, level);
+            let stored = Stored::from_report(&report, "now".into(), &frames, levels);
+            let text = serde_json::to_string(&stored).unwrap();
+            let read: Stored = serde_json::from_str(&text).unwrap();
+            let again = crate::measured_cull::decide_with(&read.frames().unwrap(), level);
+            assert_eq!(summary(&again), summary(&report), "{level:?}");
+        }
     }
 
     #[test]

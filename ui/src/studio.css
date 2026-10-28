@@ -397,6 +397,23 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .photo-cull-summary { font-size: 15px; margin: 14px 0; }
 .photo-cull-tabs { display: flex; gap: 6px; margin: 0 0 12px; }
 .photo-cull-tabs button[aria-selected='true'] { background: #443750; border-color: var(--accent); color: #eee1ff; }
+.photo-cull-levels { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 6px; }
+.photo-cull-levels button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 14px; min-width: 150px; }
+.photo-cull-levels button span { font-size: 12px; color: var(--muted); }
+.photo-cull-levels button[aria-checked='true'] { background: #443750; border-color: var(--accent); color: #eee1ff; }
+.photo-cull-reasons { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+.photo-cull-reasons button { padding: 4px 10px; font-size: 12px; border-radius: 14px; }
+.photo-cull-reasons button[aria-pressed='true'] { background: #443750; border-color: var(--accent); color: #eee1ff; }
+.cull-detail-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.cull-moment h4 { margin: 14px 0 6px; font-weight: 550; }
+.cull-moment h4 small { color: var(--muted); font-weight: 400; margin-left: 6px; }
+.cull-moment div { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.cull-moment button { padding: 0; display: flex; flex-direction: column; overflow: hidden; border-radius: 6px; font-size: 11px; }
+.cull-moment button img, .cull-moment button .cull-thumb-pending { width: 100%; aspect-ratio: 3 / 2; object-fit: cover; }
+.cull-moment button span { padding: 3px 5px; }
+.cull-moment button.is-out { opacity: 0.6; }
+.cull-moment button.is-current { border-color: var(--accent); opacity: 1; }
+.cull-keys { margin-top: 12px; }
 .photo-cull-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 14px; font-size: 13px; color: var(--muted); }
 .photo-cull-toolbar select { margin-left: 6px; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
 .photo-cull-body { display: flex; gap: 18px; align-items: flex-start; }

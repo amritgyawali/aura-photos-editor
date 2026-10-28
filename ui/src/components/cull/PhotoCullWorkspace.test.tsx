@@ -1,10 +1,10 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-import { oneClickFinish, photoCullChecks, photoCullReview, photoCullStatus, setPhotoCullChoice, startPhotoCull } from '../../ipc/client';
+import { oneClickFinish, photoCullChecks, photoCullReview, photoCullStatus, setPhotoCullChoice, setPhotoCullStrictness, startPhotoCull } from '../../ipc/client';
 import type { PhotoCullPhotoDto, PhotoCullReviewDto } from '../../ipc/types';
 import { useAutomatic } from '../../state/automaticStore';
-import { actionFor, choiceLabel, cullSummary, groupChecks, PhotoCullWorkspace, photosFor } from './PhotoCullWorkspace';
+import { actionFor, choiceLabel, cullSummary, groupChecks, PhotoCullWorkspace, photosFor, reasonCounts, siblingsOf, stepFrom } from './PhotoCullWorkspace';
 
 vi.mock('../../ipc/client', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../ipc/client')>();
@@ -17,6 +17,7 @@ vi.mock('../../ipc/client', async (importOriginal) => {
     photoCullCancel: vi.fn(),
     photoCullChecks: vi.fn(),
     setPhotoCullChoice: vi.fn(),
+    setPhotoCullStrictness: vi.fn(),
     oneClickFinish: vi.fn(),
     pickImportPaths: vi.fn(),
     getThumbnail: vi.fn(() => new Promise(() => undefined)),
@@ -41,6 +42,12 @@ function review(photos: PhotoCullPhotoDto[]): PhotoCullReviewDto {
     keptByYou: photos.filter((p) => p.choice === 'keep').length,
     leftOutByYou: photos.filter((p) => p.choice === 'leave_out').length, notCulled: 0,
     groups: ['Exposure', 'Focus', 'Motion and shake', 'Noise and quality', 'Colour', 'Composition', 'Faces', 'Eyes', 'Light', 'Among similar photos'],
+    strictness: 'balanced',
+    levels: [
+      { strictness: 'gentle', label: 'Gentle', description: 'Leaves out only mistakes.', best: 3, leftOut: 1 },
+      { strictness: 'balanced', label: 'Balanced', description: 'Also weaker shots.', best, leftOut: photos.length - best },
+      { strictness: 'strict', label: 'Strict', description: 'Only the strongest.', best: 1, leftOut: 3 },
+    ],
     photos,
   };
 }
@@ -55,6 +62,7 @@ const base = review([
 beforeEach(() => {
   vi.mocked(photoCullReview).mockReset().mockResolvedValue(base);
   vi.mocked(setPhotoCullChoice).mockReset();
+  vi.mocked(setPhotoCullStrictness).mockReset();
   vi.mocked(startPhotoCull).mockReset();
   vi.mocked(photoCullStatus).mockReset();
   vi.mocked(photoCullChecks).mockReset().mockResolvedValue([]);
@@ -143,4 +151,91 @@ it('edits and exports the best photos, or only the ones brought back', async () 
   fireEvent.click(await screen.findByRole('button', { name: 'Edit & export only the 1 brought back' }));
   await waitFor(() => expect(oneClickFinish).toHaveBeenCalledWith({ projectId: 'p1', destination: '', ingestJobId: null, onlyPhotos: ['b'] }));
   expect(useAutomatic.getState()).toMatchObject({ jobId: 'oneclick-1', projectId: 'p1' });
+});
+
+const moment = review([
+  photo('a', true, 91, { moment: 1 }),
+  photo('b', false, 70, { moment: 1, reason: 'weaker_of_moment', reasonLabel: 'Weaker shot of the moment' }),
+  photo('c', true, 60),
+  photo('d', false, 30, { reason: 'out_of_focus', reasonLabel: 'Out of focus', keptInstead: null }),
+  photo('e', false, 40, { reason: 'out_of_focus', reasonLabel: 'Out of focus', keptInstead: null }),
+]);
+
+it('counts each reason, finds a photo\'s moment and walks the list', () => {
+  expect(reasonCounts(moment, 'left')).toEqual([
+    { reason: 'out_of_focus', label: 'Out of focus', count: 2 },
+    { reason: 'weaker_of_moment', label: 'Weaker shot of the moment', count: 1 },
+  ]);
+  expect(photosFor(moment, 'left', 'score', false, 'out_of_focus').map((p) => p.photoId)).toEqual(['e', 'd']);
+  expect(siblingsOf(moment, moment.photos[1]!).map((p) => p.photoId)).toEqual(['a', 'b']);
+  expect(siblingsOf(moment, moment.photos[2]!)).toEqual([]);
+  const shown = photosFor(moment, 'left', 'time');
+  expect(stepFrom(shown, 'b', 1)).toBe('d');
+  expect(stepFrom(shown, 'b', -1)).toBeNull();
+  expect(stepFrom(shown, 'gone', 1)).toBe('b');
+});
+
+it('switches strictness without culling again, showing what each level delivers', async () => {
+  vi.mocked(setPhotoCullStrictness).mockResolvedValue({ ...base, strictness: 'strict' });
+  render(<PhotoCullWorkspace projectId="p1" disabled={false} onError={vi.fn()} />);
+  const strict = await screen.findByRole('radio', { name: /Strict/ });
+  expect(strict.textContent).toContain('1 best · 3 left out');
+  expect(screen.getByRole('radio', { name: /Balanced/ }).getAttribute('aria-checked')).toBe('true');
+  fireEvent.click(strict);
+  await waitFor(() => expect(setPhotoCullStrictness).toHaveBeenCalledWith({ projectId: 'p1', strictness: 'strict' }));
+  await waitFor(() => expect(screen.getByRole('radio', { name: /Strict/ }).getAttribute('aria-checked')).toBe('true'));
+  expect(startPhotoCull).not.toHaveBeenCalled();
+});
+
+it('asks for one more cull when a review predates strictness', async () => {
+  vi.mocked(photoCullReview).mockResolvedValue({ ...base, levels: [] });
+  render(<PhotoCullWorkspace projectId="p1" disabled={false} onError={vi.fn()} />);
+  expect(await screen.findByText('Cull again once to choose how strict the cull is.')).toBeTruthy();
+  expect(screen.queryByRole('radiogroup', { name: 'Strictness' })).toBeNull();
+});
+
+it('filters the left-out list by reason', async () => {
+  vi.mocked(photoCullReview).mockResolvedValue(moment);
+  render(<PhotoCullWorkspace projectId="p1" disabled={false} onError={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Left out (3)' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Out of focus (2)' }));
+  expect(screen.queryByRole('article', { name: 'b.jpg' })).toBeNull();
+  expect(screen.getByRole('article', { name: 'd.jpg' })).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'All' }));
+  expect(screen.getByRole('article', { name: 'b.jpg' })).toBeTruthy();
+});
+
+it('shows the rest of the moment and swaps the delivered frame in one click', async () => {
+  vi.mocked(photoCullReview).mockResolvedValue(moment);
+  vi.mocked(setPhotoCullChoice).mockResolvedValue(moment);
+  render(<PhotoCullWorkspace projectId="p1" disabled={false} onError={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Left out (3)' }));
+  fireEvent.click(within(screen.getByRole('article', { name: 'b.jpg' })).getByTitle('Show its hundred checks'));
+  const detail = await screen.findByRole('complementary', { name: 'Checks for b.jpg' });
+  const strip = within(detail).getByRole('region', { name: 'Same moment' });
+  expect(within(strip).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['a.jpg', 'b.jpg']);
+  fireEvent.click(within(detail).getByRole('button', { name: 'Deliver this instead of a.jpg' }));
+  await waitFor(() => expect(setPhotoCullChoice).toHaveBeenCalledTimes(2));
+  expect(vi.mocked(setPhotoCullChoice).mock.calls.map((c) => [c[0].photoIds, c[0].choice])).toEqual([[['b'], 'keep'], [['a'], 'leave_out']]);
+  // The strip opens a sibling.
+  fireEvent.click(within(strip).getByRole('button', { name: 'a.jpg' }));
+  expect(await screen.findByRole('complementary', { name: 'Checks for a.jpg' })).toBeTruthy();
+});
+
+it('walks the list with the arrow keys and decides with K, X and U', async () => {
+  vi.mocked(photoCullReview).mockResolvedValue(moment);
+  vi.mocked(setPhotoCullChoice).mockResolvedValue(moment);
+  render(<PhotoCullWorkspace projectId="p1" disabled={false} onError={vi.fn()} />);
+  fireEvent.click(await screen.findByRole('tab', { name: 'Left out (3)' }));
+  fireEvent.click(within(screen.getByRole('article', { name: 'b.jpg' })).getByTitle('Show its hundred checks'));
+  await screen.findByRole('complementary', { name: 'Checks for b.jpg' });
+  fireEvent.keyDown(window, { key: 'ArrowRight' });
+  expect(await screen.findByRole('complementary', { name: 'Checks for e.jpg' })).toBeTruthy();
+  fireEvent.keyDown(window, { key: 'k' });
+  await waitFor(() => expect(setPhotoCullChoice).toHaveBeenCalledWith({ projectId: 'p1', photoIds: ['e'], choice: 'keep' }));
+  // X does nothing to a photo already left out; Esc closes.
+  fireEvent.keyDown(window, { key: 'x' });
+  expect(setPhotoCullChoice).toHaveBeenCalledTimes(1);
+  fireEvent.keyDown(window, { key: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('complementary')).toBeNull());
 });

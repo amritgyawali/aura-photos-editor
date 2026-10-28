@@ -3332,6 +3332,17 @@ async fn photo_cull_checks(
 }
 
 #[tauri::command]
+async fn set_photo_cull_strictness(
+    state: State<'_, AppState>,
+    input: aura_app::contract::ipc::SetPhotoCullStrictnessInput,
+) -> IpcResult<aura_app::contract::ipc::PhotoCullReviewDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_photo_cull_strictness(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
 async fn set_photo_cull_choice(
     state: State<'_, AppState>,
     input: aura_app::contract::ipc::SetPhotoCullChoiceInput,
@@ -4318,6 +4329,7 @@ fn main() {
             photo_cull_review,
             photo_cull_checks,
             set_photo_cull_choice,
+            set_photo_cull_strictness,
             activity_status,
             analyse_portrait,
             find_glare,
