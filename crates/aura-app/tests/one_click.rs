@@ -151,6 +151,7 @@ fn one_press_delivers_files_with_the_refusals_it_met_written_down() {
             ingest_job_id: None,
             look: None,
             keep_everything: false,
+            only_photos: Vec::new(),
         },
     )
     .expect("start");
@@ -315,6 +316,7 @@ fn one_press_delivers_files_with_the_refusals_it_met_written_down() {
             destination: failed_destination.display().to_string(),
             ingest_job_id: None,
             keep_everything: true,
+            only_photos: Vec::new(),
             look: Some(aura_app::contract::ipc::AutomaticLookInput {
                 profile_id: Some("missing-profile-for-regression".into()),
                 profile_strength: 100,
@@ -355,6 +357,7 @@ fn one_press_delivers_files_with_the_refusals_it_met_written_down() {
             ingest_job_id: Some("waiting-import".into()),
             look: None,
             keep_everything: false,
+            only_photos: Vec::new(),
         },
     )
     .expect("previous worker is fully finished");

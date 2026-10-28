@@ -2,6 +2,7 @@ import { invoke as rawInvoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import type { InternalAiStatus } from './internalAi';
 import type { AutomaticStartDto, AutomaticStartInput, PhotoAnalysisDto, PhotoAutoEditInput, PhotoAutoEditDto, OneClickFinishInput, OneClickFinishDto, OneClickStatusDto } from './types';
+import type { PhotoCullInput, PhotoCullJobDto, PhotoCullStatusDto, PhotoCullReviewDto, PhotoCullChecksInput, PhotoCullCheckDto, SetPhotoCullChoiceInput } from './types';
 
 import { audit, drainAuditBatch, isQuietIpc } from '../audit/log';
 
@@ -118,6 +119,27 @@ export const oneClickStatus = (jobId: string): Promise<OneClickStatusDto> =>
 /** Stop between photographs. True when the id was known. */
 export const oneClickCancel = (jobId: string): Promise<boolean> =>
   invoke<boolean>('one_click_cancel', { jobId });
+
+/** ADR-0185. Cull a collection on its own; poll `photoCullStatus`. Nothing is edited or deleted. */
+export const startPhotoCull = (input: PhotoCullInput): Promise<PhotoCullJobDto> =>
+  invoke<PhotoCullJobDto>('start_photo_cull', { input });
+
+export const photoCullStatus = (jobId: string): Promise<PhotoCullStatusDto> =>
+  invoke<PhotoCullStatusDto>('photo_cull_status', { jobId });
+
+export const photoCullCancel = (jobId: string): Promise<boolean> =>
+  invoke<boolean>('photo_cull_cancel', { jobId });
+
+/** The last cull with the photographer's choices applied; null when never culled. */
+export const photoCullReview = (projectId: string): Promise<PhotoCullReviewDto | null> =>
+  invoke<PhotoCullReviewDto | null>('photo_cull_review', { projectId });
+
+export const photoCullChecks = (input: PhotoCullChecksInput): Promise<PhotoCullCheckDto[]> =>
+  invoke<PhotoCullCheckDto[]>('photo_cull_checks', { input });
+
+/** Bring back (`keep`), leave out, or hand back to the cull (`auto`). */
+export const setPhotoCullChoice = (input: SetPhotoCullChoiceInput): Promise<PhotoCullReviewDto> =>
+  invoke<PhotoCullReviewDto>('set_photo_cull_choice', { input });
 
 export async function pickImportPaths(directory: boolean): Promise<string[]> {
   const result = await invoke<string | string[] | null>('plugin:dialog|open', {

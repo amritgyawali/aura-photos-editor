@@ -11,6 +11,15 @@
 //! 4. **Burst duplicates** - consecutive near-identical frames, of which the sharpest with
 //!    the most open eyes is kept.
 //!
+//! Above those four rules sits a second question - which of the usable frames is the better
+//! photograph - answered by the hundred measured checks in [`crate::cull_checks`]:
+//!
+//! 5. **Weaker shots of one moment** - similar frames taken within seconds, of which those
+//!    scoring close to the best are kept and the clearly weaker ones are left out.
+//! 6. **Very low scores** - a frame whose hundred checks add up to almost nothing.
+//!
+//! The best-scoring fifth of what is delivered is marked as top picks. ADR-0185.
+//!
 //! It only ever errs toward keeping. A frame a person edited by hand is never rejected, a
 //! frame that cannot be measured is kept, a run in which the technical rules would discard
 //! an implausible share of the wedding withdraws them, and nothing is deleted: a rejected
@@ -28,7 +37,7 @@ use std::collections::BTreeMap;
 
 use aura_preview::contract::service::{PreviewService, Priority};
 use aura_vision::portrait::PortraitFace;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::commands::IpcResult;
 use crate::contract::ipc::ImageRowLite;
@@ -62,9 +71,32 @@ const BURST_GAP_MS: i64 = 2500;
 const BURST_WINDOW: usize = 8;
 /// Above this share of technical rejections the rules are judging a style, not a mistake.
 const IMPLAUSIBLE_SHARE: f32 = 0.40;
+/// Difference-hash bits two frames of one *moment* may differ by: wider than a burst, so a
+/// reframed shot of the same people counts, narrower than a change of scene.
+const MOMENT_BITS: u32 = 12;
+/// The same, when the camera clock cannot confirm the frames were taken together.
+const MOMENT_BITS_UNTIMED: u32 = 8;
+/// Longest gap between two frames of one moment.
+const MOMENT_GAP_MS: i64 = 20_000;
+/// How many following frames a frame is compared with when looking for its moment.
+const MOMENT_WINDOW: usize = 12;
+/// A frame of a moment within this many points of the moment's best is kept beside it.
+const MOMENT_MARGIN: f32 = 12.0;
+/// Below this score out of 100 a frame's checks say almost nothing in it worked.
+const LOW_SCORE: f32 = 25.0;
+/// The share of delivered frames marked as top picks, and the score a top pick must reach.
+const TOP_SHARE: f32 = 0.20;
+const TOP_FLOOR: f32 = 60.0;
+/// Frames either side a frame's exposure and colour are compared with.
+const NEIGHBOURS: usize = 5;
+/// Frames either side searched for a near-duplicate when measuring uniqueness.
+const UNIQUENESS_WINDOW: usize = 25;
+/// A gap longer than this, or a picture this different, opens a new scene.
+const SCENE_GAP_MS: i64 = 120_000;
+const SCENE_BITS: u32 = 24;
 
 /// Why a frame was kept or left out. The slug is stable; the sentence is for people.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Reason {
     /// Delivered: nothing technical against it.
@@ -85,6 +117,10 @@ pub enum Reason {
     MotionBlur,
     /// Left out: a sharper frame of the same burst is delivered instead.
     BurstDuplicate,
+    /// Left out: a clearly better shot of the same moment is delivered instead.
+    WeakerOfMoment,
+    /// Left out: its hundred checks add up to almost nothing.
+    LowScore,
 }
 
 impl Reason {
@@ -127,6 +163,10 @@ pub struct Measure {
     /// 64-bit difference hash, for near-duplicate frames.
     #[serde(serialize_with = "hex")]
     pub dhash: u64,
+    /// The hundred checks' raw values, in [`crate::cull_checks::CHECKS`] order; empty when they
+    /// were not measured. The ten collection checks are filled by [`decide`].
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub checks: Vec<Option<f32>>,
 }
 
 // The signature is serde's: `serialize_with` hands the field over by reference.
@@ -166,8 +206,20 @@ pub struct Verdict {
     pub detail: String,
     /// Frames of one burst share a number.
     pub burst: Option<usize>,
-    /// For a burst duplicate, the frame delivered instead.
+    /// For a burst duplicate or a weaker shot of a moment, the frame delivered instead.
     pub kept_instead: Option<String>,
+    /// Frames of one moment share a number.
+    pub moment: Option<usize>,
+    /// The hundred checks' total, `0..=100`, when they were measured.
+    pub score: Option<f32>,
+    /// One of the best-scoring frames delivered.
+    pub top_pick: bool,
+    /// Each check's score, `0..=100`, `None` where it abstained.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub checks: Vec<Option<u8>>,
+    /// Each group's score, in [`crate::cull_checks::Category::ALL`] order.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub categories: Vec<Option<u8>>,
     /// The measurements.
     pub measure: Option<Measure>,
 }
@@ -188,8 +240,16 @@ pub struct Counts {
     pub motion_blur: usize,
     /// Left out as a duplicate of a sharper burst frame.
     pub burst_duplicates: usize,
+    /// Left out as a clearly weaker shot of a moment.
+    pub weaker_of_moment: usize,
+    /// Left out for a very low score.
+    pub low_score: usize,
     /// Bursts found.
     pub bursts: usize,
+    /// Moments of several similar shots found.
+    pub moments: usize,
+    /// Delivered frames marked as top picks.
+    pub top_picks: usize,
     /// The technical rules were withdrawn because they rejected too much.
     pub rules_withdrawn: bool,
 }
@@ -200,6 +260,8 @@ pub struct Counts {
 pub struct Report {
     /// What the numbers below were judged against.
     pub thresholds: BTreeMap<&'static str, f32>,
+    /// The check each position of `checks` and `measure.checks` holds.
+    pub check_ids: Vec<&'static str>,
     /// Totals.
     pub counts: Counts,
     /// One row per frame, in timeline order.
@@ -231,8 +293,16 @@ impl Report {
             );
         }
         format!(
-            "Measured cull: delivering {} of {} photographs. Left out {} burst duplicate(s) of a sharper frame, {} out of focus, {} motion blurred and {} with unusable exposure. Nothing was deleted; every decision and its measurements are in photo-cull.json.",
-            c.kept, c.frames, c.burst_duplicates, c.out_of_focus, c.motion_blur, c.unusable_exposure
+            "Measured cull: delivering {} of {} photographs, {} of them top picks. Left out {} burst duplicate(s) of a sharper frame, {} weaker shot(s) of a moment, {} with a very low score, {} out of focus, {} motion blurred and {} with unusable exposure. Nothing was deleted; every decision, its hundred checks and its measurements are in photo-cull.json.",
+            c.kept,
+            c.frames,
+            c.top_picks,
+            c.burst_duplicates,
+            c.weaker_of_moment,
+            c.low_score,
+            c.out_of_focus,
+            c.motion_blur,
+            c.unusable_exposure
         )
     }
 }
@@ -445,6 +515,7 @@ pub fn measure_pixels(
         brightest: levels.percentile(0.99),
         blown: white as f32 / plane.values.len().max(1) as f32,
         dhash: aura_vision::embed::hash::dhash(&plane.values, plane.width, plane.height),
+        checks: Vec::new(),
     })
 }
 
@@ -567,16 +638,41 @@ fn quality(measure: &Measure, best_eyes: Option<f32>) -> f32 {
     sharp * eyes
 }
 
-fn same_burst(a: &Frame, b: &Frame) -> bool {
+/// How close two frames must be to count as one group.
+#[derive(Debug, Clone, Copy)]
+struct Grouping {
+    bits: u32,
+    bits_untimed: u32,
+    gap_ms: i64,
+    window: usize,
+}
+
+/// Near-identical frames shot within a couple of seconds.
+const BURST: Grouping = Grouping {
+    bits: BURST_BITS,
+    bits_untimed: BURST_BITS_UNTIMED,
+    gap_ms: BURST_GAP_MS,
+    window: BURST_WINDOW,
+};
+
+/// Similar frames of the same people within seconds: a burst, or the shot taken again.
+const MOMENT: Grouping = Grouping {
+    bits: MOMENT_BITS,
+    bits_untimed: MOMENT_BITS_UNTIMED,
+    gap_ms: MOMENT_GAP_MS,
+    window: MOMENT_WINDOW,
+};
+
+fn together(a: &Frame, b: &Frame, grouping: Grouping) -> bool {
     let (Some(first), Some(second)) = (&a.measure, &b.measure) else {
         return false;
     };
     let bits = (first.dhash ^ second.dhash).count_ones();
     match (a.time_ms, b.time_ms) {
         (Some(earlier), Some(later)) => {
-            bits <= BURST_BITS && (later - earlier).abs() <= BURST_GAP_MS
+            bits <= grouping.bits && (later - earlier).abs() <= grouping.gap_ms
         }
-        _ => bits <= BURST_BITS_UNTIMED,
+        _ => bits <= grouping.bits_untimed,
     }
 }
 
@@ -612,6 +708,11 @@ fn first_verdicts(frames: &[Frame]) -> Vec<Verdict> {
                 detail,
                 burst: None,
                 kept_instead: None,
+                moment: None,
+                score: None,
+                top_pick: false,
+                checks: Vec::new(),
+                categories: Vec::new(),
                 measure: frame.measure.clone(),
             }
         })
@@ -634,11 +735,11 @@ fn withdraw_if_implausible(verdicts: &mut [Verdict]) -> bool {
     true
 }
 
-/// Bursts: deliverable frames that are near-identical and close together. They need not be
+/// Groups of deliverable frames that are alike and close together. They need not be
 /// neighbours - a second camera's frame, or a rejected one, often sits between two frames of
 /// the same burst - so each frame is compared with the few that follow it. Frames the camera
 /// did not time must be neighbours.
-fn find_bursts(frames: &[Frame], verdicts: &[Verdict]) -> Vec<Vec<usize>> {
+fn find_groups(frames: &[Frame], verdicts: &[Verdict], grouping: Grouping) -> Vec<Vec<usize>> {
     let candidates: Vec<usize> = (0..frames.len())
         .filter(|index| {
             verdicts
@@ -648,7 +749,7 @@ fn find_bursts(frames: &[Frame], verdicts: &[Verdict]) -> Vec<Vec<usize>> {
         .collect();
     let mut labels: Vec<usize> = (0..candidates.len()).collect();
     for first in 0..candidates.len() {
-        for second in first + 1..candidates.len().min(first + 1 + BURST_WINDOW) {
+        for second in first + 1..candidates.len().min(first + 1 + grouping.window) {
             let pair = candidates
                 .get(first)
                 .zip(candidates.get(second))
@@ -657,7 +758,7 @@ fn find_bursts(frames: &[Frame], verdicts: &[Verdict]) -> Vec<Vec<usize>> {
                 continue;
             };
             let timed = earlier.time_ms.is_some() && later.time_ms.is_some();
-            if (!timed && second != first + 1) || !same_burst(earlier, later) {
+            if (!timed && second != first + 1) || !together(earlier, later, grouping) {
                 continue;
             }
             let (keep, merge) = (
@@ -686,7 +787,13 @@ fn find_bursts(frames: &[Frame], verdicts: &[Verdict]) -> Vec<Vec<usize>> {
 }
 
 /// Keep the best of one burst and leave the rest out, naming the frame delivered instead.
-fn settle_burst(frames: &[Frame], verdicts: &mut [Verdict], number: usize, members: &[usize]) {
+fn settle_burst(
+    frames: &[Frame],
+    verdicts: &mut [Verdict],
+    number: usize,
+    members: &[usize],
+    totals: &[Option<f32>],
+) {
     let measures: Vec<(usize, &Measure)> = members
         .iter()
         .filter_map(|i| frames.get(*i)?.measure.as_ref().map(|m| (*i, m)))
@@ -695,9 +802,23 @@ fn settle_burst(frames: &[Frame], verdicts: &mut [Verdict], number: usize, membe
         .iter()
         .filter_map(|(_, m)| m.eye_contrast)
         .reduce(f32::max);
+    // The hundred checks decide when every frame has them; sharpness and open eyes otherwise.
+    let scored = measures
+        .iter()
+        .all(|(i, _)| totals.get(*i).copied().flatten().is_some());
     let mut ranked: Vec<(usize, f32)> = measures
         .iter()
-        .map(|(i, m)| (*i, quality(m, best_eyes)))
+        .map(|(i, m)| {
+            let total = totals.get(*i).copied().flatten();
+            (
+                *i,
+                if scored {
+                    total.unwrap_or_default()
+                } else {
+                    quality(m, best_eyes)
+                },
+            )
+        })
         .collect();
     let edited = |index: usize| frames.get(index).is_some_and(|f| f.edited_by_hand);
     // A hand-edited frame is always delivered, so it leads its burst.
@@ -728,31 +849,340 @@ fn settle_burst(frames: &[Frame], verdicts: &mut [Verdict], number: usize, membe
         if rank < keepers || edited(*index) {
             if !edited(*index) && verdict.reason == Reason::Keep {
                 verdict.reason = Reason::BestOfBurst;
-                verdict.detail = format!(
-                    "Best of a burst of {}: quality {own:.3} from sharpness and open eyes.",
-                    members.len()
-                );
+                verdict.detail = if scored {
+                    format!(
+                        "Best of a burst of {}: scored {own:.0} of 100 on its hundred checks.",
+                        members.len()
+                    )
+                } else {
+                    format!(
+                        "Best of a burst of {}: quality {own:.3} from sharpness and open eyes.",
+                        members.len()
+                    )
+                };
             }
         } else {
             verdict.keep = false;
             verdict.reason = Reason::BurstDuplicate;
             verdict.kept_instead.clone_from(&best_id);
+            verdict.detail = if scored {
+                format!(
+                    "Near-identical to {best_name}, which is delivered instead: scored {own:.0} against {best_quality:.0} of 100."
+                )
+            } else {
+                format!(
+                    "Near-identical to {best_name}, which is delivered instead: quality {own:.3} against {best_quality:.3}."
+                )
+            };
+        }
+    }
+}
+
+/// Where a named check sits in the stored arrays.
+fn slot(id: &str) -> usize {
+    crate::cull_checks::CHECKS
+        .iter()
+        .position(|check| check.id == id)
+        .unwrap_or(0)
+}
+
+/// One frame's raw value for a check.
+fn raw(frame: &Frame, id: &str) -> Option<f32> {
+    frame
+        .measure
+        .as_ref()?
+        .checks
+        .get(slot(id))
+        .copied()
+        .flatten()
+}
+
+/// Score the frames that carry checks against each other; `None` for the rest.
+fn scored(values: &[Option<Vec<Option<f32>>>]) -> Vec<Option<crate::cull_checks::Scored>> {
+    let present: Vec<Vec<Option<f32>>> = values.iter().flatten().cloned().collect();
+    let mut scores = crate::cull_checks::score(&present).into_iter();
+    values
+        .iter()
+        .map(|value| value.as_ref().and_then(|_| scores.next()))
+        .collect()
+}
+
+/// The frames' own ninety checks, before any frame is compared with another.
+fn own_values(frames: &[Frame]) -> Vec<Option<Vec<Option<f32>>>> {
+    frames
+        .iter()
+        .map(|frame| {
+            frame
+                .measure
+                .as_ref()
+                .filter(|m| !m.checks.is_empty())
+                .map(|m| m.checks.clone())
+        })
+        .collect()
+}
+
+/// A frame's place in its group by score: 1 for the best, 0 for the worst.
+fn place(index: usize, members: &[usize], scores: &[Option<f32>]) -> Option<f32> {
+    let own = scores.get(index).copied().flatten()?;
+    let others: Vec<f32> = members
+        .iter()
+        .filter_map(|i| scores.get(*i).copied().flatten())
+        .collect();
+    if others.len() < 2 {
+        return None;
+    }
+    let better = others.iter().filter(|v| **v > own).count();
+    Some(1.0 - better as f32 / (others.len() - 1) as f32)
+}
+
+/// A frame's value for a check against the best of its group.
+fn against_best(
+    index: usize,
+    members: &[usize],
+    frames: &[Frame],
+    read: &dyn Fn(&Frame) -> Option<f32>,
+) -> Option<f32> {
+    let own = frames.get(index).and_then(read)?;
+    let best = members
+        .iter()
+        .filter_map(|i| frames.get(*i).and_then(read))
+        .fold(0.0_f32, f32::max);
+    (best > 1e-6).then(|| own / best)
+}
+
+fn median(mut values: Vec<f32>) -> Option<f32> {
+    if values.is_empty() {
+        return None;
+    }
+    values.sort_by(f32::total_cmp);
+    values.get(values.len() / 2).copied()
+}
+
+/// The ten collection checks: each frame against its burst, its moment and its neighbours.
+fn with_context(
+    frames: &[Frame],
+    own: &[Option<Vec<Option<f32>>>],
+    pixel: &[Option<f32>],
+    bursts: &[Vec<usize>],
+    moments: &[Vec<usize>],
+) -> Vec<Option<Vec<Option<f32>>>> {
+    let group_of =
+        |groups: &[Vec<usize>], index: usize| groups.iter().find(|g| g.contains(&index)).cloned();
+    let eyes = |f: &Frame| raw(f, "eyes_open");
+    let sharp = |f: &Frame| raw(f, "focus_face").or_else(|| raw(f, "focus_strongest_edges"));
+    own.iter()
+        .enumerate()
+        .map(|(index, values)| {
+            let mut values = values.clone()?;
+            values.resize(crate::cull_checks::COUNT, None);
+            let frame = frames.get(index)?;
+            let burst = group_of(bursts, index);
+            let moment = group_of(moments, index);
+            let near: Vec<usize> = (index.saturating_sub(NEIGHBOURS)
+                ..(index + NEIGHBOURS + 1).min(frames.len()))
+                .filter(|i| *i != index)
+                .collect();
+            let neighbour_median = |id: &str| {
+                median(
+                    near.iter()
+                        .filter_map(|i| frames.get(*i).and_then(|f| raw(f, id)))
+                        .collect(),
+                )
+            };
+            let dhash = frame.measure.as_ref().map(|m| m.dhash);
+            let distance = |other: usize| {
+                let theirs = frames.get(other)?.measure.as_ref()?.dhash;
+                Some((dhash? ^ theirs).count_ones())
+            };
+            let uniqueness = (index.saturating_sub(UNIQUENESS_WINDOW)
+                ..(index + UNIQUENESS_WINDOW + 1).min(frames.len()))
+                .filter(|i| *i != index)
+                .filter_map(distance)
+                .min();
+            let previous = index.checked_sub(1);
+            let gap_before = previous.and_then(|p| Some(frame.time_ms? - frames.get(p)?.time_ms?));
+            let gap_after = frames
+                .get(index + 1)
+                .and_then(|next| Some(next.time_ms? - frame.time_ms?));
+            let new_scene = match previous {
+                None => Some(1.0),
+                Some(p) => {
+                    let far = gap_before.is_some_and(|gap| gap > SCENE_GAP_MS)
+                        || distance(p).is_some_and(|bits| bits > SCENE_BITS);
+                    far.then_some(1.0)
+                }
+            };
+            let deliberate = match (gap_before, gap_after) {
+                (Some(a), Some(b)) => Some(a.min(b)),
+                (Some(gap), None) | (None, Some(gap)) => Some(gap),
+                (None, None) => None,
+            }
+            .map(|ms| ms.max(0) as f32 / 1000.0);
+            let fit = |id: &str| Some((raw(frame, id)? - neighbour_median(id)?).abs());
+            let colour_fit = match (fit("colour_tint"), fit("colour_cast")) {
+                (Some(tint), Some(cast)) => Some(tint + cast / 2.0),
+                (tint, cast) => tint.or(cast),
+            };
+            let context = [
+                burst.as_deref().and_then(|g| place(index, g, pixel)),
+                moment.as_deref().and_then(|g| place(index, g, pixel)),
+                moment
+                    .as_deref()
+                    .and_then(|g| against_best(index, g, frames, &eyes)),
+                moment
+                    .as_deref()
+                    .and_then(|g| against_best(index, g, frames, &sharp)),
+                uniqueness.map(|bits| bits as f32),
+                new_scene,
+                fit("exposure_mid_level"),
+                colour_fit,
+                deliberate,
+                pixel.get(index).copied().flatten(),
+            ];
+            for (slot, value) in values
+                .iter_mut()
+                .skip(crate::cull_checks::CONTEXT)
+                .zip(context)
+            {
+                *slot = value;
+            }
+            Some(values)
+        })
+        .collect()
+}
+
+/// A frame whose own checks add up to almost nothing is left out, unless a person edited it
+/// or a harder rule already named it.
+fn drop_low_scores(verdicts: &mut [Verdict], pixel: &[Option<f32>]) {
+    for (verdict, score) in verdicts.iter_mut().zip(pixel) {
+        let Some(score) = score else { continue };
+        if verdict.reason == Reason::Keep && *score < LOW_SCORE {
+            verdict.keep = false;
+            verdict.reason = Reason::LowScore;
             verdict.detail = format!(
-                "Near-identical to {best_name}, which is delivered instead: quality {own:.3} against {best_quality:.3}."
+                "Very low score: its hundred checks add up to {score:.0} of 100 (below {LOW_SCORE:.0}). Open its checks to see which groups failed."
             );
         }
     }
+}
+
+/// Of a moment's frames still delivered, keep the best and those close to it; leave out the
+/// clearly weaker ones, naming the frame delivered instead.
+fn settle_moment(
+    frames: &[Frame],
+    verdicts: &mut [Verdict],
+    number: usize,
+    members: &[usize],
+    totals: &[Option<f32>],
+) {
+    let alive: Vec<usize> = members
+        .iter()
+        .copied()
+        .filter(|i| verdicts.get(*i).is_some_and(|v| v.keep))
+        .collect();
+    for index in members {
+        if let Some(verdict) = verdicts.get_mut(*index) {
+            verdict.moment = Some(number);
+        }
+    }
+    if alive.len() < 2
+        || alive
+            .iter()
+            .any(|i| totals.get(*i).copied().flatten().is_none())
+    {
+        return;
+    }
+    let edited = |index: usize| frames.get(index).is_some_and(|f| f.edited_by_hand);
+    let mut ranked: Vec<(usize, f32)> = alive
+        .iter()
+        .map(|i| (*i, totals.get(*i).copied().flatten().unwrap_or_default()))
+        .collect();
+    ranked.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
+    let Some(&(best, best_score)) = ranked.first() else {
+        return;
+    };
+    let cap = alive.len().div_ceil(2).max(1);
+    let best_name = frames
+        .get(best)
+        .map(|f| f.file_name.clone())
+        .unwrap_or_default();
+    let best_id = frames.get(best).map(|f| f.photo_id.clone());
+    for (rank, (index, own)) in ranked.iter().enumerate() {
+        let close = best_score - own <= MOMENT_MARGIN;
+        if rank == 0 || edited(*index) || (close && rank < cap) {
+            continue;
+        }
+        let Some(verdict) = verdicts.get_mut(*index) else {
+            continue;
+        };
+        verdict.keep = false;
+        verdict.reason = Reason::WeakerOfMoment;
+        verdict.kept_instead.clone_from(&best_id);
+        verdict.detail = format!(
+            "A similar shot of the same moment, {best_name}, is delivered instead: scored {own:.0} against {best_score:.0} of 100."
+        );
+    }
+}
+
+/// Mark the best-scoring delivered frames. Returns how many.
+fn mark_top_picks(verdicts: &mut [Verdict]) -> usize {
+    let mut kept: Vec<(usize, f32)> = verdicts
+        .iter()
+        .enumerate()
+        .filter(|(_, v)| v.keep)
+        .filter_map(|(i, v)| Some((i, v.score?)))
+        .collect();
+    kept.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
+    let wanted = (kept.len() as f32 * TOP_SHARE).ceil() as usize;
+    let mut marked = 0;
+    for (index, score) in kept.into_iter().take(wanted) {
+        if score < TOP_FLOOR {
+            break;
+        }
+        if let Some(verdict) = verdicts.get_mut(index) {
+            verdict.top_pick = true;
+            marked += 1;
+        }
+    }
+    marked
 }
 
 /// Decide the whole collection. `frames` is in timeline order.
 #[must_use]
 pub fn decide(frames: &[Frame]) -> Report {
     let mut verdicts = first_verdicts(frames);
+    let own = own_values(frames);
+    let pixel: Vec<Option<f32>> = scored(&own)
+        .iter()
+        .map(|s| s.as_ref().map(|s| s.overall))
+        .collect();
+    drop_low_scores(&mut verdicts, &pixel);
     let rules_withdrawn = withdraw_if_implausible(&mut verdicts);
-    let bursts = find_bursts(frames, &verdicts);
+    let bursts = find_groups(frames, &verdicts, BURST);
+    let moments = find_groups(frames, &verdicts, MOMENT);
+    let full = with_context(frames, &own, &pixel, &bursts, &moments);
+    let final_scores = scored(&full);
+    let totals: Vec<Option<f32>> = final_scores
+        .iter()
+        .map(|s| s.as_ref().map(|s| s.overall))
+        .collect();
     for (number, members) in bursts.iter().enumerate() {
-        settle_burst(frames, &mut verdicts, number + 1, members);
+        settle_burst(frames, &mut verdicts, number + 1, members, &totals);
     }
+    for (number, members) in moments.iter().enumerate() {
+        settle_moment(frames, &mut verdicts, number + 1, members, &totals);
+    }
+    for (verdict, (scores, values)) in verdicts.iter_mut().zip(final_scores.into_iter().zip(full)) {
+        if let Some(scores) = scores {
+            verdict.score = Some((scores.overall * 10.0).round() / 10.0);
+            verdict.checks = scores.checks;
+            verdict.categories = scores.categories;
+        }
+        if let (Some(measure), Some(values)) = (verdict.measure.as_mut(), values) {
+            measure.checks = values;
+        }
+    }
+    let top_picks = mark_top_picks(&mut verdicts);
     let count = |reason: Reason| verdicts.iter().filter(|v| v.reason == reason).count();
     let counts = Counts {
         frames: frames.len(),
@@ -761,7 +1191,11 @@ pub fn decide(frames: &[Frame]) -> Report {
         out_of_focus: count(Reason::OutOfFocus),
         motion_blur: count(Reason::MotionBlur),
         burst_duplicates: count(Reason::BurstDuplicate),
+        weaker_of_moment: count(Reason::WeakerOfMoment),
+        low_score: count(Reason::LowScore),
         bursts: bursts.len(),
+        moments: moments.len(),
+        top_picks,
         rules_withdrawn,
     };
     Report {
@@ -776,8 +1210,16 @@ pub fn decide(frames: &[Frame]) -> Report {
             ("burstBits", BURST_BITS as f32),
             ("burstBitsUntimed", BURST_BITS_UNTIMED as f32),
             ("burstGapMs", BURST_GAP_MS as f32),
+            ("momentBits", MOMENT_BITS as f32),
+            ("momentBitsUntimed", MOMENT_BITS_UNTIMED as f32),
+            ("momentGapMs", MOMENT_GAP_MS as f32),
+            ("momentMargin", MOMENT_MARGIN),
+            ("lowScore", LOW_SCORE),
+            ("topShare", TOP_SHARE),
+            ("topFloor", TOP_FLOOR),
             ("implausibleShare", IMPLAUSIBLE_SHARE),
         ]),
+        check_ids: crate::cull_checks::CHECKS.iter().map(|c| c.id).collect(),
         counts,
         verdicts,
     }
@@ -821,7 +1263,68 @@ pub fn camera_times(state: &AppState, project_id: &str) -> IpcResult<BTreeMap<St
     Ok(times)
 }
 
-/// Read one photograph's pixels and measure them.
+/// The camera settings the hundred checks read, per photograph.
+///
+/// # Errors
+/// The catalog read failing.
+pub fn camera_settings(
+    state: &AppState,
+    project_id: &str,
+) -> IpcResult<BTreeMap<String, crate::cull_checks::Settings>> {
+    type Row = (
+        String,
+        Option<i64>,
+        Option<i64>,
+        Option<f64>,
+        Option<i64>,
+        Option<i64>,
+        Option<i64>,
+    );
+    let project = project_id.to_owned();
+    let rows: Vec<Row> = state.catalog().read(move |conn| {
+        let mut statement = conn
+            .prepare(
+                "SELECT photo_id, iso, shutter_us, focal_len_mm, flash_fired, width_px, height_px                  FROM photo WHERE project_id = ?1",
+            )
+            .map_err(|e| aura_core::errors::db::statement_failed("cull camera settings", &e))?;
+        let rows = statement
+            .query_map([project], |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                    row.get(5)?,
+                    row.get(6)?,
+                ))
+            })
+            .map_err(|e| aura_core::errors::db::statement_failed("cull camera settings", &e))?
+            .filter_map(Result::ok)
+            .collect();
+        Ok(rows)
+    })?;
+    Ok(rows
+        .into_iter()
+        .map(|(photo, iso, shutter, focal, flash, width, height)| {
+            let positive = |value: Option<i64>| value.filter(|v| *v > 0).map(|v| v as f32);
+            (
+                photo,
+                crate::cull_checks::Settings {
+                    iso: positive(iso),
+                    shutter_s: positive(shutter).map(|us| us / 1_000_000.0),
+                    focal_mm: focal.filter(|f| *f > 0.0).map(|f| f as f32),
+                    flash: flash.map(|f| f == 1),
+                    megapixels: positive(width)
+                        .zip(positive(height))
+                        .map(|(w, h)| w * h / 1_000_000.0),
+                },
+            )
+        })
+        .collect())
+}
+
+/// Read one photograph's pixels and measure them: the four hard rules and the hundred checks.
 ///
 /// # Errors
 /// An invalid identifier or a preview that cannot be decoded. The caller keeps the frame.
@@ -830,6 +1333,7 @@ pub fn measure_photo(
     project_id: &str,
     photo: &ImageRowLite,
     times: &BTreeMap<String, i64>,
+    settings: &BTreeMap<String, crate::cull_checks::Settings>,
 ) -> IpcResult<Frame> {
     let id = aura_core::PhotoId::from_db(&photo.id)
         .map_err(|_| aura_core::errors::render::recipe_invalid("photo", "invalid identifier"))?;
@@ -844,9 +1348,19 @@ pub fn measure_photo(
         .and_then(|rgb| aura_vision::portrait::detect(rgb, thumb.width, thumb.height).ok())
         .unwrap_or_default();
     let detail = proxy.as_ref().unwrap_or(&thumb);
-    let measure = detail
-        .as_srgb8()
-        .and_then(|rgb| measure_pixels(rgb, detail.width as usize, detail.height as usize, &faces));
+    let (width, height) = (detail.width as usize, detail.height as usize);
+    let measure = detail.as_srgb8().and_then(|rgb| {
+        let mut measure = measure_pixels(rgb, width, height, &faces)?;
+        measure.checks = crate::cull_checks::measure(&crate::cull_checks::Sample {
+            rgb,
+            width,
+            height,
+            faces: &faces,
+            settings: settings.get(&photo.id).copied().unwrap_or_default(),
+        })
+        .unwrap_or_default();
+        Some(measure)
+    });
     let edited_by_hand = !crate::develop_commands::load_or_neutral(state, id)?
         .provenance
         .user_edited_fields
@@ -1025,6 +1539,129 @@ mod tests {
         assert_eq!(report.verdicts[0].reason, Reason::RulesWithdrawn);
         assert!(report.summary().contains("withdrawn"));
         assert!(decide(&[]).kept().is_empty());
+    }
+
+    fn kept(name: &str) -> Verdict {
+        Verdict {
+            photo_id: name.into(),
+            file_name: format!("{name}.jpg"),
+            keep: true,
+            reason: Reason::Keep,
+            detail: String::new(),
+            burst: None,
+            kept_instead: None,
+            moment: None,
+            score: None,
+            top_pick: false,
+            checks: Vec::new(),
+            categories: Vec::new(),
+            measure: None,
+        }
+    }
+
+    fn plain(name: &str, edited_by_hand: bool) -> Frame {
+        Frame {
+            photo_id: name.into(),
+            file_name: format!("{name}.jpg"),
+            measure: Some(Measure::default()),
+            time_ms: None,
+            edited_by_hand,
+        }
+    }
+
+    #[test]
+    fn a_moment_keeps_its_best_and_close_shots_and_leaves_out_the_weak_ones() {
+        let frames = [
+            plain("a", false),
+            plain("b", false),
+            plain("c", false),
+            plain("d", true),
+        ];
+        let mut verdicts: Vec<Verdict> = ["a", "b", "c", "d"].iter().map(|n| kept(n)).collect();
+        let totals = [Some(80.0), Some(75.0), Some(50.0), Some(30.0)];
+        settle_moment(&frames, &mut verdicts, 1, &[0, 1, 2, 3], &totals);
+        let keeps: Vec<bool> = verdicts.iter().map(|v| v.keep).collect();
+        // b is within the margin; c is not; d is weak but a person edited it.
+        assert_eq!(keeps, [true, true, false, true]);
+        assert_eq!(verdicts[2].reason, Reason::WeakerOfMoment);
+        assert_eq!(verdicts[2].kept_instead.as_deref(), Some("a"));
+        assert!(verdicts.iter().all(|v| v.moment == Some(1)));
+        // Without scores for every frame nothing is decided by score.
+        let mut unscored: Vec<Verdict> = ["a", "b"].iter().map(|n| kept(n)).collect();
+        settle_moment(&frames, &mut unscored, 2, &[0, 1], &[Some(90.0), None]);
+        assert!(unscored.iter().all(|v| v.keep));
+    }
+
+    #[test]
+    fn a_moment_never_keeps_more_than_half_of_its_close_shots_beside_the_best() {
+        let frames: Vec<Frame> = (0..6).map(|i| plain(&i.to_string(), false)).collect();
+        let mut verdicts: Vec<Verdict> = (0..6).map(|i| kept(&i.to_string())).collect();
+        let totals: Vec<Option<f32>> = (0..6).map(|i| Some(80.0 - i as f32)).collect();
+        settle_moment(&frames, &mut verdicts, 1, &[0, 1, 2, 3, 4, 5], &totals);
+        assert_eq!(verdicts.iter().filter(|v| v.keep).count(), 3);
+    }
+
+    #[test]
+    fn a_very_low_score_is_left_out_but_never_a_hand_edited_frame() {
+        let mut verdicts = vec![kept("a"), kept("b"), kept("c")];
+        verdicts[1].reason = Reason::EditedByHand;
+        drop_low_scores(&mut verdicts, &[Some(10.0), Some(10.0), Some(70.0)]);
+        assert_eq!(verdicts[0].reason, Reason::LowScore);
+        assert!(!verdicts[0].keep);
+        assert!(verdicts[1].keep && verdicts[2].keep);
+    }
+
+    #[test]
+    fn top_picks_are_the_best_fifth_and_must_score_well() {
+        let mut verdicts: Vec<Verdict> = (0..10).map(|i| kept(&i.to_string())).collect();
+        for (i, verdict) in verdicts.iter_mut().enumerate() {
+            verdict.score = Some(10.0 + 10.0 * i as f32);
+        }
+        assert_eq!(mark_top_picks(&mut verdicts), 2);
+        assert!(verdicts[9].top_pick && verdicts[8].top_pick && !verdicts[7].top_pick);
+        let mut weak: Vec<Verdict> = (0..5).map(|i| kept(&i.to_string())).collect();
+        for verdict in &mut weak {
+            verdict.score = Some(40.0);
+        }
+        assert_eq!(mark_top_picks(&mut weak), 0);
+    }
+
+    #[test]
+    fn every_checked_frame_gets_a_hundred_scores_and_its_neighbours_are_read() {
+        let checked = |name: &str, rgb: &[u8], time_ms: Option<i64>| {
+            let mut frame = frame(name, rgb, time_ms);
+            if let Some(measure) = frame.measure.as_mut() {
+                measure.checks = crate::cull_checks::measure(&crate::cull_checks::Sample {
+                    rgb,
+                    width: 640,
+                    height: 480,
+                    faces: &[],
+                    settings: crate::cull_checks::Settings::default(),
+                })
+                .expect("checked");
+            }
+            frame
+        };
+        let frames = [
+            checked("a", &scene(1, 0, 0), Some(0)),
+            checked("b", &scene(2, 0, 0), Some(60_000)),
+            checked("c", &scene(3, 0, 0), Some(400_000)),
+        ];
+        let report = decide(&frames);
+        assert_eq!(report.check_ids.len(), crate::cull_checks::COUNT);
+        for verdict in &report.verdicts {
+            assert!(verdict.score.is_some(), "{verdict:?}");
+            assert_eq!(verdict.checks.len(), crate::cull_checks::COUNT);
+            let values = &verdict.measure.as_ref().expect("measured").checks;
+            assert!(values[slot("context_uniqueness")].is_some());
+            assert!(values[slot("context_collection_rank")].is_some());
+        }
+        // The first frame, and one after a long gap, open a scene.
+        let new_scene = slot("context_new_scene");
+        let scene_of = |i: usize| report.verdicts[i].measure.as_ref().unwrap().checks[new_scene];
+        assert_eq!(scene_of(0), Some(1.0));
+        assert_eq!(scene_of(2), Some(1.0));
+        assert!(report.summary().contains("top picks"));
     }
 
     #[test]

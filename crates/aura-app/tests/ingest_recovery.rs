@@ -92,6 +92,7 @@ fn run(fail: bool) {
                 ingest_job_id: Some(handle.job_id.clone()),
                 look: None,
                 keep_everything: true,
+                only_photos: Vec::new(),
             },
         )
         .expect("start dependent workflow");

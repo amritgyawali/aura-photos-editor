@@ -7,7 +7,7 @@ it('always opens the screenshot studio shell even with a saved alternate theme',
   const first = render(<App />);
   const nav = screen.getByRole('navigation', { name: 'Workspace' });
   expect(within(nav).getAllByRole('button').map(button => button.querySelector('strong')?.textContent))
-    .toEqual(['Start', 'Photos', 'Auto edit', 'Effects', 'Match a look', 'Hot Features', 'Export', 'Advanced']);
+    .toEqual(['Start', 'Photos', 'Cull', 'Auto edit', 'Effects', 'Match a look', 'Hot Features', 'Export', 'Advanced']);
   expect(screen.queryByRole('button', { name: /Theme:/ })).toBeNull();
   fireEvent.click(within(nav).getByRole('button', { name: /Auto edit/ }));
   expect(first.container.querySelector('.aura-studio')).toBeTruthy();

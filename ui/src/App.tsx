@@ -29,6 +29,7 @@ import { EffectsLibrary } from './components/effects/EffectsLibrary';
 import { GalleryPanel } from './components/gallery/GalleryPanel';
 import { QcPanel } from './components/qc/QcPanel';
 import { VirtualGrid } from './components/grid/VirtualGrid';
+import { PhotoCullWorkspace } from './components/cull/PhotoCullWorkspace';
 import { PAGE_SIZE, useStore } from './state/store';
 import { useThumbnails } from './stores/thumbnailStore';
 
@@ -329,6 +330,7 @@ export function App(): JSX.Element {
   const tabs = [
     ['start', 'Start', 'Look, reference, photos'],
     ['library', 'Photos', 'Browse your collection'],
+    ['cull', 'Cull', 'Best photos & left out'],
     ['edit', 'Auto edit', 'One click, start to finish'],
     ['effects', 'Effects', 'Every retouch tool & creative look'],
     ['look', 'Match a look', 'Your reference, your photos'],
@@ -415,6 +417,8 @@ export function App(): JSX.Element {
               <ImportWizard disabled={locked} running={progress.running} done={progress.done} total={progress.total} onStart={roots => void startImport(roots)} onCancel={() => void cancelImport()} />
               {rows.length > 0 ? <div className="studio-library"><VirtualGrid rows={rows} onNeedMore={() => void loadPage(activeProjectId, loadedPages, false)} /></div> : <div className="studio-empty"><strong>Your next great edit starts here.</strong><p>Choose a folder above. Your photos will appear here.</p></div>}
             </>}
+            {workspace === 'cull' && <PhotoCullWorkspace key={activeProjectId} projectId={activeProjectId} disabled={locked} onError={setError}
+              onOpen={id => { const index = rows.findIndex(row => row.id === id); if (index >= 0) { useStore.getState().focusIndex(index); useStore.getState().selectOnly(id); setWorkspace('edit'); } }} />}
             <div hidden={workspace !== 'edit' && workspace !== 'look' && !(workspace === 'hot' && hotFeature !== 'train')}>
               <div hidden={workspace !== 'edit'}>
               <div className="workspace-heading"><div><span className="eyebrow">LIGHT. COLOR. FINISH.</span><h1>A good starting point, in one click.</h1></div><button type="button" disabled={locked} onClick={() => setWorkspace('look')}>Match a reference look →</button></div>

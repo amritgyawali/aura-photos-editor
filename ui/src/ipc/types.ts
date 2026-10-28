@@ -5075,6 +5075,75 @@ export type OneClickFinishInput = {
   look?: AutomaticLookInput | null;
   /** ADR-0088. Deliver every readable frame instead of running the measured cull. */
   keepEverything?: boolean;
+  /** ADR-0185. Edit and export only these photographs, with no cull. */
+  onlyPhotos?: string[];
+};
+
+/** ADR-0185. Cull a whole collection on its own, before anything is edited. */
+export type PhotoCullInput = { projectId: string };
+export type PhotoCullJobDto = { jobId: string };
+export type PhotoCullStatusDto = {
+  jobId: string;
+  projectId: string;
+  /** `running` | `completed` | `cancelled` | `failed`. */
+  status: string;
+  done: number;
+  total: number;
+  label: string;
+};
+/** ADR-0185. One photograph of a cull review, with the photographer's choice applied. */
+export type PhotoCullPhotoDto = {
+  photoId: string;
+  fileName: string;
+  /** Delivered, after the photographer's choice. */
+  keep: boolean;
+  /** What the cull itself decided. */
+  cullKeep: boolean;
+  /** `keep` | `leave_out` when the photographer chose. */
+  choice: string | null;
+  topPick: boolean;
+  reason: string;
+  reasonLabel: string;
+  detail: string;
+  /** The hundred checks' total, 0 to 100. */
+  score: number | null;
+  /** Each group's score, in `groups` order. */
+  categories: (number | null)[];
+  keptInstead: string | null;
+  burst: number | null;
+  moment: number | null;
+};
+export type PhotoCullReviewDto = {
+  projectId: string;
+  measuredAt: string;
+  summary: string;
+  frames: number;
+  best: number;
+  leftOut: number;
+  topPicks: number;
+  keptByYou: number;
+  leftOutByYou: number;
+  /** Photographs added since this cull, so not in it. */
+  notCulled: number;
+  groups: string[];
+  photos: PhotoCullPhotoDto[];
+};
+export type PhotoCullChecksInput = { projectId: string; photoId: string };
+/** ADR-0185. One of a photograph's hundred checks. */
+export type PhotoCullCheckDto = {
+  id: string;
+  group: string;
+  name: string;
+  /** 0 to 100; null when the check did not apply. */
+  score: number | null;
+  value: number | null;
+  weight: number;
+};
+export type SetPhotoCullChoiceInput = {
+  projectId: string;
+  photoIds: string[];
+  /** `keep` | `leave_out` | `auto`. */
+  choice: string;
 };
 
 /** ADR-0088. Strengths are whole percentages: profile `0..150`, reference `0..100`. */

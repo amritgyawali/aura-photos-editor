@@ -8734,6 +8734,10 @@ pub struct OneClickFinishInput {
     /// Deliver every readable frame instead of running the measured cull. ADR-0088.
     #[serde(default)]
     pub keep_everything: bool,
+    /// Edit and export only these photographs, with no cull: the ones a photographer brought
+    /// back after a run. Empty means the whole collection. ADR-0185.
+    #[serde(default)]
+    pub only_photos: Vec<String>,
 }
 
 /// The look an unattended run applies to every delivered frame, exactly as the studio's own
@@ -8762,6 +8766,144 @@ pub struct AutomaticLookInput {
 pub struct OneClickFinishDto {
     /// The id this process knows the run by.
     pub job_id: String,
+}
+
+/// Cull a whole collection on its own, before anything is edited. ADR-0185.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PhotoCullInput {
+    /// The collection.
+    pub project_id: String,
+}
+
+/// The cull just started, or the one already running for that collection.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PhotoCullJobDto {
+    /// The id this process knows the run by.
+    pub job_id: String,
+}
+
+/// How far a cull has got.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PhotoCullStatusDto {
+    /// The run.
+    pub job_id: String,
+    /// The collection it culls.
+    pub project_id: String,
+    /// `running`, `completed`, `cancelled` or `failed`.
+    pub status: String,
+    /// Photographs checked so far.
+    pub done: u64,
+    /// Photographs to check.
+    pub total: u64,
+    /// What it is doing, or why it stopped, in a sentence.
+    pub label: String,
+}
+
+/// A collection's last cull, with the photographer's own choices applied.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PhotoCullReviewDto {
+    /// The collection.
+    pub project_id: String,
+    /// When the photographs were measured, RFC 3339.
+    pub measured_at: String,
+    /// The cull's own one-sentence account, before any choice.
+    pub summary: String,
+    /// Photographs in the review.
+    pub frames: u64,
+    /// Delivered.
+    pub best: u64,
+    /// Not delivered. Still in the collection.
+    pub left_out: u64,
+    /// Delivered photographs marked as top picks.
+    pub top_picks: u64,
+    /// Photographs the photographer brought back or kept.
+    pub kept_by_you: u64,
+    /// Photographs the photographer left out.
+    pub left_out_by_you: u64,
+    /// Photographs added to the collection since this cull, so not in it.
+    pub not_culled: u64,
+    /// The ten check groups, in the order `categories` holds them.
+    pub groups: Vec<String>,
+    /// Every photograph, in timeline order.
+    pub photos: Vec<PhotoCullPhotoDto>,
+}
+
+/// One photograph of a cull review.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PhotoCullPhotoDto {
+    /// The photograph.
+    pub photo_id: String,
+    /// Its file name.
+    pub file_name: String,
+    /// Delivered, after the photographer's choice.
+    pub keep: bool,
+    /// What the cull itself decided.
+    pub cull_keep: bool,
+    /// `keep` or `leave_out` when the photographer chose; absent when the cull decides.
+    pub choice: Option<String>,
+    /// One of the best-scoring photographs delivered.
+    pub top_pick: bool,
+    /// Stable reason slug.
+    pub reason: String,
+    /// The reason in a few words.
+    pub reason_label: String,
+    /// The reason in a sentence, with its numbers.
+    pub detail: String,
+    /// The hundred checks' total, `0..=100`.
+    pub score: Option<f32>,
+    /// Each group's score, `0..=100`, in `groups` order.
+    pub categories: Vec<Option<u8>>,
+    /// For a duplicate or a weaker shot, the photograph delivered instead.
+    pub kept_instead: Option<String>,
+    /// Photographs of one burst share a number.
+    pub burst: Option<u64>,
+    /// Photographs of one moment share a number.
+    pub moment: Option<u64>,
+}
+
+/// Which photograph's checks to show.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PhotoCullChecksInput {
+    /// The collection.
+    pub project_id: String,
+    /// The photograph.
+    pub photo_id: String,
+}
+
+/// One of a photograph's hundred checks.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PhotoCullCheckDto {
+    /// Stable slug.
+    pub id: String,
+    /// Its group, in words.
+    pub group: String,
+    /// What it measures, in words.
+    pub name: String,
+    /// `0..=100`; absent when the check did not apply to this photograph.
+    pub score: Option<u8>,
+    /// The raw measurement behind the score.
+    pub value: Option<f32>,
+    /// How much it counts in its group.
+    pub weight: f32,
+}
+
+/// Bring photographs back, leave them out, or hand them back to the cull.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetPhotoCullChoiceInput {
+    /// The collection.
+    pub project_id: String,
+    /// The photographs.
+    pub photo_ids: Vec<String>,
+    /// `keep`, `leave_out` or `auto`.
+    pub choice: String,
 }
 
 /// The live row behind the button: what phase is running, and what each phase did.

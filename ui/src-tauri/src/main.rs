@@ -3281,6 +3281,67 @@ async fn activity_status(state: State<'_, AppState>) -> IpcResult<aura_app::acti
         .map_err(|_| background_request_failed())?
 }
 
+// ADR-0185. The Cull screen: a cull of its own, its review, and the photographer's choices.
+#[tauri::command]
+async fn start_photo_cull(
+    state: State<'_, AppState>,
+    input: aura_app::contract::ipc::PhotoCullInput,
+) -> IpcResult<aura_app::contract::ipc::PhotoCullJobDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::start_photo_cull(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn photo_cull_status(
+    job_id: String,
+) -> IpcResult<aura_app::contract::ipc::PhotoCullStatusDto> {
+    tauri::async_runtime::spawn_blocking(move || aura_app::photo_cull_status(&job_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn photo_cull_cancel(job_id: String) -> IpcResult<bool> {
+    tauri::async_runtime::spawn_blocking(move || Ok(aura_app::photo_cull_cancel(&job_id)))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn photo_cull_review(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<Option<aura_app::contract::ipc::PhotoCullReviewDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::photo_cull_review(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn photo_cull_checks(
+    state: State<'_, AppState>,
+    input: aura_app::contract::ipc::PhotoCullChecksInput,
+) -> IpcResult<Vec<aura_app::contract::ipc::PhotoCullCheckDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::photo_cull_checks(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_photo_cull_choice(
+    state: State<'_, AppState>,
+    input: aura_app::contract::ipc::SetPhotoCullChoiceInput,
+) -> IpcResult<aura_app::contract::ipc::PhotoCullReviewDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_photo_cull_choice(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
 #[tauri::command]
 async fn one_click_cancel(job_id: String) -> IpcResult<bool> {
     let found = tauri::async_runtime::spawn_blocking(move || {
@@ -4251,6 +4312,12 @@ fn main() {
             one_click_finish,
             one_click_status,
             one_click_cancel,
+            start_photo_cull,
+            photo_cull_status,
+            photo_cull_cancel,
+            photo_cull_review,
+            photo_cull_checks,
+            set_photo_cull_choice,
             activity_status,
             analyse_portrait,
             find_glare,

@@ -121,9 +121,10 @@ fn learned_analysis_enabled() -> bool {
     std::env::var_os("AURA_LEARNED_ANALYSIS").is_some_and(|value| value == "1")
 }
 
-/// The cull that needs no learned model: focus, motion, exposure and bursts, measured from
-/// each photograph. `None` means the run was stopped. Nothing is deleted, and a frame that
-/// cannot be measured is delivered.
+/// The cull that needs no learned model: the four hard rules and the hundred checks, measured
+/// from each photograph. A cull the photographer already reviewed on the Cull screen is used
+/// as it stands, and their own choices always win. `None` means the run was stopped. Nothing
+/// is deleted, and a frame that cannot be measured is delivered. ADR-0088, ADR-0185.
 fn measured_cull(
     state: &AppState,
     job: &str,
@@ -132,51 +133,78 @@ fn measured_cull(
     readable: &[String],
     destination: &Path,
 ) -> Result<Option<Vec<String>>, IpcError> {
+    let choices = crate::photo_cull::choices(state, project).unwrap_or_default();
+    let wanted: BTreeSet<&String> = readable.iter().collect();
+    let report_path = destination.join("photo-cull.json");
+    if let Some(review) = crate::photo_cull::stored(state, project)? {
+        let reviewed: BTreeSet<&str> = review.photos.iter().map(|p| p.photo_id.as_str()).collect();
+        if readable.iter().all(|id| reviewed.contains(id.as_str())) {
+            let kept: Vec<String> = crate::photo_cull::delivered(&review, &choices)
+                .into_iter()
+                .filter(|id| wanted.contains(id))
+                .collect();
+            std::fs::write(
+                &report_path,
+                serde_json::to_vec_pretty(&review).map_err(|e| error(&e.to_string()))?,
+            )
+            .map_err(|e| aura_core::errors::io::from_io(&e, &report_path))?;
+            note(
+                job,
+                format!(
+                    "Used the cull reviewed on the Cull screen (measured {}): delivering {} of {} photographs, with every choice you made there.",
+                    review.measured_at,
+                    kept.len(),
+                    readable.len()
+                ),
+            );
+            return Ok(Some(if kept.is_empty() {
+                readable.to_vec()
+            } else {
+                kept
+            }));
+        }
+    }
     phase(
         job,
         "cull",
-        "Culling: measuring focus, motion, exposure and bursts in each photo.",
+        "Culling: checking each photo against 100 measurements and choosing the best of every moment.",
         readable.len() as u64,
     );
-    let times = crate::measured_cull::camera_times(state, project).unwrap_or_default();
-    let wanted: BTreeSet<&String> = readable.iter().collect();
-    let mut frames = Vec::with_capacity(readable.len());
     let chosen: Vec<&ImageRowLite> = photos
         .iter()
         .filter(|photo| wanted.contains(&photo.id))
         .collect();
-    let lanes = workers(state);
-    // Each frame is measured on its own; the decision over all of them is made afterwards.
-    for chunk in chosen.chunks(lanes.saturating_mul(16).max(1)) {
-        if stopped(job) {
-            return Ok(None);
-        }
-        let measured = in_order(chunk, lanes, |photo| {
-            let frame = crate::measured_cull::measure_photo(state, project, photo, &times)
-                .unwrap_or_else(|_| crate::measured_cull::Frame {
-                    photo_id: photo.id.clone(),
-                    file_name: photo.file_name.clone(),
-                    measure: None,
-                    time_ms: None,
-                    edited_by_hand: false,
-                });
+    let Some(frames) =
+        crate::photo_cull::measure_frames(state, project, &chosen, &|| stopped(job), &|| {
             update(job, |s| s.items_done = s.items_done.saturating_add(1));
-            frame
-        });
-        frames.extend(measured);
-    }
-    if stopped(job) {
+        })
+    else {
         return Ok(None);
-    }
+    };
     let report = crate::measured_cull::decide(&frames);
-    let path = destination.join("photo-cull.json");
     std::fs::write(
-        &path,
+        &report_path,
         serde_json::to_vec_pretty(&report).map_err(|e| error(&e.to_string()))?,
     )
-    .map_err(|e| aura_core::errors::io::from_io(&e, &path))?;
+    .map_err(|e| aura_core::errors::io::from_io(&e, &report_path))?;
+    // The Cull screen shows this run's decision, so a left-out photograph can be brought back.
+    if let Err(err) = crate::photo_cull::save(state, project, &report) {
+        note(
+            job,
+            format!("The cull could not be saved for review: {}", err.message),
+        );
+    }
     note(job, report.summary());
-    let kept = report.kept();
+    let kept = crate::photo_cull::delivered_from(&report, &choices);
+    if !choices.is_empty() {
+        note(
+            job,
+            format!(
+                "{} choice(s) you made on the Cull screen were applied.",
+                choices.len()
+            ),
+        );
+    }
     Ok(Some(if kept.is_empty() {
         readable.to_vec()
     } else {
@@ -335,7 +363,7 @@ fn error(message: &str) -> IpcError {
 /// Run `work` on every item, `workers` at a time, and give the answers back in the items' own
 /// order. Each answer is what that item would produce alone - only the scheduling changes - so
 /// reports, file numbering and every recipe are the same with one worker or with three.
-fn in_order<T: Sync, R: Send>(
+pub(crate) fn in_order<T: Sync, R: Send>(
     items: &[T],
     workers: usize,
     work: impl Fn(&T) -> R + Sync,
@@ -381,7 +409,7 @@ fn timed_out(err: &IpcError) -> bool {
 
 /// How many photographs a folder run works on at once: as many as the image gate lets run
 /// together, so the run never holds more full-size frames than the rest of the app may.
-fn workers(state: &AppState) -> usize {
+pub(crate) fn workers(state: &AppState) -> usize {
     state.image_work_gate().permits()
 }
 
@@ -501,6 +529,7 @@ pub fn automatic_start(
             ingest_job_id: Some(ingest.job_id.clone()),
             look: input.look,
             keep_everything: input.keep_everything,
+            only_photos: Vec::new(),
         },
     );
     match result {
@@ -775,6 +804,15 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
     if photos.is_empty() {
         return Err(error("No readable photographs were imported. Check the selected file formats and Import problems."));
     }
+    if !input.only_photos.is_empty() {
+        let only: BTreeSet<&String> = input.only_photos.iter().collect();
+        photos.retain(|photo| only.contains(&photo.id));
+        if photos.is_empty() {
+            return Err(error(
+                "None of the photographs you chose are in this collection any more.",
+            ));
+        }
+    }
     update(job, |s| s.frames = photos.len() as u64);
     let problems = crate::list_problems(state, project)?;
     if !problems.is_empty() {
@@ -990,7 +1028,8 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
         readable.len() as u64,
     );
     let mut targets = readable.clone();
-    if advanced {
+    // Photographs a person chose by hand are finished as chosen, whatever cull is configured.
+    if advanced && input.only_photos.is_empty() {
         match crate::cull_project(
             state,
             &CullProjectInput {
@@ -1022,6 +1061,14 @@ fn stages(state: &AppState, job: &str, input: &OneClickFinishInput) -> Result<()
                 ),
             ),
         }
+    } else if !input.only_photos.is_empty() {
+        note(
+            job,
+            format!(
+                "Finishing only the {} photograph(s) you chose; no cull for this run.",
+                readable.len()
+            ),
+        );
     } else if input.keep_everything {
         note(
             job,
