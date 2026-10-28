@@ -187,7 +187,7 @@ def self_test() -> int:
     # --- 3. the per-hair-type report can fail ----------------------------------------------
     biased_rows = []
     for hair_type in HAIR_TYPES:
-        rows = dataset(random.Random(hash(hair_type) & 0xFFFF), hair_type, 300, True)
+        rows = dataset(random.Random(0xB0 + HAIR_TYPES.index(hair_type)), hair_type, 300, True)
         if hair_type == "coily":
             # A model trained on data whose coily strands are mislabelled: the disparity the gate
             # exists to find, injected on purpose.
