@@ -70,6 +70,8 @@ export type StudioFinish = {
   faces: [number, number][];
   /** The people as the learned selection found them, frozen by the backend; carried unchanged. */
   subjectMatte?: unknown;
+  /** ADR-0185: the faces were agreed between AURA's two face detectors; carried unchanged. */
+  facesReconciled?: boolean;
 };
 /** `notes`: what the saved finish could not do on this photograph, e.g. people tools with no face. */
 export type StudioFinishDto = { finish: StudioFinish; recipe: RecipeDto; notes?: string[] };
@@ -272,6 +274,7 @@ export function normaliseFinish(value: Partial<StudioFinish> | null | undefined)
     subject: { ...NEUTRAL_SUBJECT, ...(value?.subject ?? {}) },
     faces: value?.faces ?? [],
     subjectMatte: value?.subjectMatte ?? null,
+    ...(value?.facesReconciled ? { facesReconciled: true } : {}),
   };
 }
 

@@ -80,6 +80,8 @@ pub mod photo_analysis;
 pub mod provider_links;
 pub mod spatial_lab_commands;
 pub mod studio_color_commands;
+/// ADR-0185: Portrait studio faces agreed between the portrait parse and the learned detector.
+mod studio_faces;
 pub mod studio_tools;
 pub mod workflow_lab;
 
