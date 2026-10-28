@@ -121,7 +121,7 @@ def run(page, out, incoming, count):
     page.screenshot(path=str(out / '01-after-import.png'))
     check('an import gives every photograph the pass by itself', len(reports) == count == len(photos),
           f'{len(reports)} of {len(photos)} photographs carry a report')
-    check('every report lists every built step', all(len(r['steps']) == 25 and r['planned'] == 100 for r in reports.values()),
+    check('every report lists every built step', all(len(r['steps']) == 50 and r['planned'] == 100 for r in reports.values()),
           {p['fileName']: len(reports.get(p['id'], {}).get('steps', [])) for p in photos})
 
     entries = {}
@@ -141,7 +141,7 @@ def run(page, out, incoming, count):
     expect(panel).to_be_visible(timeout=180000)
     status = panel.get_by_role('status').inner_text()
     page.screenshot(path=str(out / '02-develop-panel.png'))
-    check('Develop shows the report', '25 of 100 steps built' in status, status)
+    check('Develop shows the report', '50 of 100 steps built' in status, status)
     before = len(invoke('image_history', {'input': {'photoId': first['id']}})['entries'])
     again = panel.get_by_role('button', name='Run photo pass again', exact=True)
     expect(again).to_be_enabled(timeout=180000)

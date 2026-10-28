@@ -257,6 +257,15 @@ fn the_photo_pass_on_real_photographs() {
         let ms = started.elapsed().as_millis();
         pass_ms.push(ms);
         let report = result.report;
+        if aura_app::perf::enabled() {
+            let mut steps: BTreeMap<&str, u64> = BTreeMap::new();
+            for (label, ms) in aura_app::perf::take() {
+                if label.starts_with("pass.") {
+                    *steps.entry(label).or_default() += ms;
+                }
+            }
+            println!("  timing: {steps:?}");
+        }
         println!(
             "\n=== {name}: {} (enhance {enhanced} ms, pass {ms} ms)",
             report.summary

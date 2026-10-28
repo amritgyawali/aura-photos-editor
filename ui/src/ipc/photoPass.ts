@@ -4,7 +4,7 @@ import type { StageOutcome } from './advancedRetouch';
 
 /** The hundred-step photo pass that runs after Auto enhance on every imported photo (ADR-0186). */
 export const PASS_PLANNED = 100;
-export type PassCategory = 'capture';
+export type PassCategory = 'capture' | 'face';
 export type PassStepReport = {
   number: number; id: string; title: string; category: PassCategory; outcome: StageOutcome;
   checks: string[]; changes: string[]; operations: number; saved: boolean;
@@ -36,7 +36,7 @@ export function readPassReport(recipe: RecipeDto | null | undefined): PhotoPassR
     const steps = raw.steps.filter(isRecord).flatMap((s): PassStepReport[] => {
       const outcome = OUTCOMES.find(o => o === s.outcome);
       if (!outcome || typeof s.number !== 'number' || typeof s.id !== 'string' || typeof s.title !== 'string') return [];
-      return [{ number: s.number, id: s.id, title: s.title, category: 'capture', outcome,
+      return [{ number: s.number, id: s.id, title: s.title, category: s.category === 'face' ? 'face' : 'capture', outcome,
         checks: strings(s.checks), changes: strings(s.changes), operations: count(s.operations), saved: s.saved === true }];
     });
     return {

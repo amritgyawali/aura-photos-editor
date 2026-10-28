@@ -10,6 +10,7 @@
 //! so. Operations carry [`PREFIX`]; a repeat run replaces only its own and keeps every other one.
 
 pub mod capture;
+pub mod face;
 pub mod scene;
 
 use crate::{commands::IpcResult, contract::ipc::RecipeDto, portrait_features::Pixels, AppState};
@@ -29,7 +30,7 @@ pub use crate::advanced_retouch::Outcome;
 /// Where the pass's report is stored in the recipe.
 pub const KEY: &str = "photo_pass_v1";
 /// Written into the report; bump on any behavioural change.
-pub const VERSION: &str = "photo-pass-v1-batch1";
+pub const VERSION: &str = "photo-pass-v1-batch2";
 /// Every operation the pass places starts with this.
 pub const PREFIX: &str = "pass-";
 /// How many steps the finished pass will have (ADR-0186); the catalogue grows by batch.
@@ -41,6 +42,8 @@ pub const PLANNED: usize = 100;
 pub enum Category {
     /// Capture, light and colour faults (steps 1-25).
     Capture,
+    /// Faces and skin, checked on the edited photograph (steps 26-50).
+    Face,
 }
 
 /// One step of the catalogue.
@@ -57,12 +60,16 @@ const fn step(number: u8, id: &'static str, title: &'static str) -> StepDef {
         number,
         id,
         title,
-        category: Category::Capture,
+        category: if number <= 25 {
+            Category::Capture
+        } else {
+            Category::Face
+        },
     }
 }
 
 /// The steps implemented so far, in the order they run.
-pub const STEPS: [StepDef; 25] = [
+pub const STEPS: [StepDef; 50] = [
     step(1, "sensor_dust", "Sensor dust"),
     step(2, "clipped_channels", "Clipped colour channels"),
     step(3, "colour_noise", "Colour noise"),
@@ -88,6 +95,31 @@ pub const STEPS: [StepDef; 25] = [
     step(23, "dark_foreground", "Dark foreground"),
     step(24, "sharpen_mask", "Sharpening mask for noisy files"),
     step(25, "flicker", "Flicker bands"),
+    step(26, "face_exposure", "Face against its background"),
+    step(27, "skin_clipping", "Skin clipped by the edit"),
+    step(28, "skin_hue", "Skin hue moved by the grade"),
+    step(29, "skin_saturation", "Skin saturation raised by the grade"),
+    step(30, "lip_colour", "Lips that lost their colour"),
+    step(31, "pores_kept", "Pores kept"),
+    step(32, "skin_tone_kept", "Skin colour kept by the retouch"),
+    step(33, "beard_kept", "Beard and stubble kept"),
+    step(34, "brows_kept", "Eyebrows kept"),
+    step(35, "hairline_kept", "Hairline kept"),
+    step(36, "under_eye_kept", "Under-eyes no lighter than the cheek"),
+    step(37, "teeth_natural", "Teeth no whiter than the eyes"),
+    step(38, "shine_left", "Shine left after mattifying"),
+    step(39, "ceremonial_kept", "Bindi, tika and sindoor kept"),
+    step(40, "moles_kept", "Moles and beauty marks kept"),
+    step(41, "retouch_balance", "Both halves of each face alike"),
+    step(42, "retouch_leak", "Retouch stays on skin"),
+    step(43, "skin_noise", "Noise lifted onto skin"),
+    step(44, "eye_focus", "Eyes in focus"),
+    step(45, "side_light", "Coloured light on one side of a face"),
+    step(46, "face_neck_colour", "Face and neck colour"),
+    step(47, "mehndi_kept", "Mehndi kept"),
+    step(48, "makeup_kept", "Eye make-up kept"),
+    step(49, "small_faces", "Faces too small to retouch"),
+    step(50, "neck_light", "Neck in shadow"),
 ];
 
 /// One change to a recipe value, applied and described the same way everywhere.
@@ -107,6 +139,8 @@ pub enum Change {
     SharpenRadius(f32),
     SharpenMasking(i16),
     Texture(i16),
+    /// One of Auto enhance's retouch strength factors (ADR-0130), `0..=2`.
+    Intensity(aura_recipe::retouch_intensity::Category, f32),
     /// Rotation in degrees (positive clockwise) and the crop that hides the corners.
     Level {
         rotate: f32,
@@ -133,6 +167,13 @@ impl Change {
             Self::SharpenRadius(v) => g.sharpen.radius = v,
             Self::SharpenMasking(v) => g.sharpen.masking = v,
             Self::Texture(v) => g.texture = v,
+            Self::Intensity(category, factor) => {
+                use aura_recipe::retouch_intensity as intensity;
+                if let Ok(mut factors) = intensity::read(recipe) {
+                    factors.insert(category, factor.clamp(0.0, intensity::MAX_FACTOR));
+                    intensity::write(recipe, &factors).ok();
+                }
+            }
             Self::Level { rotate, crop } => {
                 recipe.geometry.rotate = rotate;
                 recipe.geometry.crop = crop;
@@ -277,10 +318,24 @@ pub fn read_report(recipe: &Recipe) -> Option<Report> {
     serde_json::from_value(recipe.extra.get(KEY)?.clone()).ok()
 }
 
-/// Measure the photograph and plan every step, without saving anything.
+/// Measure the photograph and plan the capture steps (1-25), without saving anything.
 #[must_use]
 pub fn plan(scene: &scene::Scene<'_>, base: &Recipe) -> Vec<(StepDef, Finding)> {
     STEPS.into_iter().zip(capture::plan(scene, base)).collect()
+}
+
+/// Plan the face steps (26-50) against the recipe the capture steps leave, rendered.
+#[must_use]
+pub fn plan_faces(
+    scene: &scene::Scene<'_>,
+    rendered: Option<&face::Rendered>,
+    current: &Recipe,
+) -> Vec<(StepDef, Finding)> {
+    STEPS
+        .into_iter()
+        .skip(25)
+        .zip(face::plan(scene, rendered, current))
+        .collect()
 }
 
 /// Run every step on one photograph; each step that changes it is saved as its own history step.
@@ -354,11 +409,31 @@ pub fn plan_photo(
         .ok();
     let capture = capture_of(state, &input.photo_id);
     let base = crate::develop_commands::load_or_neutral(state, photo)?;
-    let scene = scene::Scene::new(px, faces, capture, frame);
-    let planned = {
+    // The renderer's own parse of the faces, the one its face tools are anchored on.
+    let map = frame
+        .as_ref()
+        .and_then(|f| aura_render::portrait::parse(f, &aura_render::portrait::hints(&base)));
+    let scene = scene::Scene::new(px, faces, capture, frame).with_map(map);
+    let mut planned = {
         let _t = crate::perf::step(state, "pass.plan");
         plan(&scene, &base)
     };
+    // The face steps judge the edit itself: the recipe the capture steps leave, rendered with
+    // and without its retouch operations.
+    let (saves, _) = merge_all(&base, planned.clone(), |_, _, _| {})?;
+    let current = saves
+        .last()
+        .map_or_else(|| base.clone(), |s| s.recipe.clone());
+    let rendered = if scene.map_faces().is_empty() {
+        None
+    } else {
+        let _t = crate::perf::step(state, "pass.render_faces");
+        Some(face::Rendered::of(state, photo, &current)?)
+    };
+    planned.extend({
+        let _t = crate::perf::step(state, "pass.plan_faces");
+        plan_faces(&scene, rendered.as_ref(), &current)
+    });
     Ok((base, planned))
 }
 
@@ -640,6 +715,42 @@ mod tests {
         ids.sort_unstable();
         ids.dedup();
         assert_eq!(ids.len(), STEPS.len());
+    }
+
+    #[test]
+    fn the_first_25_steps_are_capture_and_the_next_25_are_faces() {
+        assert!(STEPS[..25].iter().all(|s| s.category == Category::Capture));
+        assert!(STEPS[25..].iter().all(|s| s.category == Category::Face));
+    }
+
+    #[test]
+    fn a_strength_factor_change_writes_that_factor_and_keeps_the_others() {
+        use aura_recipe::retouch_intensity::{self as intensity, Category as Kind};
+        let mut r = recipe();
+        intensity::write(&mut r, &BTreeMap::from([(Kind::Teeth, 0.8)])).unwrap();
+        Change::Intensity(Kind::Smoothing, 0.6).apply(&mut r);
+        let f = intensity::read(&r).unwrap();
+        assert_eq!(f.get(&Kind::Smoothing), Some(&0.6));
+        assert_eq!(f.get(&Kind::Teeth), Some(&0.8));
+        // A person's factor is kept by the merge, like any value they set.
+        let mut mine = recipe();
+        intensity::write(&mut mine, &BTreeMap::from([(Kind::Smoothing, 1.2)])).unwrap();
+        let (mine, _) = schema::merge(&recipe(), &mine, EditSource::User).unwrap();
+        let (_, report) = merge_all(
+            &mine,
+            vec![(
+                STEPS[30],
+                Finding::applied(
+                    "flat",
+                    "Smoothing.",
+                    vec![Change::Intensity(Kind::Smoothing, 0.6)],
+                    vec![],
+                ),
+            )],
+            |_, _, _| {},
+        )
+        .unwrap();
+        assert_eq!(report.steps[0].outcome, Outcome::Protected);
     }
 
     #[test]

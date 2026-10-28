@@ -6,9 +6,9 @@ each looking for one fault Auto enhance does not look for. A check measures the 
 fixes only what it measured. Most checks find nothing on most photos, and that is the point: a
 clean photo is left clean.
 
-The finished pass will have one hundred checks. This release has the first twenty-five, for
-capture, light and colour. Skin and face, eyes, hair, clothes and background, and the final look
-and quality checks follow.
+The finished pass will have one hundred checks. This release has the first fifty: twenty-five for
+capture, light and colour, and twenty-five that look at every face on the edited photograph.
+Eyes, hair, clothes and background, and the final look and quality checks follow.
 
 ## What every check reports
 
@@ -51,9 +51,48 @@ You can see the list for any photo under **Photo pass** in Develop, and run it a
 | 24 | Sharpening mask for noisy files | High ISO or measured noise | Keeps sharpening off flat, noisy areas |
 | 25 | Flicker bands | Light and dark stripes from LED light and a fast shutter | Tells you; they cannot be removed reliably |
 
+## The face checks (26-50)
+
+Auto enhance already retouches every face. These checks do not retouch again: they look at each
+person on the finished edit and compare them with themselves - the skin after the colour grade
+with grey and white after it, the retouched under-eye with the same person's cheek, the teeth
+with the same person's eyes. When Auto enhance went too far, its own strength slider for that
+kind of retouch is moved (you see it under Retouch strength); otherwise one change is made on that
+person's skin only. A face behind a coloured veil, or under a coloured light, is left as it is.
+
+| # | Check | What it looks for | What it does |
+|---|---|---|---|
+| 26 | Face against its background | A face in front of a window or the sky | Tells you, and points to Portrait light; it never brightens a face on its own, because a face in shade and darker skin look alike to a measurement |
+| 27 | Skin clipped by the edit | Skin the edit burnt out that had detail | Rolls the brightest skin off below white |
+| 28 | Skin hue moved by the grade | Skin pushed further than grey and white by the colour grade | Takes the extra colour back out of the skin |
+| 29 | Skin saturation raised by the grade | Skin made much more saturated than the original | Brings it back close to the original |
+| 30 | Lips that lost their colour | Lips paler than in the original | Brings their colour back |
+| 31 | Pores kept | Skin smoothed so much its texture is gone | Lowers smoothing so the pores show |
+| 32 | Skin colour kept by the retouch | Retouch that changed the person's skin colour | Halves tone and redness evening |
+| 33 | Beard and stubble kept | Stubble smoothed away | Lowers smoothing |
+| 34 | Eyebrows kept | Brows smoothed | Tells you |
+| 35 | Hairline kept | Hair round the face smoothed | Tells you |
+| 36 | Under-eyes no lighter than the cheek | Under-eyes lifted past the cheek | Lowers the under-eye lift to the cheek |
+| 37 | Teeth no whiter than the eyes | Teeth whitened past the whites of the eyes | Lowers teeth whitening |
+| 38 | Shine left after mattifying | Shiny skin still there | Raises shine control |
+| 39 | Bindi, tika and sindoor kept | Red marks on the forehead and parting losing colour | Tells you |
+| 40 | Moles and beauty marks kept | Dark marks removed | Tells you |
+| 41 | Both halves of each face alike | One side of a face retouched more | Tells you |
+| 42 | Retouch stays on skin | Clothes or background changed by face retouch | Tells you |
+| 43 | Noise lifted onto skin | Grain on skin after brightening | Softens the grain on that skin |
+| 44 | Eyes in focus | Soft eyes | Tells you whether it is focus or closed/covered eyes |
+| 45 | Coloured light on one side of a face | One cheek a different colour from the other, lit as brightly | Evens that side to the forehead's colour |
+| 46 | Face and neck colour | A neck a different colour from the face | Evens the neck to the face |
+| 47 | Mehndi kept | Henna patterns softened | Tells you |
+| 48 | Eye make-up kept | Eyeshadow colour evened away | Tells you |
+| 49 | Faces too small to retouch | Guests too small to judge | Tells you how many |
+| 50 | Neck in shadow | A neck much darker than the face above it | Lifts it half way |
+
 ## What it will never do
 
 - Change a value you set by hand.
 - Touch a person's skin in any scene check: people are kept out of them.
+- Judge a face against an ideal skin colour: every face check compares the person with themselves.
+- Reshape anybody.
 - Make up detail: dust is healed from surface beside it, colour comes from what surrounds it.
 - Remove people or objects.

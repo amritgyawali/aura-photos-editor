@@ -60,6 +60,8 @@ pub struct Scene<'a> {
     pub capture: Capture,
     /// The renderer's own working-space frame, when it could be built.
     pub frame: Option<aura_render::Frame>,
+    /// The renderer's own parse of the faces and their regions, on its analysis grid.
+    pub map: Option<std::sync::Arc<aura_portrait::PortraitMap>>,
 }
 
 impl<'a> Scene<'a> {
@@ -98,7 +100,23 @@ impl<'a> Scene<'a> {
             faces,
             capture,
             frame,
+            map: None,
         }
+    }
+
+    /// The same scene with the renderer's parse of its faces.
+    #[must_use]
+    pub fn with_map(mut self, map: Option<std::sync::Arc<aura_portrait::PortraitMap>>) -> Self {
+        self.map = map;
+        self
+    }
+
+    /// The faces the renderer's parse found, largest first.
+    #[must_use]
+    pub fn map_faces(&self) -> Vec<aura_portrait::FaceGeometry> {
+        let mut faces = self.map.as_ref().map_or_else(Vec::new, |m| m.faces.clone());
+        faces.sort_by(|a, b| b.size.total_cmp(&a.size));
+        faces
     }
 
     #[must_use]
