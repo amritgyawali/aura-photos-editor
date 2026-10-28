@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, asIpcError, develop, photoAutoEdit } from '../../ipc/client';
 import type { HistoryDto, PhotoAutoEditDto, RecipeDto, RenderDto } from '../../ipc/types';
-import { rgbDataUrl } from './rgbImage';
+import { renderImageUrl } from './rgbImage';
 
 const controls = [
   ['global.exposure', 'Exposure (stops)', -5, 5, 0.1],
@@ -26,7 +26,7 @@ export function PhotoEditor({ projectId, photoId, onChanged, render, recipe, his
   const [progress, setProgress] = useState<string | null>(null);
   const stopped = useRef(false);
   const activeJob = useRef<string | null>(null);
-  const editedSrc = useMemo(() => render ? rgbDataUrl(render) : null, [render]);
+  const editedSrc = useMemo(() => renderImageUrl(render), [render]);
 
   const reload = useCallback(async () => {
     const preview = await api.getPreview({ projectId, photoId, level: 'proxy', priority: 'interactive' });

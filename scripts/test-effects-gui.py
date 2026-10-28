@@ -20,6 +20,7 @@ build so `AURA_TEST_CATALOG` is honoured). Writes `.work-checks/effects-gui/`.
 import argparse
 import base64
 import json
+import re
 import os
 import shutil
 import subprocess
@@ -102,6 +103,14 @@ QUIET = {'clipped_highlight_repair', 'sky_blue', 'anamorphic_streak', 'eye_glow_
          'lash_darken', 'sparkle'}
 
 
+def tool_ids():
+    """Every retouch tool the window offers, read from the window's own source."""
+    text = (ROOT / 'ui/src/ipc/nativeRetouch.ts').read_text(encoding='utf-8')
+    base = re.findall(r"^\s*\['([a-z_]+)', '", text.split('export const RETOUCH_TOOLS = [')[1].split('] as const')[0], re.M)
+    effects = re.findall(r"^\s*\['([a-z_]+)', '", (ROOT / 'ui/src/ipc/retouchEffects.ts').read_text(encoding='utf-8'), re.M)
+    return base + [e for e in effects if e not in base]
+
+
 def launch(exe, port):
     env = dict(os.environ,
                WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=f'--remote-debugging-port={port}',
@@ -109,12 +118,19 @@ def launch(exe, port):
                AURA_TEST_CATALOG=str(OUT / 'catalog' / 'catalog.sqlite'))
     (OUT / 'catalog').mkdir(parents=True, exist_ok=True)
     proc = subprocess.Popen([str(exe)], cwd=str(ROOT), env=env)
+    # Wait for this app's own page, not merely for a debugging port: another AURA on the machine
+    # must never be driven by mistake.
     for _ in range(180):
+        if proc.poll() is not None:
+            raise RuntimeError(f'AURA exited during start-up (code {proc.returncode})')
         try:
-            urllib.request.urlopen(f'http://127.0.0.1:{port}/json/version', timeout=1)
-            return proc
+            with urllib.request.urlopen(f'http://127.0.0.1:{port}/json/list', timeout=1) as reply:
+                pages = json.loads(reply.read())
+            if any(p.get('type') == 'page' and 'tauri' in p.get('url', '') for p in pages):
+                return proc
         except Exception:  # noqa: BLE001 - the port is not open until the window is
-            time.sleep(1)
+            pass
+        time.sleep(1)
     proc.terminate()
     raise RuntimeError('AURA did not start')
 
@@ -156,14 +172,22 @@ def main():
 
     try:
         with sync_playwright() as pw:
-            browser = pw.chromium.connect_over_cdp(f'http://127.0.0.1:{args.port}')
+            # WebView2 swaps processes when it navigates to the app's page; a connection made just
+            # before the swap stays attached to a blank target, so reconnect until the page is seen.
             page = None
-            for _ in range(120):
-                found = [p for c in browser.contexts for p in c.pages]
-                page = next((p for p in found if 'localhost' in p.url or 'tauri' in p.url), None)
+            for _ in range(8):
+                browser = pw.chromium.connect_over_cdp(f'http://127.0.0.1:{args.port}')
+                for _ in range(15):
+                    found = [p for c in browser.contexts for p in c.pages]
+                    page = next((p for p in found if 'localhost' in p.url or 'tauri' in p.url), None)
+                    if page:
+                        break
+                    time.sleep(1)
                 if page:
                     break
-                time.sleep(1)
+                browser.close()
+            if page is None:
+                raise RuntimeError(f'no AURA page on port {args.port}')
             page.set_default_timeout(300000)
             expect.set_options(timeout=300000)
             page.wait_for_function('() => !!window.__TAURI_INTERNALS__')
@@ -287,8 +311,9 @@ def main():
             expect(library).to_be_visible()
             uses = library.get_by_role('button', name='Use on this photo', exact=True)
             total = uses.count()
-            check('the Effects screen lists every tool', total == 119 and uses.first.is_enabled(),
-                  f'{total} tools')
+            expected = len(tool_ids())
+            check('the Effects screen lists every tool', total == expected and uses.first.is_enabled(),
+                  f'{total} tools, {expected} in the tool lists')
             page.screenshot(path=str(OUT / '02-effects-screen.png'), full_page=False)
             page.get_by_label('Search tools', exact=True).fill('jewellery')
             card = library.get_by_role('listitem').filter(has=page.get_by_role('heading', name='Sparkle', exact=True))

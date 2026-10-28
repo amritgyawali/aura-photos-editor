@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { asIpcError } from '../ipc/client';
 import type { RenderDto } from '../ipc/types';
-import { rgbDataUrl } from '../components/develop/rgbImage';
+import { renderImageUrl } from '../components/develop/rgbImage';
 
 /** How sharp a preview is: the original's own resolution, or the screen-sized first look. */
 export type PreviewQuality = 'full' | 'fast';
@@ -23,7 +23,6 @@ const BUDGET = 128_000_000;
 const entries = new Map<string, Entry>();
 let used = 0;
 type Pixels = Pick<RenderDto, 'width' | 'height' | 'rgbBase64'>;
-const sources = new WeakMap<Pixels, string | null>();
 
 /** The cached preview for `key`, marking it as just used. */
 export function cachedPreview(key: string): Entry | undefined {
@@ -56,11 +55,9 @@ export function forgetPreviews(): void {
   used = 0;
 }
 
-/** The displayable image for a preview, built once per preview and reused. */
+/** The displayable image for a preview, built once per preview and released with it. */
 export function previewSource(image: Pixels | null | undefined): string | null {
-  if (!image) return null;
-  if (!sources.has(image)) sources.set(image, rgbDataUrl(image));
-  return sources.get(image) ?? null;
+  return renderImageUrl(image);
 }
 
 export type ProgressivePreview = {

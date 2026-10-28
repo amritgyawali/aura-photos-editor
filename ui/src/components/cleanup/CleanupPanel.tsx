@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { asIpcError, cleanup as cleanupApi, develop as developApi } from '../../ipc/client';
 import type {
@@ -7,9 +7,10 @@ import type {
   CleanupStatusDto,
   CropRectDto,
   ManualRemoveDto,
+  RenderDto,
 } from '../../ipc/types';
 import { BeforeAfter } from './BeforeAfter';
-import { rgbDataUrl } from '../develop/rgbImage';
+import { renderImageUrl } from '../develop/rgbImage';
 import { ManualRemove } from './ManualRemove';
 import { ProposalQueue } from './ProposalQueue';
 
@@ -55,7 +56,9 @@ export function CleanupPanel({ projectId, photoId, onError }: CleanupPanelProps)
   const [proposals, setProposals] = useState<CleanupProposalDto[]>([]);
   const [blocked, setBlocked] = useState<CleanupBlockedDto[]>([]);
   const [previewing, setPreviewing] = useState<string | null>(null);
-  const [beforeSrc, setBeforeSrc] = useState<string | null>(null);
+  // The render is kept, not just its URL: the picture is released when its render is.
+  const [beforeRender, setBeforeRender] = useState<RenderDto | null>(null);
+  const beforeSrc = useMemo(() => renderImageUrl(beforeRender), [beforeRender]);
   const [region, setRegion] = useState<CropRectDto | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -98,7 +101,7 @@ export function CleanupPanel({ projectId, photoId, onError }: CleanupPanelProps)
   // The selection moved: whatever was being previewed belongs to a different photograph.
   useEffect(() => {
     setPreviewing(null);
-    setBeforeSrc(null);
+    setBeforeRender(null);
     setRegion(null);
   }, [photoId]);
 
@@ -138,7 +141,7 @@ export function CleanupPanel({ projectId, photoId, onError }: CleanupPanelProps)
           level: 'proxy2048',
           purpose: 'interactive',
         });
-        setBeforeSrc(rgbDataUrl(render));
+        setBeforeRender(render);
       } catch (error) {
         fail(error);
       }

@@ -7,7 +7,7 @@ import { AutoRetouchSettings } from './AutoRetouchSettings';
 import { AdvancedRetouch } from './AdvancedRetouch';
 import { RetouchIntensity } from './RetouchIntensity';
 import { EFFECT_COLOR, EFFECT_DEFAULTS, isEffectTool } from '../../ipc/retouchEffects';
-import { changesDataUrl, coverageDataUrl } from './rgbImage';
+import { changesImageUrl, coverageImageUrl } from './rgbImage';
 import { previewSource, useProgressivePreview } from '../../state/previewCache';
 import { useSavedRetouchCoverage } from './useSavedRetouchCoverage';
 import { RetouchCanvas, type RetouchMode, type SkinInspectionView } from './RetouchCanvas';
@@ -103,8 +103,8 @@ export function NativeRetouchWorkspace({projectId, photoId, disabled = false, re
   const coverage = useSavedRetouchCoverage(projectId, photoId, `${recipe?.recipeHash}:${refresh}:${revision}`,
     coverageOperation, coverageView && coverageMode === 'selection' && !blocked);
   const coverageSrc = useMemo(() => {
-    if (coverageMode === 'changes') return before && preview ? changesDataUrl(before, preview, displayedCoverageOpacity) : null;
-    return coverage.image && preview ? coverageDataUrl(preview, coverage.image, displayedCoverageOpacity) : null;
+    if (coverageMode === 'changes') return before && preview ? changesImageUrl(before, preview, displayedCoverageOpacity) : null;
+    return coverage.image && preview ? coverageImageUrl(preview, coverage.image, displayedCoverageOpacity) : null;
   }, [coverageMode, coverage.image, before, preview, displayedCoverageOpacity]);
   useEffect(() => { setCoverageOperation(null); setCoverageView(false); setInspectionView('color'); }, [photoId, projectId]);
   useEffect(() => { if (coverageOperation && !edits.some(e => e.id === coverageOperation)) setCoverageOperation(null); }, [edits, coverageOperation]);

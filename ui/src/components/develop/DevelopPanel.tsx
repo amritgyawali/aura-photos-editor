@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { rgbDataUrl } from './rgbImage';
+import { renderImageUrl } from './rgbImage';
 
 import type {
   DevelopParamDto,
@@ -69,9 +69,10 @@ function label(path: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
-/** The data URL for a rendered proxy. Built here so the DTO stays free of presentation. */
+/** The image URL for a rendered proxy, owned by the render. Built here so the DTO stays free of
+ * presentation. */
 function dataUrl(render: RenderDto): string {
-  return rgbDataUrl(render) ?? '';
+  return renderImageUrl(render) ?? '';
 }
 
 export function DevelopPanel({
