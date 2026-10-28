@@ -70,6 +70,18 @@ it('consumes an import hand-off once and prepares photos without optional model 
   expect(autopilot.autopilotPreflight).not.toHaveBeenCalled();
 });
 
+it('edits only the best photos confirmed on the Cull screen, and shows the ten stages of each photo', async () => {
+  const stages = ['Basic edit', 'Colour correction'].map((title, i) => ({ number: i + 1, key: i ? 'colour_correction' : 'basic', title, group: 'Edit',
+    outcome: i ? 'not_applicable' : 'applied', changes: i ? [] : ['Exposure +0.40 EV'], checks: ['measured'] }));
+  vi.mocked(prepareCollection).mockResolvedValueOnce([{ photoId: 'b', name: 'b.jpg', outcome: 'ready', detail: 'done', stages, millis: 6400 }] as never);
+  render(<AutopilotPanel projectId="p" automaticRequest={2} automaticPhotos={['b', 'c']} onError={vi.fn()} />);
+  await screen.findByText('b.jpg · Edited · 6.4 s');
+  expect(vi.mocked(prepareCollection).mock.calls[0]?.[7]).toEqual(['b', 'c']);
+  const list = screen.getByRole('list', { name: 'Stages for b.jpg' });
+  expect(list.textContent).toContain('1. Basic editAppliedExposure +0.40 EV');
+  expect(list.textContent).toContain('2. Colour correctionDoes not apply');
+});
+
 it('offers local editing without advanced preflight and then opens export', async () => {
   const onRender = vi.fn();
   render(<AutopilotPanel projectId="p" onError={vi.fn()} onRender={onRender} />);
@@ -96,7 +108,7 @@ it('retries only failed photos while keeping completed results', async () => {
   fireEvent.click(retry);
   await screen.findByText('2 photos have saved edits, ready to render.');
   expect(vi.mocked(prepareCollection).mock.calls[1]?.[7]).toEqual(['b']);
-  expect(screen.getByText('a.jpg · Prepared')).toBeTruthy();
+  expect(screen.getByText('a.jpg · Edited')).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'Retry failed photos only' })).toBeNull();
 });
 

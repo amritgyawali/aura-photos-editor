@@ -1,11 +1,10 @@
 import { api, develop, editProfiles, type ApplyReport, type ProfileSelection } from '../../ipc/client';
 import { Refusal, reasonOf } from '../look/refusal';
 import { referenceStyle, type ReferenceSelection } from '../look/referenceStyle';
-import { nativeRetouch } from '../../ipc/nativeRetouch';
-import { portraitMessage } from '../develop/PortraitAutoReport';
+import { fullEdit, stageTally, type FullStage } from '../../ipc/fullEdit';
 import type { RecipeDto } from '../../ipc/types';
 
-export type PreparedPhoto = { photoId: string; name: string; outcome: 'ready' | 'failed'; detail: string; settings?: string };
+export type PreparedPhoto = { photoId: string; name: string; outcome: 'ready' | 'failed'; detail: string; settings?: string; stages?: FullStage[]; millis?: number };
 
 /** Summarise the saved recipe, never a shared preset or an unsaved proposal. */
 function savedSettings(recipe: RecipeDto): string | undefined {
@@ -66,7 +65,10 @@ function adaptedRetouch(report: unknown): string | undefined {
   return faces.length ? `Retouch tuned per face (${faces.join('; ')})` : undefined;
 }
 
-/** A real pixel-based baseline before optional model stages. Every outcome is reviewable. */
+/** The full automatic edit for every photo, one at a time: basic edit, colour correction,
+ *  calibration, grade, crop and straighten, blemishes, skin, face, body and the advanced
+ *  finish (ADR-0187). A chosen look decides light and colour; every other stage still runs.
+ *  Every outcome is reviewable. */
 export async function prepareCollection(projectId: string, stopped: () => boolean,
   onProgress: (message: string) => void, onPhoto: (photo: PreparedPhoto) => void, reference?: ReferenceSelection | null, profile?: ProfileSelection | null,
   profileName?: string, photoIds?: readonly string[], cancelId?: string): Promise<PreparedPhoto[]> {
@@ -88,49 +90,56 @@ export async function prepareCollection(projectId: string, stopped: () => boolea
   const checkStop = () => {
     if (stopped()) throw new Refusal('Stopped before preview verification. Completed edits are saved; retry this photo to finish.');
   };
-  for (const [index, photo] of photos.entries()) {
-    if (stopped()) break;
-    onProgress(`Editing photo ${index + 1} of ${photos.length}: ${photo.fileName}`);
-    let result: PreparedPhoto;
-    let matched: ApplyReport | undefined;
-    try {
-      // A profile already contains the measured correction, so it replaces the plain enhancement.
-      const adaptations: string[] = [];
-      if (profile) {
-        const report = await editProfiles.apply(photo.id, profile.profileId, profile.strength);
-        adaptations.push(...report.adaptations);
+  // Stage-by-stage progress of the photo being edited; a window without events edits the same.
+  let current = '';
+  const unlisten = await fullEdit.onProgress(event => {
+    if (current && event.state === 'running') onProgress(`${current} · stage ${event.number} of ${event.total}: ${event.title}`);
+  }).catch(() => () => undefined);
+  try {
+    for (const [index, photo] of photos.entries()) {
+      if (stopped()) break;
+      current = `Editing photo ${index + 1} of ${photos.length}: ${photo.fileName}`;
+      onProgress(current);
+      let result: PreparedPhoto;
+      let matched: ApplyReport | undefined;
+      try {
+        // A profile already contains the measured correction, so it replaces the measured light
+        // and colour; the retouch, straightening, calibration and finish run after it.
+        const adaptations: string[] = [];
+        if (profile) {
+          const report = await editProfiles.apply(photo.id, profile.profileId, profile.strength);
+          adaptations.push(...report.adaptations);
+          checkStop();
+        }
+        const edited = await fullEdit.run(projectId, photo.id, profile ? 'applied' : reference ? 'coming' : 'none');
+        const stages = edited.stages;
+        adaptations.push(`Full automatic edit, 10 stages: ${stageTally(stages)}.`);
         checkStop();
-        const portrait = portraitMessage(await nativeRetouch.autoPortrait(photo.id));
-        if (portrait) adaptations.push(portrait);
-      } else {
-        const portrait = portraitMessage(await develop.enhancePhoto({ photoId: photo.id }));
-        if (portrait) adaptations.push(portrait);
+        if (reference) {
+          onProgress(`Matching reference style ${index + 1} of ${photos.length}: ${photo.fileName}`);
+          matched = cancelId ? await referenceStyle.apply(photo.id, reference.analysis.id, reference.strength, profile ?? null, cancelId)
+            : profile ? await referenceStyle.apply(photo.id, reference.analysis.id, reference.strength, profile)
+            : await referenceStyle.apply(photo.id, reference.analysis.id, reference.strength);
+          checkStop();
+        }
+        // Drain both reads before moving on, even if one fails, to bound native render work.
+        const [saved, preview] = await Promise.allSettled([
+          develop.imageRecipe({ photoId: photo.id }),
+          develop.renderImage({ photoId: photo.id, level: 'screen', screen: [512, 512], purpose: 'interactive' }),
+        ]);
+        if (saved.status === 'rejected') throw saved.reason;
+        if (preview.status === 'rejected') throw preview.reason;
+        const look = profile ? `${profileName ?? profile.profileId} profile at ${Math.round(profile.strength * 100)}%` : 'Full automatic edit';
+        const detail = reference
+          ? `${matchSentence(profile ? look : null, reference.analysis.origin, reference.strength, matched)} Manual settings protected. ${adaptations.join(' ')}`
+          : `${look} saved. Preview rendered. Manual settings protected.${adaptations.length ? ` ${adaptations.join(' ')}` : ''}`;
+        result = { photoId: photo.id, name: photo.fileName, outcome: 'ready', detail, settings: savedSettings(saved.value), stages, millis: edited.millis };
+      } catch (error) {
+        result = { photoId: photo.id, name: photo.fileName, outcome: 'failed', detail: reasonOf(error) };
       }
-      checkStop();
-      if (reference) {
-        onProgress(`Matching reference style ${index + 1} of ${photos.length}: ${photo.fileName}`);
-        matched = cancelId ? await referenceStyle.apply(photo.id, reference.analysis.id, reference.strength, profile ?? null, cancelId)
-          : profile ? await referenceStyle.apply(photo.id, reference.analysis.id, reference.strength, profile)
-          : await referenceStyle.apply(photo.id, reference.analysis.id, reference.strength);
-        checkStop();
-      }
-      // Drain both reads before moving on, even if one fails, to bound native render work.
-      const [saved, preview] = await Promise.allSettled([
-        develop.imageRecipe({ photoId: photo.id }),
-        develop.renderImage({ photoId: photo.id, level: 'screen', screen: [512, 512], purpose: 'interactive' }),
-      ]);
-      if (saved.status === 'rejected') throw saved.reason;
-      if (preview.status === 'rejected') throw preview.reason;
-      const look = profile ? `${profileName ?? profile.profileId} profile at ${Math.round(profile.strength * 100)}%` : 'Local exposure, contrast, highlights and shadows';
-      const detail = reference
-        ? `${matchSentence(profile ? look : null, reference.analysis.origin, reference.strength, matched)} Manual settings protected. ${adaptations.join(' ')}`
-        : `${look} saved. Preview rendered. Manual settings protected.${adaptations.length ? ` ${adaptations.join(' ')}` : ''}`;
-      result = { photoId: photo.id, name: photo.fileName, outcome: 'ready', detail, settings: savedSettings(saved.value) };
-    } catch (error) {
-      result = { photoId: photo.id, name: photo.fileName, outcome: 'failed', detail: reasonOf(error) };
+      outcomes.push(result);
+      onPhoto(result);
     }
-    outcomes.push(result);
-    onPhoto(result);
-  }
+  } finally { current = ''; unlisten(); }
   return outcomes;
 }

@@ -30,7 +30,7 @@ use aura_raw::contract::sidecar::{
 use aura_raw::meta::RawMeta;
 use aura_raw::timeout::{self, DecodeLimits};
 use aura_raw::{codec, full, meta, proxy, thumb};
-use parking_lot::Mutex;
+use parking_lot::{Condvar, Mutex};
 
 use crate::contract::service::{ImageId, PreviewService, Priority};
 use crate::pool::{DecodePool, Handler};
@@ -118,8 +118,68 @@ impl MemoryCache {
     }
 }
 
+/// How many decodes may run at once, across the pool and every caller.
+///
+/// Requests used to decode on whatever thread asked. A grid of a hundred fresh camera files
+/// asked for a hundred thumbnails at once: a hundred 20-megapixel decodes side by side, gigabytes
+/// of memory, every core saturated, the whole machine unresponsive - and every one of them past
+/// its deadline, so each photograph was quarantined as unreadable. Decodes now take turns, and
+/// a deadline is counted from when a decode starts, not from when it was asked for.
+#[derive(Debug)]
+struct DecodeSlots {
+    busy: Mutex<usize>,
+    freed: Condvar,
+    capacity: usize,
+}
+
+/// A held decode slot; released when dropped.
+struct Slot<'a>(&'a DecodeSlots);
+
+impl Drop for Slot<'_> {
+    fn drop(&mut self) {
+        let mut busy = self.0.busy.lock();
+        *busy = busy.saturating_sub(1);
+        drop(busy);
+        self.0.freed.notify_all();
+    }
+}
+
+impl DecodeSlots {
+    fn new(capacity: usize) -> Self {
+        Self {
+            busy: Mutex::new(0),
+            freed: Condvar::new(),
+            capacity: capacity.max(2),
+        }
+    }
+
+    /// Half the logical cores, two to six: a decode is memory as much as it is CPU.
+    fn default_capacity() -> usize {
+        std::thread::available_parallelism()
+            .map_or(4, std::num::NonZeroUsize::get)
+            .div_ceil(2)
+            .clamp(2, 6)
+    }
+
+    /// Wait for a slot. Batch and background work may never take the last one, so the photo
+    /// somebody is looking at is never queued behind a whole collection's prefetch.
+    fn acquire(&self, prio: Priority) -> Slot<'_> {
+        let limit = match prio {
+            Priority::Visible | Priority::Interactive => self.capacity,
+            Priority::AiBatch | Priority::Background => self.capacity - 1,
+        };
+        let mut busy = self.busy.lock();
+        while *busy >= limit {
+            self.freed.wait(&mut busy);
+        }
+        *busy += 1;
+        Slot(self)
+    }
+}
+
 #[derive(Debug)]
 struct Inner {
+    slots: DecodeSlots,
     cache: CacheStore,
     source: Arc<dyn PreviewSource>,
     memory: Mutex<MemoryCache>,
@@ -170,6 +230,7 @@ impl Previews {
         clock: Arc<dyn Clock>,
     ) -> AuraResult<Self> {
         let inner = Arc::new(Inner {
+            slots: DecodeSlots::new(DecodeSlots::default_capacity()),
             cache: CacheStore::open(cache_root, budget)?,
             source,
             memory: Mutex::new(MemoryCache::default()),
@@ -301,6 +362,20 @@ impl Inner {
             return Ok(buffer);
         }
 
+        let _slot = self.slots.acquire(prio);
+        // Another request for the same photograph may have finished while this one waited.
+        if let Some(found) = self.memory.lock().get(&key) {
+            Self::report(id, level, prio, Served::Memory, &found);
+            return Ok(found);
+        }
+        if let Some(found) = self.read_cached(&file.content_hash, level) {
+            let buffer = Arc::new(found);
+            self.memory
+                .lock()
+                .insert(key, &buffer, self.config.memory_budget_bytes);
+            Self::report(id, level, prio, Served::Disk, &buffer);
+            return Ok(buffer);
+        }
         match self.decode(id, level, &file.path, &file.content_hash) {
             Ok(buffer) => {
                 let buffer = Arc::new(buffer);
@@ -379,7 +454,7 @@ impl Inner {
         content_hash: &str,
         edge: u32,
     ) -> AuraResult<PixelBuffer> {
-        let limits = DecodeLimits::tier1().for_pixels(timeout::declared_pixels(bytes).unwrap_or(0));
+        let limits = DecodeLimits::tier1().for_file(bytes);
         let clock = Arc::clone(&self.clock);
         let owned = bytes.to_vec();
         let owned_path = path.to_path_buf();
@@ -425,7 +500,7 @@ impl Inner {
         path: &Path,
         content_hash: &str,
     ) -> AuraResult<PixelBuffer> {
-        let limits = DecodeLimits::tier2().for_pixels(timeout::declared_pixels(bytes).unwrap_or(0));
+        let limits = DecodeLimits::tier2().for_file(bytes);
         let clock = Arc::clone(&self.clock);
         let owned = bytes.to_vec();
         let owned_path = path.to_path_buf();
@@ -520,7 +595,7 @@ impl Inner {
     }
 
     fn decode_tier3(&self, bytes: &[u8], path: &Path) -> AuraResult<PixelBuffer> {
-        let limits = DecodeLimits::tier3().for_pixels(timeout::declared_pixels(bytes).unwrap_or(0));
+        let limits = DecodeLimits::tier3().for_file(bytes);
         let clock = Arc::clone(&self.clock);
         let owned = bytes.to_vec();
         let owned_path = path.to_path_buf();
@@ -651,5 +726,46 @@ fn blank_sidecar(id: ImageId, content_hash: &str) -> PreviewSidecar {
             decoder: aura_raw::decoder_version(),
             pipeline_ver: PIPELINE_VER,
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    #[test]
+    fn decodes_take_turns_and_batch_work_leaves_a_slot_for_the_photo_on_screen() {
+        let slots = Arc::new(DecodeSlots::new(3));
+        let running = Arc::new(AtomicUsize::new(0));
+        let most = Arc::new(AtomicUsize::new(0));
+        let threads: Vec<_> = (0..24)
+            .map(|i| {
+                let (slots, running, most) = (slots.clone(), running.clone(), most.clone());
+                std::thread::spawn(move || {
+                    let prio = if i % 2 == 0 {
+                        Priority::AiBatch
+                    } else {
+                        Priority::Visible
+                    };
+                    let _slot = slots.acquire(prio);
+                    let now = running.fetch_add(1, Ordering::SeqCst) + 1;
+                    most.fetch_max(now, Ordering::SeqCst);
+                    std::thread::sleep(std::time::Duration::from_millis(5));
+                    running.fetch_sub(1, Ordering::SeqCst);
+                })
+            })
+            .collect();
+        for t in threads {
+            assert!(t.join().is_ok());
+        }
+        assert!(most.load(Ordering::SeqCst) <= 3);
+        // With two batch slots taken, a visible request still gets the third at once.
+        let a = slots.acquire(Priority::Background);
+        let b = slots.acquire(Priority::AiBatch);
+        let c = slots.acquire(Priority::Visible);
+        assert_eq!(*slots.busy.lock(), 3);
+        drop((a, b, c));
+        assert_eq!(*slots.busy.lock(), 0);
     }
 }

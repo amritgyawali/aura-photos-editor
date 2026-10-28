@@ -30,6 +30,10 @@ import { useThumbnails } from '../../stores/thumbnailStore';
  * says what each would deliver first. A photograph's panel shows the rest of its burst or
  * moment, so the frame AURA chose can be swapped for another in one click; the arrow keys
  * walk the list, K keeps, X leaves out, U undoes and Esc closes.
+ *
+ * After an import of several photos the cull runs on its own (`autoStart`), and nothing is
+ * edited until the photographer has looked and pressed "Edit the best photos" - the full
+ * automatic edit then works through the confirmed set one photo at a time. ADR-0187.
  */
 
 export type CullTab = 'best' | 'left';
@@ -41,7 +45,18 @@ export type PhotoCullWorkspaceProps = {
   onError: (error: { code: string; message: string } | null) => void;
   /** Open a photograph in the editor. */
   onOpen?: (photoId: string) => void;
+  /** A request to cull now, from an import of several photos; 0 for none. */
+  autoStart?: number;
+  /** Told when `autoStart` has been acted on, so it is not repeated. */
+  onAutoStarted?: () => void;
+  /** Edit the confirmed best photos, in shooting order. */
+  onEditBest?: (photoIds: string[]) => void;
 };
+
+/** The confirmed best set, in shooting order. */
+export function bestIds(review: PhotoCullReviewDto): string[] {
+  return review.photos.filter((photo) => photo.keep).map((photo) => photo.photoId);
+}
 
 /** The header sentence, from the review alone. */
 export function cullSummary(review: PhotoCullReviewDto): string {
@@ -255,7 +270,7 @@ function Detail({ projectId, photo, review, disabled, onClose, onOpen, onSelect,
   );
 }
 
-export function PhotoCullWorkspace({ projectId, disabled, onError, onOpen }: PhotoCullWorkspaceProps): JSX.Element {
+export function PhotoCullWorkspace({ projectId, disabled, onError, onOpen, autoStart = 0, onAutoStarted, onEditBest }: PhotoCullWorkspaceProps): JSX.Element {
   const [review, setReview] = useState<PhotoCullReviewDto | null | undefined>(undefined);
   const [job, setJob] = useState<PhotoCullStatusDto | null>(null);
   const [tab, setTab] = useState<CullTab>('best');
@@ -320,6 +335,18 @@ export function PhotoCullWorkspace({ projectId, disabled, onError, onOpen }: Pho
       onError(asIpcError(err));
     }
   }, [projectId, watch, onError]);
+
+  // An import of several photos culls them straight away; the photographer reviews the result.
+  const [justCulled, setJustCulled] = useState(false);
+  const started = useRef(0);
+  useEffect(() => {
+    if (autoStart > 0 && started.current !== autoStart && inTauri()) {
+      started.current = autoStart;
+      onAutoStarted?.();
+      setJustCulled(true);
+      void cull();
+    }
+  }, [autoStart, onAutoStarted, cull]);
 
   const choose = useCallback(async (photoIds: string[], choice: string) => {
     if (photoIds.length === 0) return;
@@ -425,6 +452,15 @@ export function PhotoCullWorkspace({ projectId, disabled, onError, onOpen }: Pho
       {review === null && !running && <div className="studio-empty"><strong>This collection has not been culled yet.</strong><p>Press “Cull all photos”. Nothing is edited or deleted; you review the result here.</p></div>}
       {review && (
         <>
+          {onEditBest && !running && (
+            <section className={`cull-confirm${justCulled ? ' is-new' : ''}`} aria-label="Confirm the best photos">
+              <div>
+                <strong>{justCulled ? `AURA chose ${review.best} best photos and left ${review.leftOut} out.` : `${review.best} photos are in the best set.`}</strong>
+                <p>Check both lists - bring back anything you want, leave out anything you don't. Nothing is edited until you confirm; then every best photo gets the full automatic edit, one at a time.</p>
+              </div>
+              <button type="button" className="is-primary" disabled={locked || review.best === 0} onClick={() => onEditBest(bestIds(review))}>Edit the {review.best} best photos →</button>
+            </section>
+          )}
           <p className="photo-cull-summary">{cullSummary(review)}</p>
           {review.levels.length > 0 ? (
             <div className="photo-cull-levels" role="radiogroup" aria-label="Strictness">

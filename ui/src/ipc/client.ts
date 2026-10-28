@@ -297,8 +297,17 @@ export const portrait = {
     invoke<PortraitRetouch>('auto_portrait_retouch', { input: { projectId, photoId, style } }),
 };
 
+/** A window test's answer to the operating system's file dialog, which a script cannot click.
+ *  Nothing in the app sets it; `scripts/test-full-auto-gui.py` does, before pressing a button. */
+function testPick(): string | null {
+  const value: unknown = typeof window === 'undefined' ? undefined : (window as unknown as { __AURA_TEST_PICK__?: unknown }).__AURA_TEST_PICK__;
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
 /** Ask the desktop for a folder; cancel leaves the current selection intact. */
 export async function pickPhotoFolder(title = 'Choose a photo folder'): Promise<string | null> {
+  const picked = testPick();
+  if (picked) return picked;
   const result: string | string[] | null = await invoke('plugin:dialog|open', {
     options: { directory: true, multiple: false, title },
   });
@@ -307,6 +316,8 @@ export async function pickPhotoFolder(title = 'Choose a photo folder'): Promise<
 
 /** Select individual photographs without importing their entire folder. */
 export async function pickPhotos(): Promise<string[]> {
+  const picked = testPick();
+  if (picked) return [picked];
   const result: string | string[] | null = await invoke('plugin:dialog|open', {
     options: { directory: false, multiple: true, title: 'Choose photos to edit',
       filters: [{ name: 'Photos', extensions: ['jpg', 'jpeg', 'jpe', 'png', 'dng', 'cr2', 'cr3', 'nef', 'arw', 'raf', 'orf', 'rw2', 'pef'] }] },

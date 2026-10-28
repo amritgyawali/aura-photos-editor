@@ -97,6 +97,7 @@ pub mod evoto_workflow;
 pub mod explain_commands;
 pub mod finish_commands;
 pub mod framing_workflows;
+pub mod full_edit;
 pub mod geometry_commands;
 pub mod index_commands;
 pub mod infer_commands;

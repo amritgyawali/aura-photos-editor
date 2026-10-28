@@ -453,3 +453,21 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .photo-cull-finish { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 22px 0 8px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 13px; }
 .photo-cull-finish input { margin-left: 8px; min-width: 260px; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
 @media (max-width: 900px) { .photo-cull-body { flex-direction: column; } .cull-detail { width: 100%; position: static; } }
+/* The cull's confirmation step and the full automatic edit's ten stages. ADR-0187. */
+.cull-confirm { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; margin: 14px 0 4px; padding: 14px 18px; border: 1px solid var(--line-strong); border-radius: var(--radius-3); background: var(--accent-soft); }
+.cull-confirm.is-new { border-color: var(--accent); }
+.cull-confirm > div { flex: 1 1 320px; min-width: 0; }
+.cull-confirm p { margin: 4px 0 0; color: var(--text-dim); font-size: 13px; }
+.full-edit-plan { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; padding: 0; list-style: none; counter-reset: stage; }
+.full-edit-plan li { counter-increment: stage; padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px; font-size: 12px; color: var(--text-dim); }
+.full-edit-plan li::before { content: counter(stage) ". "; color: var(--muted); }
+.full-edit-plan li[data-group='Retouch'] { border-color: var(--line-strong); }
+.full-edit-plan li[data-group='Advanced'] { border-color: var(--accent-deep); }
+.full-edit-stages { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; }
+.full-edit-stages li { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 6px 8px; border: 1px solid var(--line); border-left-width: 3px; border-radius: var(--radius-1); font-size: 12px; }
+.full-edit-stages li b { font-weight: 600; }
+.full-edit-stages li small { grid-column: 1 / -1; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.full-edit-stages li.is-applied { border-left-color: var(--success); }
+.full-edit-stages li.is-unchanged { border-left-color: var(--line-strong); }
+.full-edit-stages li.is-not_applicable { border-left-color: var(--line); opacity: .8; }
+.full-edit-stages li.is-protected { border-left-color: var(--accent); }

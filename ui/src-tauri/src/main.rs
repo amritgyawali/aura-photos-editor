@@ -3590,6 +3590,27 @@ async fn auto_advanced_retouch(
     .map_err(|_| background_request_failed())?
 }
 
+/// The full automatic edit of one photograph: ten stages in order, each measured and each its
+/// own history step. Streams a `full-edit` event before and after every stage. ADR-0187.
+#[tauri::command]
+async fn full_edit_photo(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    input: aura_app::full_edit::FullEditInput,
+) -> IpcResult<aura_app::full_edit::FullEditDto> {
+    use tauri::Emitter;
+    let shared = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::full_edit::run(&shared, &input, &|progress| {
+            if let Err(error) = app.emit("full-edit", progress) {
+                tracing::error!(target: "retouch", %error, "could not deliver full edit progress");
+            }
+        })
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
 #[tauri::command]
 async fn sync_settings(
     state: State<'_, AppState>,
@@ -4399,6 +4420,7 @@ fn main() {
             enhance_portrait,
             auto_retouch,
             auto_advanced_retouch,
+            full_edit_photo,
             create_project,
             list_projects,
             start_ingest,

@@ -215,8 +215,11 @@ fn measured_cull(
     }))
 }
 
-/// One photograph's edit and retouch - the same three paths the studio's own batch takes,
-/// so a wedding finished unattended and a photo edited by hand in the studio agree.
+/// One photograph's edit and retouch - the full automatic edit's ten stages (ADR-0187), the
+/// same ones the studio's Auto edit runs, so a wedding finished unattended and a photo edited
+/// in the studio agree. A look or a provider's grade decides light and colour; every retouch,
+/// levelling and calibration stage still runs after it.
+#[allow(clippy::too_many_lines)]
 fn edit_one(
     state: &AppState,
     job: &str,
@@ -228,9 +231,21 @@ fn edit_one(
     let develop = DevelopImageInput {
         photo_id: photo.to_owned(),
     };
+    let full = |look: crate::full_edit::Look| {
+        crate::full_edit::run(
+            state,
+            &crate::full_edit::FullEditInput {
+                project_id: project.to_owned(),
+                photo_id: photo.to_owned(),
+                look,
+            },
+            &|_| {},
+        )
+    };
     if let Some(look) = look {
         let mut reasons = Vec::new();
         let profile = look.profile_id.clone().filter(|id| !id.is_empty());
+        let reference = look.reference_id.clone().filter(|id| !id.is_empty());
         let strength = f32::from(look.profile_strength.min(150)) / 100.0;
         // A profile already contains the measured correction, so it replaces the plain one.
         let mut recipe = if let Some(id) = &profile {
@@ -247,11 +262,19 @@ fn edit_one(
                 look.profile_strength.min(150)
             ));
             reasons.extend(report.adaptations);
-            crate::photo_enhance::enhance_portrait(state, &develop)?
+            let edited = full(crate::full_edit::Look::Applied)?;
+            reasons.extend(crate::full_edit::report_lines(&edited));
+            edited.recipe
         } else {
-            crate::photo_enhance::enhance_photo(state, &develop)?
+            let edited = full(if reference.is_some() {
+                crate::full_edit::Look::Coming
+            } else {
+                crate::full_edit::Look::None
+            })?;
+            reasons.extend(crate::full_edit::report_lines(&edited));
+            edited.recipe
         };
-        if let Some(reference) = look.reference_id.clone().filter(|id| !id.is_empty()) {
+        if let Some(reference) = reference {
             let cancel = JOBS
                 .lock()
                 .get(job)
@@ -276,11 +299,10 @@ fn edit_one(
             ));
             recipe = crate::image_recipe(state, &develop)?;
         }
-        reasons.push("Portrait retouch evaluated with this photo's saved preferences.".into());
         return Ok(EditedPhoto {
             photo_id: photo.to_owned(),
             source: "local".into(),
-            model: "AURA measured edit with your look".into(),
+            model: "AURA full automatic edit with your look".into(),
             boundary_preflight: None,
             reasons,
             recipe,
@@ -299,14 +321,13 @@ fn edit_one(
         );
         child(job, None);
         let mut answer = answer?;
-        // Run the portrait pass AFTER grading so its luminance selections use the exposure
-        // being exported. It reads this photo's saved choices and protects manual work.
-        let cancel = JOBS
-            .lock()
-            .get(job)
-            .map_or_else(CancelToken::new, |slot| slot.cancel.clone());
-        answer.recipe = crate::internal_ai::retouch_with_cancel(state, &develop, &cancel)?;
-        answer.reasons.push("Local portrait retouch evaluated with this photo's saved preferences. Applied and skipped corrections are recorded in its portrait report.".into());
+        // Run the retouch stages AFTER grading so their luminance selections use the exposure
+        // being exported. The provider's light and colour are kept; manual work is protected.
+        let edited = full(crate::full_edit::Look::Applied)?;
+        answer
+            .reasons
+            .extend(crate::full_edit::report_lines(&edited));
+        answer.recipe = edited.recipe;
         return Ok(EditedPhoto {
             photo_id: photo.to_owned(),
             source: answer.source,
@@ -316,16 +337,17 @@ fn edit_one(
             recipe: answer.recipe,
         });
     }
-    // The measured edit: light, colour, white balance and scene from this photograph's own
-    // pixels, then skin, blemishes, eyes and teeth for each detected person.
-    let recipe = crate::photo_enhance::enhance_photo(state, &develop)?;
+    // The full automatic edit: basic, colour correction, calibration, grade, crop and
+    // straighten, blemishes, skin, face, body and the advanced finish, each measured from this
+    // photograph and each its own step in the history.
+    let edited = full(crate::full_edit::Look::None)?;
     Ok(EditedPhoto {
         photo_id: photo.to_owned(),
         source: "local".into(),
-        model: "AURA measured edit".into(),
+        model: "AURA full automatic edit".into(),
         boundary_preflight: None,
-        reasons: vec!["Light, colour, white balance and scene measured from this photograph; portrait retouch evaluated with its saved preferences. Every decision is recorded as a step in its history.".into()],
-        recipe,
+        reasons: crate::full_edit::report_lines(&edited),
+        recipe: edited.recipe,
     })
 }
 /// True when this build cannot render the photograph at full size: a camera file whose

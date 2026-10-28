@@ -1832,6 +1832,19 @@ pub fn run(
     input: &AdvancedRetouchInput,
     progress: &dyn Fn(Progress),
 ) -> IpcResult<AdvancedRetouchDto> {
+    run_keeping(state, input, false, progress)
+}
+
+/// [`run`], optionally leaving exposure, white balance, vibrance and clarity as a look already
+/// set them (`keep_look`): every retouch, levelling, grain and sharpening stage still runs.
+/// # Errors
+/// Membership, decode, analysis, rendering or storage failures.
+pub fn run_keeping(
+    state: &AppState,
+    input: &AdvancedRetouchInput,
+    keep_look: bool,
+    progress: &dyn Fn(Progress),
+) -> IpcResult<AdvancedRetouchDto> {
     crate::studio_tools::require_member(state, &input.project_id, &input.photo_id)?;
     let invalid = |message: &str| aura_core::errors::render::recipe_invalid("photo", message);
     let photo =
@@ -1885,6 +1898,7 @@ pub fn run(
     let frame = crate::photo_frames::CatalogFrames::new(state.clone())
         .frame(&photo, RenderLevel::Proxy2048)
         .ok();
+    let planning = crate::perf::step(state, "advanced.plan");
     let mut planned = plan(
         &base,
         rgb,
@@ -1895,6 +1909,8 @@ pub fn run(
         faces,
         &options,
     )?;
+    drop(planning);
+    let saving = crate::perf::step(state, "advanced.stages");
     let mut portrait_report = planned.portrait.clone();
     portrait_report.options = Some(options);
     portrait_report.steps = planned
@@ -1929,7 +1945,17 @@ pub fn run(
             tell(stage, true, None);
         }
         let mut proposal = current.clone();
-        apply_globals(stage, &mut proposal, &planned);
+        // A look (an edit profile, a reference or a provider's grade) already chose the light
+        // and the colour; the retouch stages still run, but these two leave its values alone.
+        let look_owns = keep_look && matches!(stage, Stage::Foundation | Stage::ColourGrade);
+        if look_owns {
+            if let Some(r) = report_mut(&mut planned.reports, stage) {
+                r.checks
+                    .push("Light and colour kept as the chosen look set them.".into());
+            }
+        } else {
+            apply_globals(stage, &mut proposal, &planned);
+        }
         if stage == Stage::Foundation {
             portrait_auto::write_report(&mut proposal, &portrait_report)?;
         }
@@ -2021,7 +2047,9 @@ pub fn run(
         tell(stage, false, outcome);
     }
 
+    drop(saving);
     // ---- 18. Quality control & export readiness ---------------------------------------------
+    let _qc_time = crate::perf::step(state, "advanced.qc");
     tell(Stage::QualityControl, true, None);
     let mut quality = QualityReport::default();
     let mut qc_notes = Vec::new();

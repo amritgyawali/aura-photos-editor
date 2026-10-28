@@ -52,6 +52,10 @@ export function App(): JSX.Element {
   const [exporting, setExporting] = useState(false);
   const [revision, setRevision] = useState(0);
   const [automaticRequest, setAutomaticRequest] = useState(0);
+  /** The photos the next automatic edit works on: the best set confirmed on the Cull screen, or all. */
+  const [automaticPhotos, setAutomaticPhotos] = useState<string[] | null>(null);
+  /** A cull the import asked for: several photos are culled and reviewed before anything is edited. */
+  const [cullRequest, setCullRequest] = useState(0);
   const automaticSequence = useRef(0);
   const automaticConsumed = useCallback(() => setAutomaticRequest(0), []);
   const editAfterImport = useRef(false);
@@ -218,8 +222,15 @@ export function App(): JSX.Element {
         } else if (event.kind === 'finished') {
           importFinished.current = true;
           setProgress({ running: false, jobId: null });
-          if (editAfterImport.current && event.inserted > 0) {
+          if (editAfterImport.current && event.inserted > 1) {
+            // Several photos: cull first, and let the photographer confirm the best set before
+            // anything is edited. ADR-0187.
             editAfterImport.current = false;
+            setWorkspace('cull');
+            setCullRequest(++automaticSequence.current);
+          } else if (editAfterImport.current && event.inserted > 0) {
+            editAfterImport.current = false;
+            setAutomaticPhotos(null);
             setWorkspace('edit');
             setAutomaticRequest(++automaticSequence.current);
           }
@@ -380,7 +391,7 @@ export function App(): JSX.Element {
               {!focusedPhoto && <p>Add your target photos in Photos to match a single reference.</p>}</div></header>}
             <details open={workspace === 'start'}><summary>Learn a style from a reference folder or Instagram export</summary>
             <InstagramStyle selection={reference} disabled={locked} onChange={changeReference} onBusyChange={setAnalysingReference}
-              onAddPhotos={() => void chooseAndImport()} onApply={activeProjectId && rows.length ? () => { setWorkspace('edit'); setAutomaticRequest(++automaticSequence.current); } : undefined} compact={workspace === 'start'}
+              onAddPhotos={() => void chooseAndImport()} onApply={activeProjectId && rows.length ? () => { setAutomaticPhotos(null); setWorkspace('edit'); setAutomaticRequest(++automaticSequence.current); } : undefined} compact={workspace === 'start'}
               heading={<header className="step-heading"><span className="step-number">2</span><div><span className="eyebrow">OPTIONAL</span><h2>Match a look you love</h2>
                 <p>Choose a folder of reference photos, or your own Instagram data export, to learn its tone and colour and fit it on top of your profile. Skip this step to use the profile alone.</p></div></header>} />
             </details>
@@ -396,9 +407,9 @@ export function App(): JSX.Element {
             <div className="import-actions">
               <button type="button" disabled={!inTauri() || locked} onClick={() => void chooseAndImport()}>{choosingPhotos ? 'Choosing…' : 'Choose photos'}</button>
               <button type="button" disabled={!inTauri() || locked} onClick={() => void chooseAndImport(true)}>Choose a folder</button>
-              {activeProjectId && rows.length > 0 && <button type="button" disabled={locked} onClick={() => { setWorkspace('edit'); setAutomaticRequest(++automaticSequence.current); }}>Apply to the {rows.length} photos in this collection</button>}
+              {activeProjectId && rows.length > 0 && <button type="button" disabled={locked} onClick={() => { setAutomaticPhotos(null); setWorkspace('edit'); setAutomaticRequest(++automaticSequence.current); }}>Apply to the {rows.length} photos in this collection</button>}
             </div>
-            {progress.running && <p role="status">Importing {progress.done} of {progress.total || '…'} photos. Editing starts automatically when the import finishes.</p>}
+            {progress.running && <p role="status">Importing {progress.done} of {progress.total || '…'} photos. Next: several photos are culled for you to confirm the best ones; a single photo is edited straight away.</p>}
             <p className="studio-footnote">Choose photos or Choose a folder imports and edits, then waits for you to review before you export.</p>
             {!inTauri() && <p className="studio-footnote">Open the AURA desktop app to import and edit your photos.</p>}
           </section>}
@@ -418,12 +429,14 @@ export function App(): JSX.Element {
               {rows.length > 0 ? <div className="studio-library"><VirtualGrid rows={rows} onNeedMore={() => void loadPage(activeProjectId, loadedPages, false)} /></div> : <div className="studio-empty"><strong>Your next great edit starts here.</strong><p>Choose a folder above. Your photos will appear here.</p></div>}
             </>}
             {workspace === 'cull' && <PhotoCullWorkspace key={activeProjectId} projectId={activeProjectId} disabled={locked} onError={setError}
+              autoStart={cullRequest} onAutoStarted={() => setCullRequest(0)}
+              onEditBest={ids => { setAutomaticPhotos(ids); setWorkspace('edit'); setAutomaticRequest(++automaticSequence.current); }}
               onOpen={id => { const index = rows.findIndex(row => row.id === id); if (index >= 0) { useStore.getState().focusIndex(index); useStore.getState().selectOnly(id); setWorkspace('edit'); } }} />}
             <div hidden={workspace !== 'edit' && workspace !== 'look' && !(workspace === 'hot' && hotFeature !== 'train')}>
               <div hidden={workspace !== 'edit'}>
               <div className="workspace-heading"><div><span className="eyebrow">LIGHT. COLOR. FINISH.</span><h1>A good starting point, in one click.</h1></div><button type="button" disabled={locked} onClick={() => setWorkspace('look')}>Match a reference look →</button></div>
               <AutopilotPanel key={activeProjectId} projectId={activeProjectId} onError={setError} onBusyChange={editBusyChanged}
-                automaticRequest={automaticRequest} onAutomaticConsumed={automaticConsumed} onRender={() => setWorkspace('export')} reference={reference}
+                automaticRequest={automaticRequest} automaticPhotos={automaticPhotos} onAutomaticConsumed={automaticConsumed} onRender={() => setWorkspace('export')} reference={reference}
                 profile={profile} profileName={profileName} />
               </div>
               {/* Stays mounted while another section is open, so the photograph, its full-quality

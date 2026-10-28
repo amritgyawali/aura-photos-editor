@@ -4,6 +4,40 @@ Press **Auto enhance photo** and AURA finishes the photograph on its own. It loo
 picture, decides what it needs, and saves the result as a short list of steps you can walk
 back through. Nothing leaves your computer and your original file is never changed.
 
+## From import to finished photos
+
+Choose photos or a folder on the Start screen and AURA does the rest, the same way every time:
+
+1. **One photo** is edited straight away. **Several photos** are culled first: every photo is
+   checked against a hundred measurements and the best of each moment is kept. The Cull screen
+   then shows what AURA chose and **waits for you**: look through the best and the left-out
+   photos, bring any back or leave any out, then press **Edit the N best photos**. Nothing is
+   edited before that.
+2. Each confirmed photo gets the **full automatic edit**, one photo at a time, always the same
+   ten stages in the same order:
+
+   | | Stage | What it does |
+   |---|---|---|
+   | Edit | 1 Basic edit | exposure, contrast, highlights, shadows, whites, blacks, levels, clarity, dehaze, noise |
+   | | 2 Colour correction | white balance, tint, vibrance, colour fringes |
+   | | 3 Calibration | evens a green or magenta tint left in neutral shadows; brings back detail in reds or blues that clip on their own |
+   | | 4 Colour grading | a gentle split tone in the photo's own light; shadows stay untinted when people are in the frame |
+   | | 5 Crop & straighten | levels a horizon the photo's own straight lines measure, cropped so no corner is empty |
+   | Retouch | 6 Blemishes | spots healed from nearby skin; moles and freckles kept |
+   | | 7 Skin smoothing | smoothing that keeps pores, lines softened, tone evened |
+   | | 8 Face | eyes, under-eyes, teeth, lips, dodge and burn |
+   | | 9 Body | neck, shoulders and arms matched to the same person's face skin |
+   | Advanced | 10 Advanced edit | background, hair, clothing, jewellery, background toning, grain, output sharpening, quality control |
+
+   The Auto edit screen says which stage of which photo is running, and lists each photo's ten
+   stages: **Applied**, **Nothing needed**, **Does not apply** (no person in the frame) or **Kept
+   your setting**. Each stage that changed something is its own step in the photo's history.
+3. With a **look** chosen on the Start screen, the look decides light, colour and grade; every
+   other stage still runs on top of it.
+
+Finish Folder gives every photo the same ten stages, without stopping for the cull review.
+ADR-0187.
+
 ## What happens, step by step
 
 | Step | What AURA measures | What it changes |

@@ -239,3 +239,37 @@ it('walks the list with the arrow keys and decides with K, X and U', async () =>
   fireEvent.keyDown(window, { key: 'Escape' });
   await waitFor(() => expect(screen.queryByRole('complementary')).toBeNull());
 });
+
+it('culls on its own after an import of several photos and edits nothing until the best set is confirmed', async () => {
+  vi.mocked(photoCullReview).mockResolvedValueOnce(null).mockResolvedValue(base);
+  vi.mocked(startPhotoCull).mockResolvedValue({ jobId: 'cull-1' });
+  vi.mocked(photoCullStatus).mockResolvedValue({ jobId: 'cull-1', projectId: 'p1', status: 'completed', done: 4, total: 4, label: 'Done.' });
+  const started = vi.fn();
+  const editBest = vi.fn();
+  render(<PhotoCullWorkspace projectId="p1" disabled={false} onError={vi.fn()} autoStart={7} onAutoStarted={started} onEditBest={editBest} />);
+  await waitFor(() => expect(startPhotoCull).toHaveBeenCalledOnce());
+  expect(started).toHaveBeenCalledOnce();
+  const confirm = await screen.findByRole('region', { name: 'Confirm the best photos' });
+  expect(confirm.textContent).toContain('AURA chose 2 best photos and left 2 out.');
+  expect(editBest).not.toHaveBeenCalled();
+  // The photographer brings one back; the confirmed set is what the edit receives.
+  vi.mocked(setPhotoCullChoice).mockResolvedValue(review([photo('a', true, 91), photo('b', true, 70, { choice: 'keep', cullKeep: false }), photo('c', true, 60), photo('d', false, 30)]));
+  fireEvent.click(screen.getByRole('tab', { name: 'Left out (2)' }));
+  fireEvent.click(within(screen.getByRole('article', { name: 'b.jpg' })).getByRole('button', { name: 'Bring back' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Edit the 3 best photos →' })).toBeTruthy());
+  fireEvent.click(screen.getByRole('button', { name: 'Edit the 3 best photos →' }));
+  expect(editBest).toHaveBeenCalledWith(['a', 'b', 'c']);
+  expect(oneClickFinish).not.toHaveBeenCalled();
+});
+
+it('does not cull again for the same import request', async () => {
+  const { rerender } = render(<PhotoCullWorkspace projectId="p1" disabled={false} onError={vi.fn()} autoStart={0} onEditBest={vi.fn()} />);
+  await screen.findByRole('region', { name: 'Confirm the best photos' });
+  expect(startPhotoCull).not.toHaveBeenCalled();
+  expect(screen.getByRole('region', { name: 'Confirm the best photos' }).textContent).toContain('2 photos are in the best set.');
+  vi.mocked(startPhotoCull).mockResolvedValue({ jobId: 'cull-2' });
+  vi.mocked(photoCullStatus).mockResolvedValue({ jobId: 'cull-2', projectId: 'p1', status: 'completed', done: 4, total: 4, label: 'Done.' });
+  rerender(<PhotoCullWorkspace projectId="p1" disabled={false} onError={vi.fn()} autoStart={3} onEditBest={vi.fn()} />);
+  rerender(<PhotoCullWorkspace projectId="p1" disabled={false} onError={vi.fn()} autoStart={3} onEditBest={vi.fn()} />);
+  await waitFor(() => expect(startPhotoCull).toHaveBeenCalledOnce());
+});
