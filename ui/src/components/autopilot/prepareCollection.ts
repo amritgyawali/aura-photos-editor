@@ -2,6 +2,7 @@ import { api, develop, editProfiles, type ApplyReport, type ProfileSelection } f
 import { Refusal, reasonOf } from '../look/refusal';
 import { referenceStyle, type ReferenceSelection } from '../look/referenceStyle';
 import { nativeRetouch } from '../../ipc/nativeRetouch';
+import { photoPass } from '../../ipc/photoPass';
 import { portraitMessage } from '../develop/PortraitAutoReport';
 import type { RecipeDto } from '../../ipc/types';
 
@@ -106,6 +107,11 @@ export async function prepareCollection(projectId: string, stopped: () => boolea
         const portrait = portraitMessage(await develop.enhancePhoto({ photoId: photo.id }));
         if (portrait) adaptations.push(portrait);
       }
+      checkStop();
+      // Faults Auto enhance does not look for, fixed before any reference look (ADR-0186).
+      onProgress(`Photo pass ${index + 1} of ${photos.length}: ${photo.fileName}`);
+      const pass = await photoPass.run(projectId, photo.id);
+      adaptations.push(`Photo pass: ${pass.report.summary}`);
       checkStop();
       if (reference) {
         onProgress(`Matching reference style ${index + 1} of ${photos.length}: ${photo.fileName}`);

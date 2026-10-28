@@ -115,6 +115,7 @@ pub mod people_commands;
 pub mod perf;
 pub mod photo_enhance;
 mod photo_frames;
+pub mod photo_pass;
 pub mod portrait_auto;
 pub mod portrait_commands;
 pub mod portrait_features;
