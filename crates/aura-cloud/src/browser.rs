@@ -39,11 +39,19 @@ impl Launcher for SystemLauncher {
         } else {
             ("xdg-open", vec![url])
         };
-        Command::new(program)
+        let mut process = Command::new(program);
+        process
             .args(args)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
+            .stderr(Stdio::null());
+        // CREATE_NO_WINDOW: opening a page must not flash a console window.
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            process.creation_flags(0x0800_0000);
+        }
+        process
             .spawn()
             .map(|_| ())
             .map_err(|err| format!("could not start {program}: {err}"))

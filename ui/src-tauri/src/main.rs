@@ -1,7 +1,15 @@
 // The desktop shell. It owns the window, the single-instance guard, the panic
 // hook and logging, and forwards every command to `aura-app`. No product logic
 // lives here: the shell must stay thin enough to replace.
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+//
+// No console window in any build that embeds the frontend: the installer and start-aura.ps1 ship
+// the optimised dev profile, where `debug_assertions` is on, so keying this on a release build
+// opened a console beside every photographer's window. `tauri dev` builds without
+// `custom-protocol` and keeps its console for logs; everything is also in the engine log file.
+#![cfg_attr(
+    any(not(debug_assertions), feature = "custom-protocol"),
+    windows_subsystem = "windows"
+)]
 
 use aura_app::contract::ipc::{
     AutomaticStartDto, AutomaticStartInput, PhotoAnalysisDto, PhotoAutoEditDto, PhotoAutoEditInput,
