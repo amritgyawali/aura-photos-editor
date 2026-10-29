@@ -1049,6 +1049,758 @@ fn calibrate(
     (stage, frame)
 }
 
+// ---------------------------------------------------------------------------------------------
+// White balance and whites, measured on the render (stage 2 and stage 1)
+// ---------------------------------------------------------------------------------------------
+
+/// A pixel more saturated than this is a colour, not a neutral under a coloured light.
+pub const NEUTRAL_SATURATION: f32 = 0.30;
+/// Neutral references must cover this share of the frame (faces aside) to be measured.
+pub const NEUTRAL_MIN_SHARE: f32 = 0.004;
+/// The share of a warm light's warmth kept after white balance: a room lit by tungsten still
+/// reads as a warm room, with its whites white.
+pub const WARMTH_KEPT: f32 = 0.15;
+/// A white balance this close to the one in place (log chroma) is left as it is.
+pub const BALANCE_TOLERANCE: f32 = 0.03;
+/// The most of a magenta or green cast removed in one edit, in log chroma (about 25 tint).
+pub const TINT_CEILING: f32 = 0.08;
+/// The most white balance may turn the faces' hue, in degrees.
+pub const FACE_HUE_CEILING: f32 = 5.0;
+/// The largest white-balance correction, in log chroma, made in one edit.
+pub const BALANCE_CEILING: f32 = 0.6;
+
+/// A bright pixel whose channels are this close is a rebuilt clipped highlight, not a witness.
+pub const RECONSTRUCTED_SPREAD: u8 = 2;
+
+/// What a measured step adds to a stage the advanced retouch already reported.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Notes {
+    pub applied: bool,
+    pub protected: bool,
+    pub changes: Vec<String>,
+    pub checks: Vec<String>,
+}
+
+impl Notes {
+    fn into_stage(self, stage: &mut FullStage) {
+        if self.applied {
+            stage.outcome = Outcome::Applied;
+        } else if self.protected && stage.outcome != Outcome::Applied {
+            stage.outcome = Outcome::Protected;
+        } else if stage.outcome == Outcome::NotApplicable && !self.checks.is_empty() {
+            stage.outcome = Outcome::Unchanged;
+        }
+        stage.changes.extend(self.changes);
+        stage.checks.extend(self.checks);
+    }
+}
+
+/// The neutral references of a rendered frame: whites, greys and low-saturation cloth, outside
+/// the faces, and the colour cast they read.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Neutrals {
+    /// `(ln r/g, ln b/g)` of the references in linear light; `(0, 0)` is neutral.
+    pub cast: (f32, f32),
+    /// The share of the measured frame the references cover.
+    pub share: f32,
+    /// Byte offsets of the references, so a second render is read at the same places.
+    pub at: Vec<usize>,
+    /// One vote per part of the frame (a 3x3 grid) that holds enough references.
+    pub votes: usize,
+    /// The share of those votes within [`VOTE_AGREEMENT`] of the cast: below
+    /// [`MIXED_LIGHT_SHARE`] the parts of the frame are under different light.
+    pub agreement: f32,
+    /// Byte offsets of highlights the camera clipped (rebuilt as exact grey): a white balance
+    /// tints them, so they are read again on the checked render.
+    pub blown: Vec<usize>,
+    /// The share of the measured frame they cover.
+    pub blown_share: f32,
+}
+
+/// Blown highlights covering this share of the frame (a sky, a window) must stay white.
+pub const BLOWN_SHARE: f32 = 0.02;
+/// How far a white balance may tint blown highlights, in log chroma.
+pub const BLOWN_CEILING: f32 = 0.07;
+
+/// The colour blown highlights read on a render, `(ln r/g, ln b/g)`.
+#[must_use]
+pub fn blown_cast(rgb: &[u8], at: &[usize]) -> Option<(f32, f32)> {
+    let samples: Vec<(f32, f32, f32)> = at
+        .iter()
+        .filter_map(|&i| {
+            let p = rgb.get(i..i + 3)?;
+            let (lr, lg, lb) = (lin(*p.first()?), lin(*p.get(1)?), lin(*p.get(2)?));
+            (lg > 0.01 && lr > 0.01 && lb > 0.01).then(|| ((lr / lg).ln(), (lb / lg).ln(), 1.0))
+        })
+        .collect();
+    if samples.len() < 20 {
+        return None;
+    }
+    median_cast(&samples)
+}
+
+/// Two parts of a frame agree about the light within this, in log chroma.
+pub const VOTE_AGREEMENT: f32 = 0.10;
+/// Fewer agreeing votes than this share is mixed light: the correction is halved.
+pub const MIXED_LIGHT_SHARE: f32 = 0.6;
+
+fn in_boxes(faces: &[[f32; 4]], x: f32, y: f32) -> bool {
+    faces.iter().any(|&[left, top, right, bottom]| {
+        let (gw, gh) = ((right - left) * 0.2, (bottom - top) * 0.2);
+        x >= left - gw && x <= right + gw && y >= top - gh && y <= bottom + gh
+    })
+}
+
+/// The weighted median of `(value, weight)` pairs.
+fn weighted_median(values: &mut [(f32, f32)]) -> Option<f32> {
+    values.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let total: f32 = values.iter().map(|v| v.1).sum();
+    if total <= 0.0 {
+        return None;
+    }
+    let mut run = 0.0;
+    for (value, weight) in values.iter() {
+        run += weight;
+        if run >= total * 0.5 {
+            return Some(*value);
+        }
+    }
+    values.last().map(|v| v.0)
+}
+
+/// `(ln r/g, ln b/g, luminance)` of one sRGB pixel, when it can witness the light: unclipped,
+/// not dark and not strongly coloured.
+fn neutral_sample(p: &[u8]) -> Option<(f32, f32, f32)> {
+    let (&r, &g, &b) = (p.first()?, p.get(1)?, p.get(2)?);
+    let (max, min) = (r.max(g).max(b), r.min(g).min(b));
+    if max >= 245 || min < 12 {
+        return None;
+    }
+    if f32::from(max - min) / f32::from(max) > NEUTRAL_SATURATION {
+        return None;
+    }
+    // A highlight the camera clipped is rebuilt as an exact grey: it shows the reconstruction,
+    // not the light. A white shirt blown in the camera file reads (238, 238, 238) at any balance.
+    if max - min <= RECONSTRUCTED_SPREAD && max >= 140 {
+        return None;
+    }
+    let (lr, lg, lb) = (lin(r), lin(g), lin(b));
+    let y = 0.2126 * lr + 0.7152 * lg + 0.0722 * lb;
+    (y >= 0.03).then(|| ((lr / lg).ln(), (lb / lg).ln(), y))
+}
+
+fn median_cast(samples: &[(f32, f32, f32)]) -> Option<(f32, f32)> {
+    // Brighter references weigh more: whites take the colour of the light and little else.
+    let mut red: Vec<(f32, f32)> = samples.iter().map(|s| (s.0, s.2)).collect();
+    let mut blue: Vec<(f32, f32)> = samples.iter().map(|s| (s.1, s.2)).collect();
+    Some((weighted_median(&mut red)?, weighted_median(&mut blue)?))
+}
+
+/// Find the neutral references of a rendered sRGB frame. The search starts from its brightest
+/// near-neutral tones and narrows onto the cluster around them, so a red sari, gold work or skin
+/// do not pull it; `None` when too little of the frame is near-neutral to measure.
+#[must_use]
+pub fn read_neutrals(rgb: &[u8], w: usize, h: usize, faces: &[[f32; 4]]) -> Option<Neutrals> {
+    if w < 8 || h < 8 {
+        return None;
+    }
+    let step = ((w * h) as f32 / 120_000.0).sqrt().ceil().max(1.0) as usize;
+    let mut candidates = Vec::new();
+    let mut blown = Vec::new();
+    let mut total = 0_usize;
+    for y in (0..h).step_by(step) {
+        for x in (0..w).step_by(step) {
+            if in_boxes(
+                faces,
+                (x as f32 + 0.5) / w as f32,
+                (y as f32 + 0.5) / h as f32,
+            ) {
+                continue;
+            }
+            total += 1;
+            let i = (y * w + x) * 3;
+            let Some(p) = rgb.get(i..i + 3) else {
+                continue;
+            };
+            if let Some(sample) = neutral_sample(p) {
+                candidates.push((i, sample));
+            } else if let (Some(&r), Some(&g), Some(&b)) = (p.first(), p.get(1), p.get(2)) {
+                if r.max(g).max(b) >= 140
+                    && r.max(g).max(b) - r.min(g).min(b) <= RECONSTRUCTED_SPREAD
+                {
+                    blown.push(i);
+                }
+            }
+        }
+    }
+    if total == 0 || candidates.len() < 40 {
+        return None;
+    }
+    let mut lumas: Vec<f32> = candidates.iter().map(|c| c.1 .2).collect();
+    lumas.sort_by(f32::total_cmp);
+    let bright = lumas.get(lumas.len() * 4 / 5).copied().unwrap_or(0.0);
+    let brightest: Vec<_> = candidates
+        .iter()
+        .filter(|c| c.1 .2 >= bright)
+        .map(|c| c.1)
+        .collect();
+    let mut centre = median_cast(&brightest)?;
+    let mut chosen: Vec<&(usize, (f32, f32, f32))> = Vec::new();
+    for radius in [0.2_f32, 0.12, 0.08] {
+        chosen = candidates
+            .iter()
+            .filter(|c| (c.1 .0 - centre.0).hypot(c.1 .1 - centre.1) <= radius)
+            .collect();
+        if chosen.len() < 20 {
+            return None;
+        }
+        let samples: Vec<_> = chosen.iter().map(|c| c.1).collect();
+        centre = median_cast(&samples)?;
+    }
+    let share = chosen.len() as f32 / total as f32;
+    if share < NEUTRAL_MIN_SHARE {
+        return None;
+    }
+    // Equal votes from the parts of the frame: a large canopy or wall must not outvote the
+    // rest by its area, and parts that disagree are under different light.
+    let mut parts: [Vec<(f32, f32, f32)>; 9] = std::array::from_fn(|_| Vec::new());
+    for c in &chosen {
+        let pixel = c.0 / 3;
+        let (x, y) = (pixel % w, pixel / w);
+        if let Some(part) = parts.get_mut((y * 3 / h).min(2) * 3 + (x * 3 / w).min(2)) {
+            part.push(c.1);
+        }
+    }
+    let votes: Vec<(f32, f32)> = parts
+        .iter()
+        .filter(|p| p.len() >= 15)
+        .filter_map(|p| median_cast(p))
+        .collect();
+    let mut cast = centre;
+    let mut agreement = 1.0;
+    if votes.len() >= 3 {
+        let mut red: Vec<(f32, f32)> = votes.iter().map(|v| (v.0, 1.0)).collect();
+        let mut blue: Vec<(f32, f32)> = votes.iter().map(|v| (v.1, 1.0)).collect();
+        cast = (weighted_median(&mut red)?, weighted_median(&mut blue)?);
+        agreement = votes
+            .iter()
+            .filter(|v| (v.0 - cast.0).hypot(v.1 - cast.1) <= VOTE_AGREEMENT)
+            .count() as f32
+            / votes.len() as f32;
+    }
+    Some(Neutrals {
+        cast,
+        share,
+        at: chosen.iter().map(|c| c.0).collect(),
+        votes: votes.len(),
+        agreement,
+        blown_share: blown.len() as f32 / total as f32,
+        blown,
+    })
+}
+
+/// The cast the same references read on another render of the same size.
+#[must_use]
+pub fn cast_at(rgb: &[u8], at: &[usize]) -> Option<(f32, f32)> {
+    let samples: Vec<_> = at
+        .iter()
+        .filter_map(|&i| rgb.get(i..i + 3).and_then(neutral_sample))
+        .collect();
+    if samples.len() < 20 {
+        return None;
+    }
+    median_cast(&samples)
+}
+
+/// `(ln r, ln b)` of the white-balance multipliers a temperature and tint imply, green at one.
+fn balance_log(kelvin: u32, tint: i16) -> (f32, f32) {
+    let [r, _, b] = aura_render::colour::white_balance(kelvin as f32, f32::from(tint));
+    (r.max(1e-6).ln(), b.max(1e-6).ln())
+}
+
+/// The temperature and tint whose multipliers are closest to `target` (`(ln r, ln b)`).
+#[must_use]
+pub fn solve_balance(target: (f32, f32)) -> (u32, i16) {
+    let score = |kelvin: u32| {
+        let (ar, ab) = balance_log(kelvin, 0);
+        // Tint scales green down by (1 + t/300), lifting red and blue together.
+        let u = ((target.0 - ar) + (target.1 - ab)) * 0.5;
+        let tint = ((u.exp() - 1.0) * 300.0).round().clamp(-150.0, 150.0) as i16;
+        let (r, b) = balance_log(kelvin, tint);
+        ((r - target.0).powi(2) + (b - target.1).powi(2), tint)
+    };
+    let mut best = (f32::INFINITY, 5500_u32, 0_i16);
+    for kelvin in (2000..=50_000).step_by(50) {
+        let (error, tint) = score(kelvin);
+        if error < best.0 {
+            best = (error, kelvin, tint);
+        }
+    }
+    for kelvin in best.1.saturating_sub(50).max(2000)..=(best.1 + 50).min(50_000) {
+        let (error, tint) = score(kelvin);
+        if error < best.0 {
+            best = (error, kelvin, tint);
+        }
+    }
+    (best.1, best.2)
+}
+
+/// The hue of the faces' mean colour, in degrees (reds past zero read as negative).
+#[must_use]
+pub fn face_hue(rgb: &[u8], w: usize, h: usize, faces: &[[f32; 4]]) -> Option<f32> {
+    let mut sum = [0.0_f64; 3];
+    let mut n = 0_usize;
+    for &[left, top, right, bottom] in faces {
+        let (cx, cy) = (f32::midpoint(left, right), f32::midpoint(top, bottom));
+        let (hw, hh) = ((right - left) * 0.3, (bottom - top) * 0.3);
+        let x0 = ((cx - hw).max(0.0) * w as f32) as usize;
+        let x1 = ((cx + hw).min(1.0) * w as f32) as usize;
+        let y0 = ((cy - hh).max(0.0) * h as f32) as usize;
+        let y1 = ((cy + hh).min(1.0) * h as f32) as usize;
+        for y in y0..y1.min(h) {
+            for x in x0..x1.min(w) {
+                let i = (y * w + x) * 3;
+                if let Some(p) = rgb.get(i..i + 3) {
+                    for (s, v) in sum.iter_mut().zip(p) {
+                        *s += f64::from(*v);
+                    }
+                    n += 1;
+                }
+            }
+        }
+    }
+    if n < 50 {
+        return None;
+    }
+    let [r, g, b] = sum.map(|s| (s / n as f64) as f32);
+    let (max, min) = (r.max(g).max(b), r.min(g).min(b));
+    if max - min < 1.0 {
+        return Some(0.0);
+    }
+    let hue = if (max - r).abs() < f32::EPSILON {
+        60.0 * ((g - b) / (max - min))
+    } else if (max - g).abs() < f32::EPSILON {
+        60.0 * ((b - r) / (max - min) + 2.0)
+    } else {
+        60.0 * ((r - g) / (max - min) + 4.0)
+    };
+    Some(if hue > 180.0 { hue - 360.0 } else { hue })
+}
+
+/// Skin of every complexion sits between a rosy red and a golden yellow.
+#[must_use]
+pub fn skin_hue(hue: f32) -> bool {
+    (-10.0..=50.0).contains(&hue)
+}
+
+/// The decided correction for a cast read at the camera's own balance: the multipliers wanted,
+/// as `(ln r, ln b)`, and the output cast they aim for. Removes the cast, keeping
+/// [`WARMTH_KEPT`] of a warm one, and moves at most [`BALANCE_CEILING`].
+/// A cast splits into warm-cool, `(ln r/g - ln b/g) / 2`, and magenta-green,
+/// `(ln r/g + ln b/g) / 2`; the magenta-green part comes off at most this far in one edit,
+/// because a pink canopy, a green lawn or coloured decor fool every neutral estimate the same way.
+#[must_use]
+pub fn balance_goal(cast: (f32, f32)) -> ((f32, f32), (f32, f32)) {
+    let warmth = (cast.0 - cast.1) * 0.5;
+    let magenta = (cast.0 + cast.1) * 0.5;
+    let keep = if warmth > 0.0 { WARMTH_KEPT } else { 0.0 };
+    let warmth_left = warmth * keep;
+    let magenta_left = magenta - magenta.clamp(-TINT_CEILING, TINT_CEILING);
+    let mut goal = (magenta_left + warmth_left, magenta_left - warmth_left);
+    let (dr, db) = (goal.0 - cast.0, goal.1 - cast.1);
+    let size = dr.hypot(db);
+    if size > BALANCE_CEILING {
+        let k = BALANCE_CEILING / size;
+        goal = (cast.0 + dr * k, cast.1 + db * k);
+    }
+    // At the camera's own balance the multipliers are one, so the output cast moves with them.
+    ((goal.0 - cast.0, goal.1 - cast.1), goal)
+}
+
+/// Stage 2's white balance, for every photograph: measured on a render at the camera's own
+/// balance, so a second run decides the same thing, and checked on a render of the result.
+/// Returns what it did and, when it saved a balance, the render with it.
+fn balance_white(
+    state: &AppState,
+    ids: (&ProjectId, PhotoId),
+    current: &mut Recipe,
+    base: &mut Recipe,
+    shown: &Frame,
+    faces: &[[f32; 4]],
+    look: Look,
+) -> (Notes, Option<Frame>) {
+    let (project, photo) = ids;
+    let mut notes = Notes::default();
+    if look == Look::Applied {
+        notes.protected = true;
+        notes
+            .checks
+            .push("White balance: your chosen look sets it; kept.".into());
+        return (notes, None);
+    }
+    let reference = aura_render::colour::REFERENCE_KELVIN as u32;
+    let mut as_shot = base.clone();
+    as_shot.global.temperature = reference;
+    as_shot.global.tint = 0;
+    let rendered_as_shot;
+    let frame = if base.global.temperature == reference && base.global.tint == 0 {
+        shown
+    } else {
+        match measure(state, photo, &as_shot) {
+            Ok(f) => {
+                rendered_as_shot = f;
+                &rendered_as_shot
+            }
+            Err(error) => {
+                notes.checks.push(format!(
+                    "White balance left as it was: the photograph could not be rendered at the camera's own balance to measure it ({}).",
+                    error.code
+                ));
+                return (notes, None);
+            }
+        }
+    };
+    let Some(refs) = read_neutrals(&frame.0, frame.1, frame.2, faces) else {
+        notes.checks.push(format!(
+            "White balance kept as shot: less than {:.1}% of the frame is white, grey or near-neutral, so there is nothing true to measure the light on.",
+            NEUTRAL_MIN_SHARE * 100.0
+        ));
+        return (notes, None);
+    };
+    let size = refs.cast.0.hypot(refs.cast.1);
+    let (mut target, mut goal) = balance_goal(refs.cast);
+    let mixed = refs.agreement < MIXED_LIGHT_SHARE;
+    if mixed {
+        // Mixed light: no one balance is right everywhere, so take half the step.
+        target = (target.0 * 0.5, target.1 * 0.5);
+        goal = (refs.cast.0 + target.0, refs.cast.1 + target.1);
+        notes.checks.push(format!(
+            "Mixed light: only {:.0}% of the {} parts of the frame with neutral references agree about its colour, so half the correction was made.",
+            refs.agreement * 100.0,
+            refs.votes
+        ));
+    }
+    let now = balance_log(base.global.temperature, base.global.tint);
+    if (target.0 - now.0).hypot(target.1 - now.1) < BALANCE_TOLERANCE {
+        notes.checks.push(format!(
+            "White balance measured on whites, greys and near-neutral cloth over {:.1}% of the frame (faces left out): {}",
+            refs.share * 100.0,
+            if size < BALANCE_TOLERANCE {
+                format!("already neutral (cast {size:.3}).")
+            } else {
+                format!("cast {size:.3}, already corrected the way this edit corrects it.")
+            }
+        ));
+        return (notes, None);
+    }
+    let face_before = face_hue(&frame.0, frame.1, frame.2, faces);
+    // Checked on the render: the same references must move to the goal, and faces stay skin.
+    let mut best: Option<((u32, i16), Frame, (f32, f32))> = None;
+    let mut halved = false;
+    for _ in 0..3 {
+        let (kelvin, tint) = solve_balance(target);
+        let mut proposal = base.clone();
+        proposal.global.temperature = kelvin;
+        proposal.global.tint = tint;
+        let Ok(rendered) = measure(state, photo, &proposal) else {
+            break;
+        };
+        let Some(after) = cast_at(&rendered.0, &refs.at) else {
+            break;
+        };
+        let face_after = face_hue(&rendered.0, rendered.1, rendered.2, faces);
+        let turned = match (face_before, face_after) {
+            (Some(a), Some(b)) => (b - a).abs(),
+            _ => 0.0,
+        };
+        let lost_skin = face_before.is_some_and(skin_hue) && !face_after.is_some_and(skin_hue);
+        if lost_skin || turned > FACE_HUE_CEILING {
+            if halved {
+                best = None;
+                notes.checks.push(format!(
+                    "Even a reduced white balance turned the faces {turned:.0}° in hue on the render (limit {FACE_HUE_CEILING:.0}°); the camera's balance was kept."
+                ));
+                break;
+            }
+            halved = true;
+            // Scale the step back to what the faces allow, measured, and check again.
+            let k = if lost_skin {
+                0.5
+            } else {
+                (FACE_HUE_CEILING / turned * 0.9).clamp(0.3, 0.9)
+            };
+            // Towards the camera's own balance, where it was measured, so a repeat run decides the same.
+            target = (target.0 * k, target.1 * k);
+            notes.checks.push(format!(
+                "The full correction turned the faces {turned:.0}° in hue (limit {FACE_HUE_CEILING:.0}°); reduced to {:.0}% and checked again.",
+                k * 100.0
+            ));
+            continue;
+        }
+        // A sky or window the camera clipped must stay white, not turn the colour opposite the cast.
+        if refs.blown_share >= BLOWN_SHARE && !halved {
+            if let Some(tinted) = blown_cast(&rendered.0, &refs.blown) {
+                let tint_size = tinted.0.hypot(tinted.1);
+                if tint_size > BLOWN_CEILING {
+                    halved = true;
+                    let k = (BLOWN_CEILING / tint_size).clamp(0.3, 0.9);
+                    // Towards the camera's own balance, where it was measured, so a repeat run decides the same.
+                    target = (target.0 * k, target.1 * k);
+                    goal = (refs.cast.0 + target.0, refs.cast.1 + target.1);
+                    notes.checks.push(format!(
+                        "Blown highlights over {:.0}% of the frame (a sky or window) would have turned {tint_size:.2} off white; the correction was reduced to {:.0}% so they stay white.",
+                        refs.blown_share * 100.0,
+                        k * 100.0
+                    ));
+                    continue;
+                }
+            }
+        }
+        let error = (after.0 - goal.0, after.1 - goal.1);
+        let closer = best
+            .as_ref()
+            .is_none_or(|b| error.0.hypot(error.1) < (b.2 .0 - goal.0).hypot(b.2 .1 - goal.1));
+        if closer {
+            best = Some(((kelvin, tint), rendered, after));
+        }
+        if error.0.hypot(error.1) < 0.025 || halved {
+            break;
+        }
+        // The tone curve and the camera matrix bend the result a little: step by what is left.
+        target = (target.0 - error.0, target.1 - error.1);
+    }
+    let Some(((kelvin, tint), rendered, after)) = best else {
+        if notes.checks.is_empty() {
+            notes.checks.push(
+                "White balance left as shot: the correction could not be checked on a render."
+                    .into(),
+            );
+        }
+        return (notes, None);
+    };
+    let left = after.0.hypot(after.1);
+    if left >= size * 0.85 {
+        notes.checks.push(format!(
+            "A white balance of {kelvin} K / tint {tint:+} did not bring the whites closer to neutral on the render (cast {size:.3} to {left:.3}); kept as shot."
+        ));
+        return (notes, None);
+    }
+    let warm = refs.cast.0 - refs.cast.1 > 0.0;
+    let mut proposal = current.clone();
+    proposal.global.temperature = kelvin;
+    proposal.global.tint = tint;
+    let change = format!(
+        "White balance {kelvin} K / tint {tint:+}: whites, greys and near-neutral cloth over {:.1}% of the frame (faces left out) read a {} cast of {size:.3}; now {left:.3}{}.",
+        refs.share * 100.0,
+        if warm { "warm" } else { "cool or green" },
+        if warm {
+            ", keeping a little of the light's warmth"
+        } else {
+            ""
+        }
+    );
+    let label = format!("Full auto edit 2/10 · White balance {kelvin} K / tint {tint:+}");
+    match save_step(state, project, &photo, current, proposal, &label) {
+        Ok((true, _)) => {
+            notes.applied = true;
+            notes.changes.push(change);
+            notes.checks.push(format!(
+                "Checked on the render at the same places{}.",
+                match (
+                    face_before,
+                    face_hue(&rendered.0, rendered.1, rendered.2, faces)
+                ) {
+                    (Some(a), Some(b)) =>
+                        format!("; faces stayed skin-coloured (hue {a:.0}° to {b:.0}°)"),
+                    _ => String::new(),
+                }
+            ));
+            base.global.temperature = kelvin;
+            base.global.tint = tint;
+            (notes, Some(rendered))
+        }
+        Ok((false, refused)) if !refused.is_empty() => {
+            notes.protected = true;
+            notes.checks.push(format!(
+                "White balance: kept your own setting ({}).",
+                refused.join(", ")
+            ));
+            (notes, None)
+        }
+        Ok((false, _)) => (notes, None),
+        Err(error) => {
+            notes.checks.push(format!(
+                "The white balance could not be saved ({}); left as it was.",
+                error.code
+            ));
+            (notes, None)
+        }
+    }
+}
+
+/// The tones of a rendered frame outside the faces: median and 99.5th-percentile luma (0-1)
+/// and the share of pixels with a clipped channel.
+#[must_use]
+pub fn read_top(rgb: &[u8], w: usize, h: usize, faces: &[[f32; 4]]) -> Option<(f32, f32, f32)> {
+    let step = ((w * h) as f32 / 120_000.0).sqrt().ceil().max(1.0) as usize;
+    let (mut lumas, mut clipped) = (Vec::new(), 0_usize);
+    for y in (0..h).step_by(step) {
+        for x in (0..w).step_by(step) {
+            if in_boxes(
+                faces,
+                (x as f32 + 0.5) / w as f32,
+                (y as f32 + 0.5) / h as f32,
+            ) {
+                continue;
+            }
+            let i = (y * w + x) * 3;
+            let Some(&[r, g, b]) = rgb.get(i..i + 3) else {
+                continue;
+            };
+            if r.max(g).max(b) >= 250 {
+                clipped += 1;
+            }
+            lumas.push(
+                (0.2126 * f32::from(r) + 0.7152 * f32::from(g) + 0.0722 * f32::from(b)) / 255.0,
+            );
+        }
+    }
+    if lumas.len() < 100 {
+        return None;
+    }
+    let n = lumas.len();
+    lumas.sort_by(f32::total_cmp);
+    Some((
+        lumas.get(n / 2).copied()?,
+        lumas.get(n * 995 / 1000).copied()?,
+        clipped as f32 / n as f32,
+    ))
+}
+
+/// The brightest tones of a frame that is not dark reach at least this.
+pub const TOP_FLOOR: f32 = 0.80;
+/// Where the whites are lifted to.
+pub const TOP_GOAL: f32 = 0.92;
+/// The most the whites are lifted in one edit.
+pub const WHITES_CEILING: f32 = 70.0;
+/// The most a lift may clip, as a share of the frame.
+pub const CLIP_CEILING: f32 = 0.004;
+
+/// Stage 1's finish: a photograph whose brightest tones stop short of white - often after the
+/// exposure came down to save skin - looks grey and flat; its whites are lifted until they
+/// reach white, checked on a render so nothing new clips.
+fn lift_whites(
+    state: &AppState,
+    ids: (&ProjectId, PhotoId),
+    current: &mut Recipe,
+    base: &mut Recipe,
+    shown: &Frame,
+    faces: &[[f32; 4]],
+    look: Look,
+) -> (Notes, Option<Frame>) {
+    let (project, photo) = ids;
+    let mut notes = Notes::default();
+    if look == Look::Applied {
+        return (notes, None);
+    }
+    let Some((median, top, clipped)) = read_top(&shown.0, shown.1, shown.2, faces) else {
+        return (notes, None);
+    };
+    if median < 0.25 || top >= TOP_FLOOR || clipped >= CLIP_CEILING * 0.5 {
+        notes.checks.push(format!(
+            "Whites: the brightest tones reach {:.0}% of white{}; left as they are.",
+            top * 100.0,
+            if median < 0.25 {
+                " in a dark, low-key frame"
+            } else {
+                ""
+            }
+        ));
+        return (notes, None);
+    }
+    let mut lift = ((TOP_GOAL - top) * 160.0)
+        .round()
+        .clamp(5.0, WHITES_CEILING) as i16;
+    let mut kept: Option<(i16, Frame, f32, f32)> = None;
+    let mut over: Option<i16> = None;
+    for _ in 0..3 {
+        let mut proposal = base.clone();
+        proposal.global.whites = (base.global.whites + lift).clamp(-100, 100);
+        let Ok(rendered) = measure(state, photo, &proposal) else {
+            break;
+        };
+        let Some((_, top_after, clipped_after)) =
+            read_top(&rendered.0, rendered.1, rendered.2, faces)
+        else {
+            break;
+        };
+        if clipped_after > CLIP_CEILING {
+            // Too far: come back halfway towards the last lift that did not clip.
+            over = Some(lift);
+            let floor = kept.as_ref().map_or(0, |k| k.0 - base.global.whites);
+            lift = i16::midpoint(floor, lift);
+            if lift <= floor {
+                break;
+            }
+            continue;
+        }
+        if top_after > top + 0.01 {
+            kept = Some((proposal.global.whites, rendered, top_after, clipped_after));
+        }
+        // The slider's response is measured, not assumed: step by it to the goal.
+        let gained = top_after - top;
+        if top_after >= TOP_GOAL - 0.02 || gained <= 0.005 {
+            break;
+        }
+        let wanted = (f32::from(lift) * (TOP_GOAL - top) / gained).round();
+        let ceiling = over.map_or(WHITES_CEILING, |o| f32::from(o - 1));
+        let next = wanted.max(f32::from(lift) + 1.0).min(ceiling) as i16;
+        if next <= lift {
+            break;
+        }
+        lift = next;
+    }
+    let Some((whites, rendered, top_after, clipped_after)) = kept else {
+        notes.checks.push(format!(
+            "Whites: the brightest tones reach only {:.0}% of white, but lifting them clipped or changed nothing on the render; left as they are.",
+            top * 100.0
+        ));
+        return (notes, None);
+    };
+    let mut proposal = current.clone();
+    proposal.global.whites = whites;
+    let label = format!("Full auto edit 1/10 · Whites {whites:+}");
+    match save_step(state, project, &photo, current, proposal, &label) {
+        Ok((true, _)) => {
+            notes.applied = true;
+            notes.changes.push(format!(
+                "Whites {whites:+}: the brightest tones reached only {:.0}% of white, so the photo looked grey and flat; now {:.0}%, with {:.2}% clipped (checked on the render).",
+                top * 100.0,
+                top_after * 100.0,
+                clipped_after * 100.0
+            ));
+            base.global.whites = whites;
+            (notes, Some(rendered))
+        }
+        Ok((false, refused)) if !refused.is_empty() => {
+            notes.protected = true;
+            notes.checks.push(format!(
+                "Whites: kept your own setting ({}).",
+                refused.join(", ")
+            ));
+            (notes, None)
+        }
+        Ok((false, _)) => (notes, None),
+        Err(error) => {
+            notes.checks.push(format!(
+                "The whites could not be saved ({}); left as they are.",
+                error.code
+            ));
+            (notes, None)
+        }
+    }
+}
+
 /// What a save meant for the stage's outcome.
 fn record(
     stage: &mut FullStage,
@@ -1525,7 +2277,51 @@ pub fn run(
     if input.look == Look::None {
         base.global.colour_grade = ColourGrade::default();
     }
-    let shown = measure(state, photo, &base);
+    let mut shown = measure(state, photo, &base);
+    // Stage 2's white balance and stage 1's whites, both measured and checked on the render,
+    // before calibration and grade read it.
+    let mut balance = Notes::default();
+    let mut finish = Notes::default();
+    if let Ok(frame) = &shown {
+        let (notes, balanced) = balance_white(
+            state,
+            ids,
+            &mut current,
+            &mut base,
+            frame,
+            &faces,
+            input.look,
+        );
+        balance = notes;
+        if let Some(frame) = balanced {
+            show(
+                Some(FullStageKey::ColourCorrection),
+                format!("{} · White balance", FullStageKey::ColourCorrection.title()),
+                &current,
+            );
+            shown = Ok(frame);
+        }
+    }
+    if let Ok(frame) = &shown {
+        let (notes, lifted) = lift_whites(
+            state,
+            ids,
+            &mut current,
+            &mut base,
+            frame,
+            &faces,
+            input.look,
+        );
+        finish = notes;
+        if let Some(frame) = lifted {
+            show(
+                Some(FullStageKey::Basic),
+                format!("{} · Whites", FullStageKey::Basic.title()),
+                &current,
+            );
+            shown = Ok(frame);
+        }
+    }
     let (calibration, calibrated) = if keep_calibration {
         let mut stage = FullStage::new(FullStageKey::Calibration);
         stage.outcome = Outcome::Protected;
@@ -1609,6 +2405,13 @@ pub fn run(
         input.look,
         people,
     )?;
+    for stage in &mut stages {
+        match stage.key {
+            FullStageKey::ColourCorrection => std::mem::take(&mut balance).into_stage(stage),
+            FullStageKey::Basic => std::mem::take(&mut finish).into_stage(stage),
+            _ => {}
+        }
+    }
     stages.push(calibration);
     stages.push(graded);
     stages.sort_by_key(|s| s.number);
@@ -1866,5 +2669,160 @@ mod tests {
         assert!(chroma_shift(a, b).is_some_and(|m| m > FACE_SHIFT_CEILING));
         assert!(chroma_shift(a, a).is_some_and(|m| m < 1e-6));
         assert!(face_chroma(&warm, w, h, &[]).is_none());
+    }
+
+    /// A 200x100 frame painted by a function of (x, y).
+    fn painted(paint: impl Fn(usize, usize) -> [u8; 3]) -> (Vec<u8>, usize, usize) {
+        let (w, h) = (200, 100);
+        let mut rgb = Vec::with_capacity(w * h * 3);
+        for y in 0..h {
+            for x in 0..w {
+                rgb.extend(paint(x, y));
+            }
+        }
+        (rgb, w, h)
+    }
+
+    #[test]
+    fn white_balance_solves_back_to_the_temperature_and_tint_it_came_from() {
+        for (kelvin, tint) in [(5500_u32, 0_i16), (4300, 12), (6800, -20), (3400, 30)] {
+            let (k, t) = solve_balance(balance_log(kelvin, tint));
+            assert!(k.abs_diff(kelvin) <= 60, "{kelvin} -> {k}");
+            assert!((t - tint).abs() <= 2, "{tint} -> {t}");
+        }
+    }
+
+    #[test]
+    fn a_warm_white_shirt_beside_a_red_sari_reads_the_warm_light_not_the_sari() {
+        // Left: a cream shirt and its shading (warm light). Right: a saturated red sari.
+        let (rgb, w, h) = painted(|x, y| {
+            if x < 80 {
+                let v = 150 + (y % 40) as u8;
+                [v, v.saturating_sub(8), v.saturating_sub(26)]
+            } else {
+                [200, 30, 45]
+            }
+        });
+        let refs = read_neutrals(&rgb, w, h, &[]).expect("the shirt is a reference");
+        assert!(refs.cast.0 > 0.0 && refs.cast.1 < -0.1, "{:?}", refs.cast);
+        assert!(refs.share > 0.3 && refs.share < 0.45, "{}", refs.share);
+        // The same places read again on another render give the same cast.
+        let again = cast_at(&rgb, &refs.at).expect("same places");
+        assert!((again.0 - refs.cast.0).abs() < 1e-3 && (again.1 - refs.cast.1).abs() < 1e-3);
+    }
+
+    #[test]
+    fn a_highlight_the_camera_clipped_is_not_a_witness_of_the_light() {
+        // A blown shirt rebuilt as exact grey, and nothing else near-neutral.
+        let (rgb, w, h) = painted(|x, _| {
+            if x < 100 {
+                [238, 238, 238]
+            } else {
+                [200, 30, 45]
+            }
+        });
+        assert!(read_neutrals(&rgb, w, h, &[]).is_none());
+        // Beside real references it is recorded as blown, to be read again on the checked render.
+        let (rgb, w, h) = painted(|x, y| match x {
+            0..=59 => [238, 238, 238],
+            60..=139 => {
+                let v = 140 + (y % 30) as u8;
+                [v, v.saturating_sub(6), v.saturating_sub(20)]
+            }
+            _ => [200, 30, 45],
+        });
+        let refs = read_neutrals(&rgb, w, h, &[]).expect("the cloth is a reference");
+        assert!(refs.blown_share > 0.25, "{}", refs.blown_share);
+        assert!(
+            refs.cast.1 < -0.05,
+            "the clipped grey did not pull the cast to zero: {:?}",
+            refs.cast
+        );
+        assert!(blown_cast(&rgb, &refs.blown).is_some_and(|c| c.0.hypot(c.1) < 1e-3));
+    }
+
+    #[test]
+    fn faces_are_not_references() {
+        // The whole frame is a pale warm tone; inside the face box it is skin.
+        let face = [0.4_f32, 0.2, 0.6, 0.8];
+        let (rgb, w, h) = painted(|x, y| {
+            let (fx, fy) = (x as f32 / 200.0, y as f32 / 100.0);
+            if in_boxes(&[face], fx, fy) {
+                [220, 170, 140]
+            } else {
+                [180, 177, 172]
+            }
+        });
+        let refs = read_neutrals(&rgb, w, h, &[face]).expect("the background is a reference");
+        // The faint warm grey, not the skin: skin would read a cast many times this size.
+        assert!(refs.cast.0.hypot(refs.cast.1) < 0.08, "{:?}", refs.cast);
+        assert!(face_hue(&rgb, w, h, &[face]).is_some_and(skin_hue));
+    }
+
+    #[test]
+    fn a_warm_cast_keeps_a_little_warmth_and_magenta_or_green_comes_off_only_so_far() {
+        // Warm: goal is 15% of the cast, multipliers take the rest off.
+        let ((dr, db), goal) = balance_goal((0.2, -0.2));
+        assert!(
+            (goal.0 - 0.03).abs() < 1e-4 && (goal.1 + 0.03).abs() < 1e-4,
+            "{goal:?}"
+        );
+        assert!((dr + 0.17).abs() < 1e-4 && (db - 0.17).abs() < 1e-4);
+        // Cool: all of it.
+        let (_, goal) = balance_goal((-0.1, 0.1));
+        assert!(goal.0.abs() < 1e-4 && goal.1.abs() < 1e-4, "{goal:?}");
+        // Magenta 0.2 (a pink canopy reads this way): at most 0.08 of it comes off.
+        let (_, goal) = balance_goal((0.2, 0.2));
+        assert!(
+            (goal.0 - 0.12).abs() < 1e-4 && (goal.1 - 0.12).abs() < 1e-4,
+            "{goal:?}"
+        );
+        // Never more than the ceiling in one edit.
+        let (step, _) = balance_goal((1.2, -1.2));
+        assert!(step.0.hypot(step.1) <= BALANCE_CEILING + 1e-4);
+    }
+
+    #[test]
+    fn every_part_of_a_frame_under_one_light_votes_for_it() {
+        let (rgb, w, h) = painted(|x, y| {
+            let v = 150 + ((x + y) % 20) as u8;
+            [v, v.saturating_sub(10), v.saturating_sub(35)]
+        });
+        let one = read_neutrals(&rgb, w, h, &[]).expect("one light");
+        assert!(
+            one.votes == 9 && one.agreement >= MIXED_LIGHT_SHARE,
+            "{} {}",
+            one.votes,
+            one.agreement
+        );
+        // A small part under another light, close enough to be measured with the rest, loses its vote.
+        let (rgb, w, h) = painted(|x, y| {
+            let v = 150 + ((x + y) % 20) as u8;
+            if x < 70 {
+                [v, v.saturating_sub(4), v.saturating_sub(4)]
+            } else {
+                [v, v.saturating_sub(10), v.saturating_sub(35)]
+            }
+        });
+        let two = read_neutrals(&rgb, w, h, &[]).expect("two lights");
+        assert!(
+            two.agreement < 1.0 || two.votes < 9,
+            "{} {}",
+            two.votes,
+            two.agreement
+        );
+    }
+
+    #[test]
+    fn whites_short_of_white_are_read_outside_the_faces() {
+        let (rgb, w, h) = painted(|x, _| {
+            let v = 60 + (x % 130) as u8; // tops out at 189: 74% of white
+            [v, v, v]
+        });
+        let (median, top, clipped) = read_top(&rgb, w, h, &[]).expect("tones");
+        assert!(
+            median > 0.25 && top < TOP_FLOOR && clipped == 0.0,
+            "{median} {top}"
+        );
     }
 }
