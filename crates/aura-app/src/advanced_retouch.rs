@@ -1832,7 +1832,27 @@ pub fn run(
     input: &AdvancedRetouchInput,
     progress: &dyn Fn(Progress),
 ) -> IpcResult<AdvancedRetouchDto> {
-    run_keeping(state, input, false, progress)
+    // Registered here, not in `run_keeping`: the full edit runs that too and names its own stages.
+    let busy = crate::activity::begin(
+        state,
+        "retouch",
+        format!(
+            "Advanced retouch: {}",
+            crate::activity::photo_name(state, &input.photo_id)
+        ),
+    );
+    run_keeping(state, input, false, &|p: Progress| {
+        busy.detail(format!("Step {} of {}: {}", p.number, p.total, p.title));
+        busy.progress(
+            u64::from(if p.state == "running" {
+                p.number.saturating_sub(1)
+            } else {
+                p.number
+            }),
+            u64::from(p.total),
+        );
+        progress(p);
+    })
 }
 
 /// [`run`], optionally leaving exposure, white balance, vibrance and clarity as a look already

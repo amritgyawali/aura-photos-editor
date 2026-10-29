@@ -3611,6 +3611,18 @@ async fn full_edit_photo(
     .map_err(|_| background_request_failed())?
 }
 
+/// The photograph's saved edit as a picture, for someone watching the automatic edit. ADR-0187.
+#[tauri::command]
+async fn full_edit_picture(
+    state: State<'_, AppState>,
+    input: aura_app::full_edit::PictureInput,
+) -> IpcResult<aura_app::full_edit::StagePicture> {
+    let shared = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::full_edit::picture(&shared, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
 #[tauri::command]
 async fn sync_settings(
     state: State<'_, AppState>,
@@ -4421,6 +4433,7 @@ fn main() {
             auto_retouch,
             auto_advanced_retouch,
             full_edit_photo,
+            full_edit_picture,
             create_project,
             list_projects,
             start_ingest,

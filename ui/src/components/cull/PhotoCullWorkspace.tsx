@@ -16,6 +16,7 @@ import {
 import type { PhotoCullCheckDto, PhotoCullPhotoDto, PhotoCullReviewDto, PhotoCullStatusDto } from '../../ipc/types';
 import { automaticBusy, useAutomatic } from '../../state/automaticStore';
 import { useThumbnails } from '../../stores/thumbnailStore';
+import { AutoChoiceNotice, useAutoChoice } from '../workflow/AutoChoice';
 
 /**
  * The Cull screen. ADR-0185.
@@ -33,7 +34,8 @@ import { useThumbnails } from '../../stores/thumbnailStore';
  *
  * After an import of several photos the cull runs on its own (`autoStart`), and nothing is
  * edited until the photographer has looked and pressed "Edit the best photos" - the full
- * automatic edit then works through the confirmed set one photo at a time. ADR-0187.
+ * automatic edit then works through the confirmed set one photo at a time. ADR-0187. Nobody
+ * there after a minute: the best set AURA chose is edited, as the button would. ADR-0189.
  */
 
 export type CullTab = 'best' | 'left';
@@ -337,13 +339,13 @@ export function PhotoCullWorkspace({ projectId, disabled, onError, onOpen, autoS
   }, [projectId, watch, onError]);
 
   // An import of several photos culls them straight away; the photographer reviews the result.
-  const [justCulled, setJustCulled] = useState(false);
+  const [justCulled, setJustCulled] = useState(0);
   const started = useRef(0);
   useEffect(() => {
     if (autoStart > 0 && started.current !== autoStart && inTauri()) {
       started.current = autoStart;
       onAutoStarted?.();
-      setJustCulled(true);
+      setJustCulled(autoStart);
       void cull();
     }
   }, [autoStart, onAutoStarted, cull]);
@@ -424,6 +426,10 @@ export function PhotoCullWorkspace({ projectId, disabled, onError, onOpen, autoS
   const leftOutIds = review ? review.photos.filter((p) => !p.keep).map((p) => p.photoId) : [];
   const chosenIds = review ? review.photos.filter((p) => p.choice).map((p) => p.photoId) : [];
   const broughtBack = review ? review.photos.filter((p) => p.keep && !p.cullKeep).map((p) => p.photoId) : [];
+  // The photographer imported and walked away: a minute without activity edits the best set,
+  // with whatever they already brought back or left out. Only after a cull the import started.
+  const autoEdit = useAutoChoice(Boolean(justCulled > 0 && job?.status === 'completed' && onEditBest && review && review.best > 0 && !locked),
+    () => { if (review && onEditBest) onEditBest(bestIds(review)); }, justCulled);
   const toggle = (id: string) => setSelected((current) => {
     const next = new Set(current);
     if (next.has(id)) next.delete(id); else next.add(id);
@@ -456,9 +462,10 @@ export function PhotoCullWorkspace({ projectId, disabled, onError, onOpen, autoS
             <section className={`cull-confirm${justCulled ? ' is-new' : ''}`} aria-label="Confirm the best photos">
               <div>
                 <strong>{justCulled ? `AURA chose ${review.best} best photos and left ${review.leftOut} out.` : `${review.best} photos are in the best set.`}</strong>
-                <p>Check both lists - bring back anything you want, leave out anything you don't. Nothing is edited until you confirm; then every best photo gets the full automatic edit, one at a time.</p>
+                <p>Check both lists - bring back anything you want, leave out anything you don't. Nothing is edited until you confirm{justCulled ? ', or until a minute passes with nobody at the screen' : ''}; then every best photo gets the full automatic edit, one at a time.</p>
               </div>
               <button type="button" className="is-primary" disabled={locked || review.best === 0} onClick={() => onEditBest(bestIds(review))}>Edit the {review.best} best photos →</button>
+              <AutoChoiceNotice choice={autoEdit} action={`edit the ${review.best} best photos`} />
             </section>
           )}
           <p className="photo-cull-summary">{cullSummary(review)}</p>

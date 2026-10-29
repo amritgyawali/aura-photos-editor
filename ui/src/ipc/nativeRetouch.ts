@@ -1,5 +1,5 @@
 export const MAX_NATIVE_RETOUCH_EDITS = 1024;
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from './client';
 import polishedWedding from '../config/polishedWedding.json';
 import type { RecipeDto, RenderDto } from './types';
 import { EFFECT_SOURCE, EFFECT_TOOLS, isEffectTool } from './retouchEffects';

@@ -503,12 +503,19 @@ fn run(state: &AppState, job: &str, project: &str, strictness: Strictness) -> Ip
         s.total = total;
         s.label = format!("Checking {total} photos against 100 measurements each.");
     });
+    let busy = crate::activity::begin(state, "cull", format!("Culling {total} photos"));
+    busy.detail("Checking each photo against 100 measurements");
+    busy.progress(0, total);
+    let checked = std::sync::atomic::AtomicU64::new(0);
     let chosen: Vec<&ImageRowLite> = photos.iter().collect();
     let Some(frames) = measure_frames(state, project, &chosen, &|| cancelled(job), &|| {
         update(job, |s| s.done = s.done.saturating_add(1));
+        let done = checked.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+        busy.progress(done, total);
     }) else {
         return Ok(false);
     };
+    busy.detail("Choosing the best of every moment");
     update(job, |s| {
         s.label = "Choosing the best of every moment.".into();
     });

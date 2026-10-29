@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import { oneClickFinish, photoCullChecks, photoCullReview, photoCullStatus, setPhotoCullChoice, setPhotoCullStrictness, startPhotoCull } from '../../ipc/client';
@@ -272,4 +272,47 @@ it('does not cull again for the same import request', async () => {
   rerender(<PhotoCullWorkspace projectId="p1" disabled={false} onError={vi.fn()} autoStart={3} onEditBest={vi.fn()} />);
   rerender(<PhotoCullWorkspace projectId="p1" disabled={false} onError={vi.fn()} autoStart={3} onEditBest={vi.fn()} />);
   await waitFor(() => expect(startPhotoCull).toHaveBeenCalledOnce());
+});
+
+it('edits the best set on its own after a minute with nobody at the screen', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  try {
+    vi.mocked(photoCullReview).mockResolvedValueOnce(null).mockResolvedValue(base);
+    vi.mocked(startPhotoCull).mockResolvedValue({ jobId: 'cull-3' });
+    vi.mocked(photoCullStatus).mockResolvedValue({ jobId: 'cull-3', projectId: 'p1', status: 'completed', done: 4, total: 4, label: 'Done.' });
+    const editBest = vi.fn();
+    render(<PhotoCullWorkspace projectId="p1" disabled={false} onError={vi.fn()} autoStart={9} onEditBest={editBest} />);
+    const notice = await screen.findByText(/AURA will edit the 2 best photos in/);
+    expect(notice.textContent).toContain('1:00');
+    act(() => { vi.advanceTimersByTime(59_000); });
+    expect(editBest).not.toHaveBeenCalled();
+    act(() => { vi.advanceTimersByTime(1_500); });
+    expect(editBest).toHaveBeenCalledOnce();
+    expect(editBest).toHaveBeenCalledWith(['a', 'c']);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it('never edits on its own when the cull was not started by an import, or when the person will decide', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  try {
+    const editBest = vi.fn();
+    const { unmount } = render(<PhotoCullWorkspace projectId="p1" disabled={false} onError={vi.fn()} autoStart={0} onEditBest={editBest} />);
+    await screen.findByRole('region', { name: 'Confirm the best photos' });
+    expect(screen.queryByText(/AURA will edit/)).toBeNull();
+    act(() => { vi.advanceTimersByTime(120_000); });
+    expect(editBest).not.toHaveBeenCalled();
+    unmount();
+
+    vi.mocked(startPhotoCull).mockResolvedValue({ jobId: 'cull-4' });
+    vi.mocked(photoCullStatus).mockResolvedValue({ jobId: 'cull-4', projectId: 'p1', status: 'completed', done: 4, total: 4, label: 'Done.' });
+    render(<PhotoCullWorkspace projectId="p1" disabled={false} onError={vi.fn()} autoStart={10} onEditBest={editBest} />);
+    await screen.findByText(/AURA will edit the 2 best photos in/);
+    fireEvent.click(screen.getByRole('button', { name: 'Let me decide' }));
+    act(() => { vi.advanceTimersByTime(120_000); });
+    expect(editBest).not.toHaveBeenCalled();
+  } finally {
+    vi.useRealTimers();
+  }
 });

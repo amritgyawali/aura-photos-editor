@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from './client';
 import type { RecipeDto, RenderDto } from './types';
 import type { BrushStroke } from './nativeRetouch';
 

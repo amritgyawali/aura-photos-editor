@@ -1,10 +1,20 @@
 import { invoke as rawInvoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { join, pictureDir } from '@tauri-apps/api/path';
 import type { InternalAiStatus } from './internalAi';
 import type { AutomaticStartDto, AutomaticStartInput, PhotoAnalysisDto, PhotoAutoEditInput, PhotoAutoEditDto, OneClickFinishInput, OneClickFinishDto, OneClickStatusDto } from './types';
 import type { PhotoCullInput, PhotoCullJobDto, PhotoCullStatusDto, PhotoCullReviewDto, PhotoCullChecksInput, PhotoCullCheckDto, SetPhotoCullChoiceInput, SetPhotoCullStrictnessInput } from './types';
 
 import { audit, drainAuditBatch, isQuietIpc } from '../audit/log';
+import { beginRequest, endRequest } from '../state/inflight';
+
+/** The engine's message for a refusal, for the status bar's history. */
+function errorText(error: unknown): string {
+  const record = typeof error === 'object' && error !== null ? (error as Record<string, unknown>) : {};
+  const text = typeof record['message'] === 'string' ? record['message']
+    : typeof record['user_message'] === 'string' ? record['user_message'] : String(error);
+  return text.slice(0, 200);
+}
 
 /**
  * Every command in the product passes through here, and the audit log hangs off
@@ -25,8 +35,10 @@ export function invoke<T>(command: string, args?: Record<string, unknown>): Prom
     audit('ipc', command, { phase: 'start' });
   }
   const startedAt = Date.now();
+  const tracked = beginRequest(command, quiet || relay, startedAt);
   return rawInvoke<T>(command, args).then(
     (value) => {
+      endRequest(tracked, true);
       const ms = Date.now() - startedAt;
       if (!quiet && !relay) {
         audit('ipc', command, { phase: 'ok', ms });
@@ -36,6 +48,7 @@ export function invoke<T>(command: string, args?: Record<string, unknown>): Prom
       return value;
     },
     (error: unknown) => {
+      endRequest(tracked, false, errorText(error));
       if (!relay) {
         const code =
           typeof error === 'object' && error !== null && 'code' in error
@@ -312,6 +325,19 @@ export async function pickPhotoFolder(title = 'Choose a photo folder'): Promise<
     options: { directory: true, multiple: false, title },
   });
   return Array.isArray(result) ? result[0] ?? null : result;
+}
+
+/**
+ * Where an export goes when nobody chose a folder: `Pictures\AURA Exports\<collection> <date time>`,
+ * a folder of its own for every run, as Finish Folder does. ADR-0189.
+ */
+export async function defaultExportFolder(collection: string): Promise<string> {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  // eslint-disable-next-line no-control-regex -- control characters are not allowed in a Windows folder name
+  const name = collection.replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ').replace(/[. ]+$/, '').trim() || 'AURA';
+  return join(await pictureDir(), 'AURA Exports', `${name} ${stamp}`);
 }
 
 /** Select individual photographs without importing their entire folder. */

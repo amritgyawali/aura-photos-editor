@@ -114,6 +114,12 @@ style, and the report says so; every wheel is an ordinary editable control.
 * The **Auto edit** screen then works through the set **one photo at a time**, saying which stage
   of which photo is running ("Editing photo 12 of 62: 5I7A8901.CR2 · stage 6 of 10: Blemishes"),
   and lists every photo's ten stages with their outcomes and the seconds it took.
+* **Render final output** opens Export with **the photos just edited** chosen ("Which photos"),
+  not the whole collection: the cull's left-out frames are not finished photographs and are
+  exported only when the photographer picks "All N photos in the collection". Opened later, with
+  nothing just edited, the Export screen offers the cull's best set the same way
+  (`finishedPhotos` in `DeliveryPanel.tsx`). Before this, Export always rendered every imported
+  photo, so a culled wedding delivered its rejects beside its keepers.
 
 ### 5. Finish Folder uses the same process
 
@@ -168,3 +174,30 @@ are in `docs/full-auto-test-2026-10-28.md`.
   contract file changed.
 * `advanced_retouch::run_keeping` is the advanced retouch with a look's light and colour kept;
   `run` is unchanged.
+
+## Addendum, 2026-10-29: watching each photo being edited
+
+The photographer asked to see the photograph being edited, not only the name of the stage: the
+original, then the photograph after each step, from the worst to the best, for every photo.
+
+* `FullEditInput.preview` (default off). When on, `full_edit::run` sends `full-edit` events with
+  `state: "picture"` and a `StagePicture` - a JPEG data URL of the saved edit at 960 px, rendered
+  with `RenderPurpose::Analysis` so heavy retouch is not skipped, with crop, effects and
+  sharpening as the photographer will see them. One for the original (stage 0), one after every
+  advanced retouch step whose outcome was **Applied** (labelled with the stage and the step), one
+  after calibration and one after the grade when they applied. A step that changed nothing makes
+  no picture. A picture that fails to render is logged and left out; the edit never depends on it.
+* `full_edit_picture` renders the saved edit as one more `StagePicture`: the last picture when a
+  reference look is matched after the ten stages.
+* The window asks for pictures only while the Auto edit screen is on screen, decided per
+  photograph. Finish Folder, the harness and `one_click_commands` pass `preview: false`, so an
+  unattended run renders nothing extra. `AURA_FULL_EDIT_PICTURES=1` makes the real-photograph
+  harness edit as a watched window does, to time the cost (`full_edit.picture` with `AURA_PERF=1`).
+* `LiveEditPreview` shows the photograph being edited, every step as a thumbnail, Before | After,
+  and a replay of a finished edit. The last twelve photographs keep their pictures (a dozen
+  screen-sized JPEGs each); older ones are dropped, because a thousand-photo run cannot keep them
+  all in the window's memory.
+
+Tested by `crates/aura-app/tests/full_edit_pictures.rs` (a watched edit sends the original first
+and every picture after its stage started; an unwatched one sends none), `prepareCollection.test.ts`
+(pictures only while watched; the matched look is the last picture) and `LiveEditPreview.test.tsx`.

@@ -5,6 +5,7 @@
 //! Every stage's outcome and first change is printed with the time each photograph took.
 //! `AURA_FULL_EDIT_LIMIT` edits only the first N in shooting order; `AURA_FULL_EDIT_OUT` writes
 //! `<file>-before-after.jpg`, the original and the edit side by side at 1200 px.
+//! `AURA_FULL_EDIT_PICTURES=1` edits as a watched window does, with a picture after every step.
 //!
 //! ```text
 //! AURA_FULL_EDIT_PHOTOS="G:/to do edit full by AURA" AURA_FULL_EDIT_LIMIT=6 \
@@ -115,6 +116,8 @@ fn full_edit_real_photographs() {
                 project_id: project.id.clone(),
                 photo_id: photo.id.clone(),
                 look: Look::None,
+                // `AURA_FULL_EDIT_PICTURES=1` times the pictures a watched edit sends.
+                preview: std::env::var_os("AURA_FULL_EDIT_PICTURES").is_some_and(|v| v == "1"),
             },
             &|_| {},
         );
@@ -196,6 +199,7 @@ fn full_edit_real_photographs() {
                     project_id: project.id.clone(),
                     photo_id: photo.id.clone(),
                     look: Look::None,
+                    preview: false,
                 },
                 &|_| {},
             )

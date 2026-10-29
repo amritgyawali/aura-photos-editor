@@ -32,11 +32,28 @@ Choose photos or a folder on the Start screen and AURA does the rest, the same w
    The Auto edit screen says which stage of which photo is running, and lists each photo's ten
    stages: **Applied**, **Nothing needed**, **Does not apply** (no person in the frame) or **Kept
    your setting**. Each stage that changed something is its own step in the photo's history.
+
+   **Watching it happen.** While the Auto edit screen is open, the photo being edited is shown
+   large and changes in front of you: first the original, then the photo after every step that
+   changed it (for example *Skin smoothing · Frequency separation* or *Calibration*), with every
+   step as a thumbnail beneath it. Pick a thumbnail to look at that step, **Follow live** to go
+   back to the newest, **Before | After** to put the original beside the result, and, once a
+   photo is finished, **Replay the edit** to play it from original to finished. The last twelve
+   photos keep their steps: pick one under **Recent photos**, or **See this photo's edit step by
+   step** in the list of finished photos. Steps that needed nothing make no picture, so they do
+   not appear. The pictures are only made while the screen is open; Finish Folder and an edit
+   nobody is watching make none and run at full speed.
 3. With a **look** chosen on the Start screen, the look decides light, colour and grade; every
    other stage still runs on top of it.
 
 Finish Folder gives every photo the same ten stages, without stopping for the cull review.
 ADR-0187.
+
+Nobody at the screen? Each place the workflow waits for a person - confirming the cull's best
+set, going on to render, and the export - takes the recommended choice after **one minute** with
+no mouse or keyboard activity, and says so with a countdown. Any activity restarts the minute,
+and **Let me decide** turns it off for that step. An unattended export goes to a new folder in
+`Pictures\AURA Exports` unless a folder was chosen. ADR-0189.
 
 ## What happens, step by step
 

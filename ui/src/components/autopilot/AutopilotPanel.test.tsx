@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { AutopilotPanel } from './AutopilotPanel';
 import { api, autopilot } from '../../ipc/client';
@@ -132,4 +132,21 @@ it('says before a run that nothing will be decided while AURA is uncalibrated', 
   (client as unknown as { explain: unknown }).explain = { ledgerStatus: vi.fn().mockResolvedValue({ calibrationVer: 0 }) };
   render(<AutopilotPanel projectId="p" onError={vi.fn()} />);
   expect(await screen.findByText(/AURA is not yet calibrated on your weddings/)).toBeTruthy();
+});
+
+it('goes on to rendering after a minute with nobody there, only while the panel is on screen', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  try {
+    const onRender = vi.fn();
+    const { rerender } = render(<AutopilotPanel projectId="p" automaticRequest={4} onError={vi.fn()} onRender={onRender} active={false} />);
+    await screen.findByText('1 photos have saved edits, ready to render.');
+    act(() => { vi.advanceTimersByTime(120_000); });
+    expect(onRender).not.toHaveBeenCalled();
+    rerender(<AutopilotPanel projectId="p" automaticRequest={4} onError={vi.fn()} onRender={onRender} active />);
+    expect(screen.getByText(/AURA will go on to render the 1 edited photos in/)).toBeTruthy();
+    act(() => { vi.advanceTimersByTime(60_500); });
+    expect(onRender).toHaveBeenCalledOnce();
+  } finally {
+    vi.useRealTimers();
+  }
 });

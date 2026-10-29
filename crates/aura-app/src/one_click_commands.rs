@@ -238,6 +238,7 @@ fn edit_one(
                 project_id: project.to_owned(),
                 photo_id: photo.to_owned(),
                 look,
+                preview: false,
             },
             &|_| {},
         )

@@ -15,6 +15,8 @@ import { BatchPhotoPicker } from './BatchPhotoPicker';
 import type { ReferenceSelection } from '../look/referenceStyle';
 import type { ProfileSelection } from '../../ipc/client';
 import { FULL_EDIT_STAGES, OUTCOME_WORDS } from '../../ipc/fullEdit';
+import { AutoChoiceNotice, useAutoChoice } from '../workflow/AutoChoice';
+import { LiveEditPreview, finishPhoto, photoEvent, startPhoto, type LivePhoto } from './LiveEditPreview';
 
 /**
  * PHASE-28. The container that wires the five autopilot views to the nine autopilot commands.
@@ -54,6 +56,8 @@ export type AutopilotPanelProps = {
   automaticPhotos?: readonly string[] | null;
   onAutomaticConsumed?: () => void;
   onRender?: () => void;
+  /** The panel is on screen: a finished edit goes on to rendering after a minute with nobody there (ADR-0189). */
+  active?: boolean;
   reference?: ReferenceSelection | null;
   /** The edit profile chosen on the start screen, and its display name. */
   profile?: ProfileSelection | null;
@@ -72,7 +76,7 @@ function toBanner(error: unknown): { code: string; message: string } {
   };
 }
 
-export function AutopilotPanel({ projectId, onError, onBusyChange, automaticRequest = 0, automaticPhotos = null, onAutomaticConsumed, onRender, reference, profile, profileName }: AutopilotPanelProps) {
+export function AutopilotPanel({ projectId, onError, onBusyChange, automaticRequest = 0, automaticPhotos = null, onAutomaticConsumed, onRender, active = true, reference, profile, profileName }: AutopilotPanelProps) {
   const [status, setStatus] = useState<AutopilotStatusDto | null>(null);
   const [stages, setStages] = useState<AutopilotStageDto[]>([]);
   const [summary, setSummary] = useState<AutopilotSummaryDto | null>(null);
@@ -91,6 +95,14 @@ export function AutopilotPanel({ projectId, onError, onBusyChange, automaticRequ
   const [preparation, setPreparation] = useState<string | null>(null);
   const [prepared, setPrepared] = useState<PreparedPhoto[]>([]);
   const [selected, setSelected] = useState<string[] | null>(null);
+  /** The photographs edited while someone watched, with a picture after every step (ADR-0187). */
+  const [livePhotos, setLive] = useState<LivePhoto[]>([]);
+  const [liveFocus, setLiveFocus] = useState<string | null>(null);
+  const watching = useRef(active);
+  watching.current = active;
+  /** The last edit run that finished without being stopped; it arms the minute before rendering. */
+  const runs = useRef(0);
+  const [finishedRun, setFinishedRun] = useState(0);
   /** No calibration yet: every deciding step will wait for review rather than act (ADR-0027). */
   const [uncalibrated, setUncalibrated] = useState(false);
   useEffect(() => {
@@ -178,13 +190,23 @@ export function AutopilotPanel({ projectId, onError, onBusyChange, automaticRequ
     stopPreparation.current = false;
     preparationJob.current = `reference-prepare-${crypto.randomUUID()}`;
     if (!retry) setPrepared([]);
+    setLive([]);
+    setLiveFocus(null);
+    const run = ++runs.current;
+    setFinishedRun(0);
     onError(null);
     try {
       const results = await prepareCollection(projectId, () => stopPreparation.current, setPreparation,
-        photo => setPrepared(current => [...current.filter(row => row.photoId !== photo.photoId), photo]), reference, profile, profileName, photoIds, preparationJob.current);
+        photo => setPrepared(current => [...current.filter(row => row.photoId !== photo.photoId), photo]), reference, profile, profileName, photoIds, preparationJob.current, {
+          watching: () => watching.current,
+          onStart: photo => setLive(current => startPhoto(current, photo)),
+          onEvent: event => setLive(current => photoEvent(current, event)),
+          onFinish: (photoId, outcome) => setLive(current => finishPhoto(current, photoId, outcome)),
+        });
       if (!retry) setPrepared(results);
       if (stopPreparation.current) { setPreparation('Stopped. Completed edits are saved.'); return; }
       const ready = results.filter(photo => photo.outcome === 'ready').length;
+      setFinishedRun(run);
       setPreparation(`${ready} of ${results.length} photos edited: all ten stages ran on each, one photo at a time.`);
       if (ready === 0 || !includeAdvanced) return;
       const report = await api.autopilotPreflight(projectId);
@@ -277,6 +299,12 @@ export function AutopilotPanel({ projectId, onError, onBusyChange, automaticRequ
     [disabled, persist],
   );
 
+  // Edits saved and nobody choosing: a minute later the photos go on to rendering. Failed photos
+  // are left for later, as the button would leave them.
+  const readyCount = prepared.filter(photo => photo.outcome === 'ready').length;
+  const autoRender = useAutoChoice(Boolean(active && onRender && finishedRun > 0 && !starting && progress === null && readyCount > 0),
+    () => onRender?.(), finishedRun);
+
   if (!projectId) {
     return null;
   }
@@ -303,9 +331,12 @@ export function AutopilotPanel({ projectId, onError, onBusyChange, automaticRequ
         <h2>{prepared.filter(photo => photo.outcome === 'ready').length} photos have saved edits, ready to render.</h2>
         <p>{prepared.filter(photo => photo.outcome === 'failed').length} photos need attention. Review the steps below whenever you want to see what changed.</p>
         <button type="button" className="is-primary" onClick={onRender}>Render final output →</button>
+        <AutoChoiceNotice choice={autoRender} action={`go on to render the ${readyCount} edited photos`} />
       </>}
+      {livePhotos.length > 0 && <LiveEditPreview photos={livePhotos} focus={liveFocus} onFocus={setLiveFocus} />}
       <details open={prepared.length > 0 && prepared.length <= 3 ? true : undefined}><summary>Review every photo's ten stages ({prepared.length} photos)</summary>
-        <ol className="preparation-log">{prepared.map(photo => <li key={photo.photoId}><strong>{photo.name} · {photo.outcome === 'ready' ? 'Edited' : 'Needs attention'}{photo.millis ? ` · ${(photo.millis / 1000).toFixed(1)} s` : ''}</strong><p>{photo.detail}</p>{photo.settings && <p>{photo.settings}</p>}
+        <ol className="preparation-log">{prepared.map(photo => <li key={photo.photoId}><strong>{photo.name} · {photo.outcome === 'ready' ? 'Edited' : 'Needs attention'}{photo.millis ? ` · ${(photo.millis / 1000).toFixed(1)} s` : ''}</strong>
+          {livePhotos.some(row => row.photoId === photo.photoId && row.pictures.length > 0) && <button type="button" className="live-edit-watch" onClick={() => setLiveFocus(photo.photoId)}>See this photo's edit step by step</button>}<p>{photo.detail}</p>{photo.settings && <p>{photo.settings}</p>}
           {photo.stages && <ul className="full-edit-stages" aria-label={`Stages for ${photo.name}`}>{photo.stages.map(stage => <li key={stage.key} className={`is-${stage.outcome}`} title={[...stage.changes, ...stage.checks].join(' · ')}>
             <span>{stage.number}. {stage.title}</span><b>{OUTCOME_WORDS[stage.outcome]}</b>{(stage.changes[0] ?? stage.checks[0]) && <small>{stage.changes[0] ?? stage.checks[0]}</small>}</li>)}</ul>}</li>)}</ol>
       </details>

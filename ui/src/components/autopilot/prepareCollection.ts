@@ -1,10 +1,20 @@
 import { api, develop, editProfiles, type ApplyReport, type ProfileSelection } from '../../ipc/client';
 import { Refusal, reasonOf } from '../look/refusal';
 import { referenceStyle, type ReferenceSelection } from '../look/referenceStyle';
-import { fullEdit, stageTally, type FullStage } from '../../ipc/fullEdit';
+import { fullEdit, stageTally, type FullEditProgress, type FullStage } from '../../ipc/fullEdit';
 import type { RecipeDto } from '../../ipc/types';
 
 export type PreparedPhoto = { photoId: string; name: string; outcome: 'ready' | 'failed'; detail: string; settings?: string; stages?: FullStage[]; millis?: number };
+
+/** Someone watching the edit: each photograph as it starts, every stage event and picture, and
+ *  when it is finished. `watching` is asked per photograph, so leaving the screen stops the
+ *  pictures from the next photograph on. */
+export type LiveWatch = {
+  watching: () => boolean;
+  onStart: (photo: { photoId: string; name: string; index: number; total: number }) => void;
+  onEvent: (event: FullEditProgress) => void;
+  onFinish: (photoId: string, outcome: 'ready' | 'failed') => void;
+};
 
 /** Summarise the saved recipe, never a shared preset or an unsaved proposal. */
 function savedSettings(recipe: RecipeDto): string | undefined {
@@ -71,7 +81,7 @@ function adaptedRetouch(report: unknown): string | undefined {
  *  Every outcome is reviewable. */
 export async function prepareCollection(projectId: string, stopped: () => boolean,
   onProgress: (message: string) => void, onPhoto: (photo: PreparedPhoto) => void, reference?: ReferenceSelection | null, profile?: ProfileSelection | null,
-  profileName?: string, photoIds?: readonly string[], cancelId?: string): Promise<PreparedPhoto[]> {
+  profileName?: string, photoIds?: readonly string[], cancelId?: string, live?: LiveWatch): Promise<PreparedPhoto[]> {
   const selected = photoIds ? new Set(photoIds) : null;
   if (selected?.size === 0) return [];
   const photos = [];
@@ -94,12 +104,15 @@ export async function prepareCollection(projectId: string, stopped: () => boolea
   let current = '';
   const unlisten = await fullEdit.onProgress(event => {
     if (current && event.state === 'running') onProgress(`${current} · stage ${event.number} of ${event.total}: ${event.title}`);
+    if (current) live?.onEvent(event);
   }).catch(() => () => undefined);
   try {
     for (const [index, photo] of photos.entries()) {
       if (stopped()) break;
       current = `Editing photo ${index + 1} of ${photos.length}: ${photo.fileName}`;
       onProgress(current);
+      const watched = live?.watching() ?? false;
+      if (watched) live?.onStart({ photoId: photo.id, name: photo.fileName, index, total: photos.length });
       let result: PreparedPhoto;
       let matched: ApplyReport | undefined;
       try {
@@ -111,7 +124,7 @@ export async function prepareCollection(projectId: string, stopped: () => boolea
           adaptations.push(...report.adaptations);
           checkStop();
         }
-        const edited = await fullEdit.run(projectId, photo.id, profile ? 'applied' : reference ? 'coming' : 'none');
+        const edited = await fullEdit.run(projectId, photo.id, profile ? 'applied' : reference ? 'coming' : 'none', watched);
         const stages = edited.stages;
         adaptations.push(`Full automatic edit, 10 stages: ${stageTally(stages)}.`);
         checkStop();
@@ -129,6 +142,12 @@ export async function prepareCollection(projectId: string, stopped: () => boolea
         ]);
         if (saved.status === 'rejected') throw saved.reason;
         if (preview.status === 'rejected') throw preview.reason;
+        // The reference look is matched after the ten stages: its result is the last picture.
+        // A picture that cannot be rendered is left out; the edit is saved either way.
+        if (watched && reference && matched?.changed) {
+          const picture = await fullEdit.picture(projectId, photo.id, `Matched to ${reference.analysis.origin}`).catch(() => null);
+          if (picture) live?.onEvent({ photoId: photo.id, number: 11, total: 10, title: 'Reference look', state: 'picture', picture });
+        }
         const look = profile ? `${profileName ?? profile.profileId} profile at ${Math.round(profile.strength * 100)}%` : 'Full automatic edit';
         const detail = reference
           ? `${matchSentence(profile ? look : null, reference.analysis.origin, reference.strength, matched)} Manual settings protected. ${adaptations.join(' ')}`
@@ -138,6 +157,7 @@ export async function prepareCollection(projectId: string, stopped: () => boolea
         result = { photoId: photo.id, name: photo.fileName, outcome: 'failed', detail: reasonOf(error) };
       }
       outcomes.push(result);
+      if (watched) live?.onFinish(photo.id, result.outcome);
       onPhoto(result);
     }
   } finally { current = ''; unlisten(); }

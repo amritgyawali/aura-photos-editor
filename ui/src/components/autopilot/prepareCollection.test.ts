@@ -2,10 +2,10 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { prepareCollection } from './prepareCollection';
 import { api, develop, editProfiles } from '../../ipc/client';
 import { referenceStyle } from '../look/referenceStyle';
-import { fullEdit } from '../../ipc/fullEdit';
+import { fullEdit, type FullEditProgress } from '../../ipc/fullEdit';
 vi.mock('../../ipc/fullEdit', async (original) => ({
   ...(await original<typeof import('../../ipc/fullEdit')>()),
-  fullEdit: { run: vi.fn(), onProgress: vi.fn() },
+  fullEdit: { run: vi.fn(), onProgress: vi.fn(), picture: vi.fn() },
 }));
 vi.mock('../look/referenceStyle', () => ({ referenceStyle: { apply: vi.fn().mockResolvedValue({}) } }));
 vi.mock('../../ipc/client', () => ({
@@ -34,7 +34,7 @@ it('edits and renders each imported photograph without another user action', asy
   const result = await prepareCollection('project', () => false, vi.fn(), log);
   expect(result.map(row => row.outcome)).toEqual(['ready', 'ready']);
   expect(fullEdit.run).toHaveBeenCalledTimes(2);
-  expect(fullEdit.run).toHaveBeenNthCalledWith(1, 'project', 'a', 'none');
+  expect(fullEdit.run).toHaveBeenNthCalledWith(1, 'project', 'a', 'none', false);
   expect(develop.renderImage).toHaveBeenCalledTimes(2);
   expect(result[0]?.stages).toHaveLength(10);
   expect(result[0]?.detail).toContain('Full automatic edit, 10 stages: 7 applied · 2 nothing needed · 1 does not apply.');
@@ -61,7 +61,7 @@ it('edits only requested photos and treats an empty selection as no work', async
   const results = await prepareCollection('project', () => false, vi.fn(), vi.fn(), null, null, undefined, ['b']);
   expect(results.map(photo => photo.photoId)).toEqual(['b']);
   expect(fullEdit.run).toHaveBeenCalledTimes(1);
-  expect(fullEdit.run).toHaveBeenCalledWith('project', 'b', 'none');
+  expect(fullEdit.run).toHaveBeenCalledWith('project', 'b', 'none', false);
   vi.clearAllMocks();
   expect(await prepareCollection('project', () => false, vi.fn(), vi.fn(), null, null, undefined, [])).toEqual([]);
   expect(api.listImages).not.toHaveBeenCalled();
@@ -109,7 +109,7 @@ it('applies the selected reference to each new photo before rendering it', async
   expect(referenceStyle.apply).toHaveBeenNthCalledWith(1, 'a', 'style', 0.8);
   expect(referenceStyle.apply).toHaveBeenNthCalledWith(2, 'b', 'style', 0.8);
   // The reference decides the colour, so the edit leaves the grade to it.
-  expect(fullEdit.run).toHaveBeenNthCalledWith(1, 'project', 'a', 'coming');
+  expect(fullEdit.run).toHaveBeenNthCalledWith(1, 'project', 'a', 'coming', false);
   expect(results.every(photo => photo.outcome === 'ready' && photo.detail.includes('@reference'))).toBe(true);
 });
 
@@ -147,8 +147,8 @@ it('applies the chosen edit profile, then every other stage keeping its light an
   const profile = { profileId: 'film-portra', strength: 0.9 };
   const results = await prepareCollection('project', () => false, vi.fn(), vi.fn(), null, profile, 'Portra Film');
   expect(editProfiles.apply).toHaveBeenNthCalledWith(1, 'a', 'film-portra', 0.9);
-  expect(fullEdit.run).toHaveBeenNthCalledWith(1, 'project', 'a', 'applied');
-  expect(fullEdit.run).toHaveBeenNthCalledWith(2, 'project', 'b', 'applied');
+  expect(fullEdit.run).toHaveBeenNthCalledWith(1, 'project', 'a', 'applied', false);
+  expect(fullEdit.run).toHaveBeenNthCalledWith(2, 'project', 'b', 'applied', false);
   expect(vi.mocked(editProfiles.apply).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(fullEdit.run).mock.invocationCallOrder[0] ?? 0);
   expect(develop.renderImage).toHaveBeenCalledTimes(2);
   expect(results[0]?.detail).toContain('Portra Film profile at 90%');
@@ -174,4 +174,40 @@ it('says which stage of which photo is running while it edits', async () => {
   await prepareCollection('project', () => false, progress, vi.fn());
   expect(progress).toHaveBeenCalledWith('Editing photo 2 of 2: b.jpg · stage 6 of 10: Blemishes');
   expect(stop).toHaveBeenCalledOnce();
+});
+
+it('asks for pictures only while someone watches, and hands every picture to the viewer', async () => {
+  let emit: ((event: never) => void) | undefined;
+  vi.mocked(fullEdit.onProgress).mockImplementation(async handler => { emit = handler as never; return () => undefined; });
+  vi.mocked(fullEdit.run).mockImplementation(async (_project, photoId) => {
+    emit?.({ photoId, number: 0, total: 10, title: 'Original', state: 'picture', picture: { step: 'Original', image: 'data:image/jpeg;base64,AA', width: 3, height: 2 } } as never);
+    return edited as never;
+  });
+  let watching = true;
+  const seen: string[] = [];
+  const live = {
+    watching: () => watching,
+    onStart: vi.fn((photo: { photoId: string }) => { seen.push(`start ${photo.photoId}`); watching = false; }),
+    onEvent: vi.fn((event: { photoId: string; state: string }) => seen.push(`${event.state} ${event.photoId}`)),
+    onFinish: vi.fn((photoId: string, outcome: string) => seen.push(`${outcome} ${photoId}`)),
+  };
+  await prepareCollection('project', () => false, vi.fn(), vi.fn(), null, null, undefined, undefined, undefined, live);
+  // Watched for the first photo; the screen was left before the second, which renders no pictures.
+  expect(fullEdit.run).toHaveBeenNthCalledWith(1, 'project', 'a', 'none', true);
+  expect(fullEdit.run).toHaveBeenNthCalledWith(2, 'project', 'b', 'none', false);
+  expect(seen.slice(0, 3)).toEqual(['start a', 'picture a', 'ready a']);
+  expect(live.onStart).toHaveBeenCalledOnce();
+  expect(live.onFinish).toHaveBeenCalledOnce();
+});
+
+it('shows the matched reference look as the last picture of a watched edit', async () => {
+  vi.mocked(referenceStyle.apply).mockResolvedValueOnce({ changed: 4 } as never);
+  vi.mocked(fullEdit.picture).mockResolvedValueOnce({ step: 'Matched to @reference', image: 'data:image/jpeg;base64,AA', width: 3, height: 2 });
+  const events: FullEditProgress[] = [];
+  const live = { watching: () => true, onStart: vi.fn(), onEvent: (event: FullEditProgress) => { events.push(event); }, onFinish: vi.fn() };
+  const selection = { analysis: { id: 'style', origin: '@reference' }, strength: 0.8 };
+  await prepareCollection('project', () => false, vi.fn(), vi.fn(), selection as never, null, undefined, ['a'], undefined, live);
+  expect(fullEdit.picture).toHaveBeenCalledWith('project', 'a', 'Matched to @reference');
+  expect(events.at(-1)?.title).toBe('Reference look');
+  expect(events.at(-1)?.picture?.step).toBe('Matched to @reference');
 });

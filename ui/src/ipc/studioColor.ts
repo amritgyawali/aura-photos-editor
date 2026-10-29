@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from './client';
 import type { RecipeDto } from './types';
 export type LevelChannel = { inputBlack: number; inputWhite: number; gamma: number; outputBlack: number; outputWhite: number };
 export type Levels = Record<'rgb' | 'red' | 'green' | 'blue', LevelChannel> & { luminosity: boolean };

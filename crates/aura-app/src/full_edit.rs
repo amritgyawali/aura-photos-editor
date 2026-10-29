@@ -43,6 +43,7 @@ use crate::{
 use aura_core::{AuraResult, PhotoId, ProjectId};
 use aura_preview::contract::service::{PreviewService, Priority};
 use aura_recipe::{retouch_tools, schema, Calibration, ColourGrade, EditSource, Recipe};
+use aura_render::RenderService;
 use serde::{Deserialize, Serialize};
 
 /// Where the run's report is stored in the recipe.
@@ -80,6 +81,10 @@ pub struct FullEditInput {
     pub photo_id: String,
     #[serde(default)]
     pub look: Look,
+    /// Someone is watching: send a picture of the photograph before the edit and after every
+    /// step that changed it (ADR-0187). Off, nothing extra is rendered.
+    #[serde(default)]
+    pub preview: bool,
 }
 
 /// The ten stages, in the photographer's own words and order.
@@ -226,8 +231,93 @@ pub struct FullProgress {
     pub number: u8,
     pub total: u8,
     pub title: String,
-    /// `running` or `done`.
+    /// `running`, `done`, or `picture` when it carries [`StagePicture`].
     pub state: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub picture: Option<StagePicture>,
+}
+
+/// The photograph as it stands after one step of the edit, for someone watching it happen.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StagePicture {
+    /// What had just been done: `Original`, or the stage and the step within it.
+    pub step: String,
+    /// A `data:image/jpeg;base64,` URL.
+    pub image: String,
+    pub width: u32,
+    pub height: u32,
+}
+
+/// Long edge of a [`StagePicture`]: large enough to see skin and colour change on a screen,
+/// small enough that a render per step costs a fraction of the step.
+pub const PICTURE_EDGE: u32 = 960;
+
+/// Render `recipe` as the photographer will see it - crop, effects and sharpening included,
+/// nothing skipped - and encode it for the screen.
+///
+/// # Errors
+/// Rendering or encoding failures.
+pub fn picture_of(
+    state: &AppState,
+    photo: PhotoId,
+    recipe: &Recipe,
+    step: String,
+) -> AuraResult<StagePicture> {
+    let result = state.render()?.render(aura_render::RenderRequest {
+        image_id: photo,
+        recipe: recipe.clone(),
+        level: aura_render::RenderLevel::Screen(PICTURE_EDGE, PICTURE_EDGE),
+        // A slider preview may skip heavy retouch; this picture must show it.
+        purpose: aura_render::RenderPurpose::Analysis,
+        output: aura_render::OutputSpec {
+            colour_space: aura_render::OutputColour::Srgb,
+            bit_depth: 8,
+            icc: None,
+        },
+    })?;
+    let bytes = match &result.data {
+        aura_render::RenderedData::Eight(v) => v.clone(),
+        aura_render::RenderedData::Sixteen(v) => v.iter().map(|x| (x >> 8) as u8).collect(),
+    };
+    let (width, height) = (result.width, result.height);
+    let mut jpeg = Vec::new();
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 84)
+        .encode(&bytes, width, height, image::ExtendedColorType::Rgb8)
+        .map_err(|e| aura_core::errors::render::recipe_invalid("picture", &e.to_string()))?;
+    Ok(StagePicture {
+        step,
+        image: format!(
+            "data:image/jpeg;base64,{}",
+            crate::develop_commands::base64(&jpeg)
+        ),
+        width,
+        height,
+    })
+}
+
+/// A request for a [`StagePicture`] of a photograph's saved edit as it stands.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PictureInput {
+    pub project_id: String,
+    pub photo_id: String,
+    /// What the picture shows, as the viewer will label it.
+    pub step: String,
+}
+
+/// The saved edit of a photograph as a [`StagePicture`]: the last picture of a watched edit whose
+/// look is matched after the ten stages.
+///
+/// # Errors
+/// Membership, recipe, rendering or encoding failures.
+pub fn picture(state: &AppState, input: &PictureInput) -> IpcResult<StagePicture> {
+    crate::studio_tools::require_member(state, &input.project_id, &input.photo_id)?;
+    let photo = PhotoId::from_db(&input.photo_id).map_err(|_| {
+        aura_core::errors::render::recipe_invalid("photo", "Invalid photo identifier")
+    })?;
+    let recipe = crate::develop_commands::load_or_neutral(state, photo)?;
+    Ok(picture_of(state, photo, &recipe, input.step.clone())?)
 }
 
 /// The report stored in the recipe.
@@ -1288,16 +1378,79 @@ pub fn run(
     let project =
         ProjectId::from_db(&input.project_id).map_err(|_| invalid("Invalid project identifier"))?;
     let total = u8::try_from(FullStageKey::ALL.len()).unwrap_or(10);
+    // The status bar names the photograph and the stage (ADR-0188).
+    let busy = crate::activity::begin(
+        state,
+        "edit",
+        format!(
+            "Full edit: {}",
+            crate::activity::photo_name(state, &input.photo_id)
+        ),
+    );
+    busy.progress(0, u64::from(total));
     let tell = |key: FullStageKey, running: bool| {
+        let number = key.number();
+        busy.detail(format!(
+            "Stage {number} of {total}: {}{}",
+            key.title(),
+            if running { "" } else { " - done" }
+        ));
+        busy.progress(
+            u64::from(if running {
+                number.saturating_sub(1)
+            } else {
+                number
+            }),
+            u64::from(total),
+        );
         progress(FullProgress {
             photo_id: input.photo_id.clone(),
             number: key.number(),
             total,
             title: key.title().into(),
             state: if running { "running" } else { "done" }.into(),
+            picture: None,
         });
     };
+    // A picture after every step that changed the photograph, only while someone watches. A
+    // picture that cannot be rendered is left out: the edit itself does not depend on it.
+    let show = |key: Option<FullStageKey>, step: String, recipe: &Recipe| {
+        if !input.preview {
+            return;
+        }
+        let _time = crate::perf::step(state, "full_edit.picture");
+        match picture_of(state, photo, recipe, step) {
+            Ok(picture) => progress(FullProgress {
+                photo_id: input.photo_id.clone(),
+                number: key.map_or(0, FullStageKey::number),
+                total,
+                title: key.map_or("Original", FullStageKey::title).into(),
+                state: "picture".into(),
+                picture: Some(picture),
+            }),
+            Err(error) => {
+                tracing::warn!(target: "retouch", code = %error.code, "no picture of the full edit step");
+            }
+        }
+    };
     let before = crate::develop_commands::load_or_neutral(state, photo)?;
+    show(None, "Original".into(), &before);
+    // The applied steps of the stage running now, pictured when the next stage starts.
+    let pending = std::cell::RefCell::new(None::<(FullStageKey, Vec<String>)>);
+    let flush = || {
+        let Some((key, steps)) = pending.borrow_mut().take() else {
+            return;
+        };
+        if let Ok(now) = crate::develop_commands::load_or_neutral(state, photo) {
+            let named: Vec<String> = steps.into_iter().filter(|s| s != key.title()).collect();
+            let step = if named.is_empty() {
+                key.title().to_owned()
+            } else {
+                format!("{} · {}", key.title(), named.join(", "))
+            };
+            show(Some(key), step, &now);
+        }
+    };
 
     // Stages 1, 2 and 5 to 10: the advanced retouch, face and body.
     let retouching = crate::perf::step(state, "full_edit.advanced");
@@ -1314,9 +1467,22 @@ pub fn run(
             let key = Stage::ALL
                 .get(usize::from(p.number.saturating_sub(1)))
                 .map_or(FullStageKey::Advanced, |s| FullStageKey::of_advanced(*s));
+            // Steps of one stage that run back to back share one picture: each picture renders
+            // the whole retouch again, and three dodge-and-burn passes read as one change.
+            if pending.borrow().as_ref().is_some_and(|(k, _)| *k != key) {
+                flush();
+            }
             tell(key, p.state == "running");
+            if p.state == "done" && p.outcome == Some(Outcome::Applied) {
+                let mut held = pending.borrow_mut();
+                match held.as_mut() {
+                    Some((_, steps)) => steps.push(p.title.clone()),
+                    None => *held = Some((key, vec![p.title.clone()])),
+                }
+            }
         },
     )?;
+    flush();
     drop(retouching);
     let mut current = crate::develop_commands::load_or_neutral(state, photo)?;
     let after_retouch = current.clone();
@@ -1381,6 +1547,13 @@ pub fn run(
         }
     };
     drop(calibrating);
+    if calibration.outcome == Outcome::Applied {
+        show(
+            Some(FullStageKey::Calibration),
+            FullStageKey::Calibration.title().into(),
+            &current,
+        );
+    }
     tell(FullStageKey::Calibration, false);
     tell(FullStageKey::ColourGrading, true);
     let grading = crate::perf::step(state, "full_edit.grade");
@@ -1420,6 +1593,13 @@ pub fn run(
         stage
     };
     drop(grading);
+    if graded.outcome == Outcome::Applied {
+        show(
+            Some(FullStageKey::ColourGrading),
+            FullStageKey::ColourGrading.title().into(),
+            &current,
+        );
+    }
     tell(FullStageKey::ColourGrading, false);
 
     let mut stages = retouch_stages(

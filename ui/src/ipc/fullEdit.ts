@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from './client';
 import { listen } from '@tauri-apps/api/event';
 import type { RecipeDto } from './types';
 import type { StageOutcome } from './advancedRetouch';
@@ -29,8 +29,12 @@ export type FullEditResult = {
   photoId: string; recipe: RecipeDto; stages: FullStage[]; faces: number;
   qualityPassed: boolean; summary: string; millis: number;
 };
+/** The photograph as it stood after one step, sent only while someone is watching. */
+export type StagePicture = { step: string; image: string; width: number; height: number };
 export type FullEditProgress = {
-  photoId: string; number: number; total: number; title: string; state: 'running' | 'done';
+  photoId: string; number: number; total: number; title: string; state: 'running' | 'done' | 'picture';
+  /** With `state: 'picture'`: the original (number 0), then the photograph after each step that changed it. */
+  picture?: StagePicture;
 };
 
 /** How an outcome reads in a report. */
@@ -49,9 +53,13 @@ export function stageTally(stages: readonly FullStage[]): string {
 }
 
 export const fullEdit = {
-  /** Runs the ten stages in order; each stage that changes something is its own history step. */
-  run: (projectId: string, photoId: string, look: FullEditLook = 'none') =>
-    invoke<FullEditResult>('full_edit_photo', { input: { projectId, photoId, look } }),
+  /** Runs the ten stages in order; each stage that changes something is its own history step.
+   *  `preview` asks for a picture before the edit and after every step that changed the photo. */
+  run: (projectId: string, photoId: string, look: FullEditLook = 'none', preview = false) =>
+    invoke<FullEditResult>('full_edit_photo', { input: { projectId, photoId, look, preview } }),
+  /** The photograph as its saved edit stands now, as a stage picture named `step`. */
+  picture: (projectId: string, photoId: string, step: string) =>
+    invoke<StagePicture>('full_edit_picture', { input: { projectId, photoId, step } }),
   /** Stage-by-stage progress of the photograph being edited. */
   onProgress: (handler: (event: FullEditProgress) => void): Promise<() => void> =>
     listen<FullEditProgress>('full-edit', message => handler(message.payload)).then(unlisten => () => { unlisten(); }),

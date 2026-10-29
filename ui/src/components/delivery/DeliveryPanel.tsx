@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { api as photosApi, asIpcError, delivery as api, exportWatermarked, inTauri, learning as learnApi, pickPhotoFolder } from '../../ipc/client';
+import { api as photosApi, asIpcError, defaultExportFolder, delivery as api, exportWatermarked, inTauri, learning as learnApi, photoCullReview, pickPhotoFolder } from '../../ipc/client';
+import { AutoChoiceNotice, useAutoChoice } from '../workflow/AutoChoice';
 import { WatermarkPanel, defaultWatermark, prepareWatermark } from './WatermarkPanel';
 import type {
   ConsentDto,
@@ -59,9 +60,30 @@ export type DeliveryPanelProps = {
   /** Surface an error to the app's banner. The same shape every other panel uses. */
   onError: (error: { code: string; message: string } | null) => void;
   onBusyChange?: (busy: boolean) => void;
+  /** The photos the automatic edit just finished - the best set confirmed on the Cull screen. */
+  editedPhotos?: readonly string[] | null;
+  /**
+   * Reached from the automatic edit: after a minute with nobody there, export the finished photos
+   * with the chosen preset, into the chosen folder or a new one under Pictures\AURA Exports.
+   * ADR-0189.
+   */
+  autoExport?: boolean;
+  /** The collection's name, for the default export folder. */
+  collectionName?: string;
 };
 
-export function DeliveryPanel({ projectId, profileId, onError, onBusyChange }: DeliveryPanelProps) {
+/**
+ * The photos an export covers by default: the ones just edited, else the cull's best set when a
+ * cull left photos out, else none (every photo). A cull's left-out frames are not finished photos
+ * and are delivered only when the photographer asks for every photo.
+ */
+export function finishedPhotos(editedPhotos: readonly string[] | null | undefined, cullBest: readonly string[] | null): { ids: readonly string[]; label: string } | null {
+  if (editedPhotos && editedPhotos.length > 0) return { ids: editedPhotos, label: `The ${editedPhotos.length} photos you just edited` };
+  if (cullBest && cullBest.length > 0) return { ids: cullBest, label: `The ${cullBest.length} best photos from the cull` };
+  return null;
+}
+
+export function DeliveryPanel({ projectId, profileId, onError, onBusyChange, editedPhotos = null, autoExport = false, collectionName = '' }: DeliveryPanelProps) {
   const [status, setStatus] = useState<ExportStatusDto | null>(null);
   const [presets, setPresets] = useState<ExportPresetDto[]>([]);
   const [selected, setSelected] = useState('gallery');
@@ -75,10 +97,12 @@ export function DeliveryPanel({ projectId, profileId, onError, onBusyChange }: D
   const [readingLogo, setReadingLogo] = useState(false);
   const [photoIds, setPhotoIds] = useState<string[]>([]);
   const [imagesLoaded, setImagesLoaded] = useState(false);
+  const [cullBest, setCullBest] = useState<string[] | null>(null);
+  const [everyPhoto, setEveryPhoto] = useState(false);
   useEffect(() => { onBusyChange?.(running || readingLogo); }, [onBusyChange, running, readingLogo]);
   useEffect(() => {
     let active = true;
-    setImagesLoaded(false); setPhotoIds([]);
+    setImagesLoaded(false); setPhotoIds([]); setCullBest(null); setEveryPhoto(false);
     if (!projectId) return;
     void (async () => {
       const ids: string[] = [];
@@ -87,7 +111,12 @@ export function DeliveryPanel({ projectId, profileId, onError, onBusyChange }: D
         ids.push(...page.map(photo => photo.id));
         if (page.length < 240) break;
       }
-      if (active) { setPhotoIds(ids); setImagesLoaded(true); }
+      // The cull's best set, when a cull left photos out. A collection never culled has none.
+      const review = inTauri() ? await photoCullReview(projectId).catch(() => null) : null;
+      if (active) {
+        setCullBest(review && review.leftOut > 0 ? review.photos.filter(photo => photo.keep).map(photo => photo.photoId) : null);
+        setPhotoIds(ids); setImagesLoaded(true);
+      }
     })().catch(error => { if (active) { const ipc = asIpcError(error); onError({ code: ipc.code, message: ipc.message }); } });
     return () => { active = false; };
   }, [projectId, onError]);
@@ -112,9 +141,17 @@ export function DeliveryPanel({ projectId, profileId, onError, onBusyChange }: D
     [onError],
   );
 
+  const finished = useMemo(() => finishedPhotos(editedPhotos, cullBest), [editedPhotos, cullBest]);
+  // In shooting order, and only photos still in the collection.
+  const exportIds = useMemo(() => {
+    if (!finished || everyPhoto) return photoIds;
+    const wanted = new Set(finished.ids);
+    return photoIds.filter(id => wanted.has(id));
+  }, [photoIds, everyPhoto, finished]);
+
   /** Build the job from what the dialog holds. Whole, never field by field. */
-  const buildJob = useCallback((): ExportJobInput | null => {
-    if (!projectId || !imagesLoaded || photoIds.length === 0) {
+  const buildJob = useCallback((into: string = destination): ExportJobInput | null => {
+    if (!projectId || !imagesLoaded || exportIds.length === 0) {
       return null;
     }
     const preset = presets.find((p) => p.name === selected);
@@ -126,9 +163,9 @@ export function DeliveryPanel({ projectId, profileId, onError, onBusyChange }: D
       sets: [
         {
           name: preset.name,
-          // Export the imported collection, including its first render. Previously exported
-          // files cannot supply this list because it is empty before the first export.
-          imageIds: photoIds,
+          // The finished photos (or every photo, when asked). Previously exported files cannot
+          // supply this list because it is empty before the first export.
+          imageIds: [...exportIds],
           format: preset.format,
           quality: preset.quality,
           colour: preset.colour,
@@ -139,7 +176,7 @@ export function DeliveryPanel({ projectId, profileId, onError, onBusyChange }: D
           sidecar: preset.sidecar,
         },
       ],
-      destination,
+      destination: into,
       destinationKind: 'folder',
       copyright: null,
       contact: null,
@@ -149,7 +186,7 @@ export function DeliveryPanel({ projectId, profileId, onError, onBusyChange }: D
       stripCameraSerial: true,
       verify,
     };
-  }, [projectId, presets, selected, photoIds, imagesLoaded, destination, verify]);
+  }, [projectId, presets, selected, exportIds, imagesLoaded, destination, verify]);
 
   const refreshExport = useCallback(async () => {
     if (!projectId) {
@@ -248,9 +285,10 @@ export function DeliveryPanel({ projectId, profileId, onError, onBusyChange }: D
     })();
   }, [buildJob, onError, fail]);
 
-  const onRun = useCallback(() => {
+  const [exported, setExported] = useState(false);
+  const onRun = useCallback((into?: string) => {
     if (running || readingLogo) return;
-    const job = buildJob();
+    const job = buildJob(into);
     if (!job) {
       return;
     }
@@ -263,6 +301,7 @@ export function DeliveryPanel({ projectId, profileId, onError, onBusyChange }: D
         // the end, and a panel that patched its own state would show the delivery it predicted.
         await refreshExport();
         await refreshDelivery();
+        setExported(true);
         onError(null);
       } catch (error) {
         fail(error);
@@ -271,6 +310,24 @@ export function DeliveryPanel({ projectId, profileId, onError, onBusyChange }: D
       }
     })();
   }, [buildJob, refreshExport, refreshDelivery, onError, fail, watermark, running, readingLogo]);
+
+  // The automatic edit brought the photographer here and nobody is choosing: a minute later the
+  // finished photos are exported with the chosen preset, into a folder of their own when none was
+  // chosen. Once per visit; a failed export waits for a person.
+  const [autoTried, setAutoTried] = useState(false);
+  const autoRun = useAutoChoice(Boolean(autoExport && inTauri() && imagesLoaded && exportIds.length > 0
+    && presets.some(p => p.name === selected) && !running && !readingLogo && !exported && !autoTried), () => {
+    setAutoTried(true);
+    void (async () => {
+      try {
+        const into = destination.trim() || await defaultExportFolder(collectionName);
+        setDestination(into);
+        onRun(into);
+      } catch (error) {
+        fail(error);
+      }
+    })();
+  }, 'export');
 
   const onBackup = useCallback(() => {
     if (!projectId) {
@@ -356,7 +413,14 @@ export function DeliveryPanel({ projectId, profileId, onError, onBusyChange }: D
 
   return (
     <div className="delivery-panel">
-      <p>{imagesLoaded ? `Render all ${photoIds.length} imported photos using their saved edits.` : 'Loading photos for rendering…'}</p>
+      <p>{!imagesLoaded ? 'Loading photos for rendering…' : finished && !everyPhoto
+        ? `Render the ${exportIds.length} finished photos using their saved edits; the ${photoIds.length - exportIds.length} photos the cull left out are not exported.`
+        : `Render all ${photoIds.length} imported photos using their saved edits.`}</p>
+      {imagesLoaded && finished && <fieldset className="export-which" disabled={running} aria-label="Which photos">
+        <legend>Which photos</legend>
+        <label><input type="radio" name="export-which" checked={!everyPhoto} onChange={() => setEveryPhoto(false)} /> {finished.label}</label>
+        <label><input type="radio" name="export-which" checked={everyPhoto} onChange={() => setEveryPhoto(true)} /> All {photoIds.length} photos in the collection</label>
+      </fieldset>}
       <button type="button" disabled={running} onClick={() => {
         void pickPhotoFolder('Choose where to save the final photos').then(path => { if (path) setDestination(path); }).catch(fail);
       }}>Choose output folder</button>
@@ -374,8 +438,9 @@ export function DeliveryPanel({ projectId, profileId, onError, onBusyChange }: D
         onDestination={setDestination}
         onVerify={setVerify}
         onPreviewNames={onPreviewNames}
-        onRun={onRun}
+        onRun={() => onRun()}
       />
+      <AutoChoiceNotice choice={autoRun} action={`export the ${exportIds.length} photos ${destination.trim() ? `into ${destination.trim()}` : 'into a new folder in Pictures\\AURA Exports'}`} />
       </>}
       <ManifestView manifest={manifest} files={files} />
       <details className="advanced-tools"><summary>Delivery, learning & diagnostics</summary>

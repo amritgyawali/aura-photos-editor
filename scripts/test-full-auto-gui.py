@@ -13,11 +13,18 @@ works it the way a photographer does:
    confirmation. The script reads both lists, brings back `--bring-back` left-out photos (a
    photographer changing the cull's mind) and presses "Edit the N best photos".
 3. **The full automatic edit** runs on each confirmed photo, one at a time, in the Auto edit screen.
-   The script waits for it to finish, reading the stage-by-stage progress line as it goes.
+   The script waits for it to finish, reading the stage-by-stage progress line as it goes, and
+   checks the photo being edited is shown from its original after every step that changed it.
 4. **Verification**, from the app itself: every confirmed photo has a stored ten-stage report and a
    changed render; every left-out photo is untouched; a second run on two photos changes no
    parameter; no page errors. Before and after renders (1200 px) and a contact sheet are written,
    with `report.json`.
+5. **Export** (on unless `--no-export`): **Render final output -> Choose output folder -> Export**
+   with the screen's defaults - the photos just edited, the gallery set (full size JPEG). The
+   script checks the export wrote and verified one file per edited photo and nothing for a left-out
+   photo, that every file opens at full size, and that each looks like the app's own render of the
+   edit. The test install has its own licence folder (`AURA_LICENCE_DIR` under `--out`), so a new
+   installation's trial applies and the machine's own licence file is never touched.
 """
 import argparse
 import base64
@@ -44,7 +51,8 @@ def launch(exe, port, out):
     env = dict(os.environ,
                WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=f'--remote-debugging-port={port}',
                WEBVIEW2_USER_DATA_FOLDER=str(out / 'webview'),
-               AURA_TEST_CATALOG=str(out / 'catalog' / 'catalog.sqlite'))
+               AURA_TEST_CATALOG=str(out / 'catalog' / 'catalog.sqlite'),
+               AURA_LICENCE_DIR=str(out / 'licence'))
     (out / 'catalog').mkdir(parents=True, exist_ok=True)
     proc = subprocess.Popen([str(exe)], cwd=str(ROOT), env=env)
     for _ in range(180):
@@ -86,6 +94,9 @@ def main():
     parser.add_argument('--out', type=Path, default=Path('I:/aura-full-edit/gui'))
     parser.add_argument('--port', type=int, default=9381)
     parser.add_argument('--bring-back', type=int, default=1)
+    parser.add_argument('--export', type=Path, default=None,
+                        help='where the final photos go (default: <out>/final-photos)')
+    parser.add_argument('--no-export', action='store_true')
     args = parser.parse_args()
     exe = Path(os.environ.get('AURA_EXE', ROOT / 'target/desktop-launch/debug/aura-desktop.exe'))
     out = args.out
@@ -202,11 +213,21 @@ def main():
             expect(button).to_be_enabled()
             started = time.monotonic()
             button.click()
-            status = page.locator('.automatic-result > p[role=status]')
+            status = page.locator('.automatic-result > p[role=status]:not(.auto-choice)')
             finished = re.compile(r'photos edited: all ten stages ran on each')
             last = ''
             stages_seen = set()
+            live = page.locator('section.live-edit')
+            live_steps = live.locator('.live-edit-steps button')
+            live_seen = {}
             while True:
+                # The photo being edited is shown after every step that changed it (ADR-0187).
+                if 'steps' not in live_seen and live_steps.count() >= 3:
+                    live_seen = {'steps': live_steps.count(), 'heading': live.locator('h3').inner_text(),
+                                 'caption': live.locator('.live-edit-stage figcaption').inner_text(),
+                                 'labels': [live_steps.nth(i).inner_text() for i in range(live_steps.count())]}
+                    live.screenshot(path=str(out / '2a-live-edit.png'))
+                    print(f"  live: {live_seen['heading']} · {live_seen['labels']}", flush=True)
                 text = status.inner_text() if status.count() else ''
                 if text != last:
                     last = text
@@ -216,10 +237,19 @@ def main():
                     print(f'  [{round(time.monotonic() - started)}s] {text}', flush=True)
                 if finished.search(text):
                     break
-                time.sleep(2)
+                time.sleep(0.5)
             report['timings']['editSeconds'] = round(time.monotonic() - started, 1)
             report['timings']['secondsPerPhoto'] = round(report['timings']['editSeconds'] / max(1, len(best)), 1)
             check('the window said which stage was running', len(stages_seen) >= 5, ', '.join(sorted(stages_seen)))
+            report['liveEdit'] = live_seen
+            check('the photo being edited was shown step by step, from its original',
+                  live_seen.get('steps', 0) >= 3 and live_seen['labels'][0] == 'Original'
+                  and live_seen['heading'].startswith('Editing photo '), json.dumps(live_seen))
+            if live.count():
+                final = live.locator('.live-edit-steps button')
+                last_photo = [final.nth(i).inner_text() for i in range(final.count())]
+                check('a finished photo keeps every step to look back at', len(last_photo) >= 2, ', '.join(last_photo))
+                live.screenshot(path=str(out / '2b-live-edit-finished.png'))
             check('every confirmed photo was edited', status.inner_text().startswith(f'{len(best)} of {len(best)} photos edited'),
                   status.inner_text())
             page.get_by_text(re.compile(r"^Review every photo's ten stages")).click()
@@ -270,6 +300,92 @@ def main():
                 now = parameters(json.loads(raw('image_recipe', input={'photoId': p['photoId']})['body']))
                 repeat_ok.append(was == now)
             check('running the full edit again changes no parameter', all(repeat_ok), str(repeat_ok))
+
+            # 5. Export the finished photos, from the screen the edit points to.
+            if not args.no_export:
+                export_dir = (args.export or out / 'final-photos').resolve()
+                if export_dir.exists():
+                    shutil.rmtree(export_dir)
+                export_dir.mkdir(parents=True)
+                page.get_by_role('button', name='Render final output →', exact=True).click()
+                which = page.get_by_role('group', name='Which photos')
+                expect(which).to_be_visible()
+                default = which.get_by_role('radio', name=f'The {len(best)} photos you just edited')
+                check('the export offers the edited photos, not the left-out ones', default.is_checked(),
+                      page.locator('.delivery-panel > p').first.inner_text())
+                page.evaluate('folder => { window.__AURA_TEST_PICK__ = folder; }', str(export_dir))
+                page.get_by_role('button', name='Choose output folder', exact=True).click()
+                expect(page.get_by_test_id('destination')).to_have_value(str(export_dir))
+                report['export'] = {'folder': str(export_dir), 'preset': page.get_by_test_id('preset').input_value()}
+                run = page.get_by_test_id('run')
+                started = time.monotonic()
+                run.click()
+                expect(run).to_have_text('Exporting…')
+                last = ''
+                while run.inner_text() == 'Exporting…':
+                    line = f"{len(list(export_dir.rglob('*.jpg')))} files written"
+                    if line != last:
+                        last = line
+                        print(f'  [export {round(time.monotonic() - started)}s] {line}', flush=True)
+                    time.sleep(5)
+                report['timings']['exportSeconds'] = round(time.monotonic() - started, 1)
+                report['timings']['exportSecondsPerPhoto'] = round(
+                    report['timings']['exportSeconds'] / max(1, len(best)), 1)
+                banner = page.locator('[role=alert]')
+                problem = banner.inner_text() if banner.count() else ''
+                page.screenshot(path=str(out / '3-exported.png'), full_page=True)
+                written_box, verified_box = page.get_by_test_id('written'), page.get_by_test_id('verified')
+                written = written_box.inner_text() if written_box.count() else '?'
+                verified = verified_box.inner_text() if verified_box.count() else '?'
+                check('the export finished without an error', not problem, problem)
+                check('one file written and verified per edited photo', written == verified == str(len(best)),
+                      f'{written} written, {verified} verified, {len(best)} edited')
+                exported = sorted(p for p in export_dir.rglob('*')
+                                  if p.is_file() and p.suffix.lower() in {'.jpg', '.jpeg'})
+                # The gallery set names files by date, couple and sequence; the app's own list of
+                # what it wrote says which photograph each file is.
+                rows = raw('export_files', projectId=project)
+                by_photo = {r['imageId']: export_dir / r['path'] for r in rows}
+                best_ids = {p['photoId'] for p in best}
+                missing = [names[i] for i in best_ids if i not in by_photo or not by_photo[i].is_file()]
+                extra = [names[p['photoId']] for p in left if p['photoId'] in by_photo]
+                check('every edited photo is in the folder, no left-out photo is',
+                      not missing and not extra and len(exported) == len(best),
+                      f'{len(exported)} files; missing {missing[:3]}; left-out exported {extra[:3]}')
+                unreadable, small, unlike, sizes, diffs = [], [], [], [], []
+                for p in best:
+                    name = names[p['photoId']]
+                    path = by_photo.get(p['photoId'])
+                    if path is None or not path.is_file():
+                        continue
+                    try:
+                        with Image.open(path) as im:
+                            im.load()
+                            size = im.size
+                            shot = im.convert('RGB')
+                    except Exception as e:  # noqa: BLE001 - any failure to read is the finding
+                        unreadable.append(f'{path.name}: {e}')
+                        continue
+                    sizes.append(size)
+                    if max(size) < 4000:
+                        small.append(f'{path.name} {size}')
+                    d = mean_difference(Image.open(out / 'after' / f'{name}.jpg'), shot)
+                    diffs.append(d)
+                    if d > 6:
+                        unlike.append(f'{path.name} {d:.1f}')
+                    for entry in report['photos']:
+                        if entry['file'] == name:
+                            entry['exported'] = {'file': path.name, 'size': list(size),
+                                                 'bytes': path.stat().st_size,
+                                                 'differenceFromAppRender': round(d, 2)}
+                check('every exported file opens', not unreadable, '; '.join(unreadable[:3]))
+                check('every exported file is full size', not small and bool(sizes),
+                      f'{sorted(set(sizes))[:3]}' + (f'; small: {small[:3]}' if small else ''))
+                check('every exported file matches the edit the app shows', not unlike and bool(diffs),
+                      f'mean difference {sum(diffs) / max(1, len(diffs)):.2f} of 255, '
+                      f'worst {max(diffs, default=0):.2f}' + (f'; unlike: {unlike[:3]}' if unlike else ''))
+                report['export'].update({'files': len(exported),
+                                         'megabytes': round(sum(p.stat().st_size for p in exported) / 1e6, 1)})
             check('no page errors', not report['pageErrors'], '; '.join(report['pageErrors'][:3]))
 
             # A contact sheet: before | after, four pairs a row.
