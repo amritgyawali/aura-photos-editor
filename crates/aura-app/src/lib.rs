@@ -135,6 +135,7 @@ pub mod state;
 pub mod story_commands;
 pub mod style_commands;
 pub mod tone_commands;
+pub mod tone_target;
 
 pub use autopilot_commands::{
     autopilot_cancel, autopilot_events, autopilot_preflight, autopilot_progress,

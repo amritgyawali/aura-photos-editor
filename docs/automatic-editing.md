@@ -18,7 +18,7 @@ Choose photos or a folder on the Start screen and AURA does the rest, the same w
 
    | | Stage | What it does |
    |---|---|---|
-   | Edit | 1 Basic edit | exposure, contrast, highlights, shadows, whites (lifted when the brightest tones stop short of white), blacks, levels, clarity, dehaze, noise |
+   | Edit | 1 Basic edit | exposure, contrast, highlights, shadows, whites and blacks solved to the photographer's own lightness for the light (skin first), vibrance and saturation to their colour strength; clarity, dehaze, noise |
    | | 2 Colour correction | white balance on every photo, measured on its whites and greys (faces and blown highlights left out) and checked on the render; vibrance, colour fringes |
    | | 3 Calibration | evens a green or magenta tint left in neutral shadows; brings back detail in reds or blues that clip on their own |
    | | 4 Colour grading | a gentle split tone in the photo's own light; shadows stay untinted when people are in the frame |
@@ -48,9 +48,20 @@ Choose photos or a folder on the Start screen and AURA does the rest, the same w
 
 **White balance, every photo.** The full automatic edit measures the colour of each photo's whites,
 greys and near-neutral cloth at the camera's own white balance, with faces and blown (clipped)
-highlights left out, and removes the cast, keeping a little of a warm room's warmth. It is
-checked on a render: the same whites must become neutral, faces must stay skin-coloured, and a
-blown sky must stay white; under mixed light only half the correction is made. ADR-0190.
+highlights left out, and removes the cast the way the photographer does: a fifth of a warm
+room's warmth kept (half when there are no people), most of a cool light's coolness kept, half
+of a pink or green cast kept. It is checked on a render: the same whites must move towards
+neutral, faces must stay skin-coloured, and a blown sky must stay white; under mixed light only
+half the correction is made. ADR-0190, ADR-0191.
+
+**Tone and colour to the photographer's own result.** The light of each photo is read as shot
+(every tone slider at zero) and the lightness the photographer's finished photographs give that
+light is predicted - skin, shadows, middle, highlights, white point - from 651 of their own
+photographs paired with the camera files they came from. Exposure, contrast, highlights,
+shadows, whites and blacks are solved to it in a model of the renderer and checked on the
+render; then vibrance and saturation bring the colour strength to theirs, skin kept below a
+ceiling. A photo without people is moved part of the way (a night scene least) and a bright
+high-key one is never darkened. ADR-0191.
 
 Finish Folder gives every photo the same ten stages, without stopping for the cull review.
 ADR-0187.

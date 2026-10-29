@@ -1058,12 +1058,24 @@ pub const NEUTRAL_SATURATION: f32 = 0.30;
 /// Neutral references must cover this share of the frame (faces aside) to be measured.
 pub const NEUTRAL_MIN_SHARE: f32 = 0.004;
 /// The share of a warm light's warmth kept after white balance: a room lit by tungsten still
-/// reads as a warm room, with its whites white.
-pub const WARMTH_KEPT: f32 = 0.15;
+/// reads as a warm room, with its whites white. The photographer's finished photographs keep
+/// about a fifth at the same neutral references (650 pairs, ADR-0191).
+pub const WARMTH_KEPT: f32 = 0.2;
+/// The share of a cool light's coolness kept: the photographer leaves shade, daylight and a
+/// blue hour cool and hardly warms them at all (they keep about seven tenths, ADR-0191).
+pub const COOLNESS_KEPT: f32 = 0.7;
+/// The share of a warm light's warmth kept when there are no people in the frame: without skin
+/// to judge it by, warm light is most often the picture - a golden hour, dust in low sun, a
+/// lamp-lit room.
+pub const SCENE_WARMTH_KEPT: f32 = 0.5;
+/// The share of a magenta or green cast kept: half, as the photographer does, because a pink
+/// canopy, a green lawn and coloured decor fool every neutral estimate the same way.
+pub const TINT_KEPT: f32 = 0.5;
 /// A white balance this close to the one in place (log chroma) is left as it is.
 pub const BALANCE_TOLERANCE: f32 = 0.03;
-/// The most of a magenta or green cast removed in one edit, in log chroma (about 25 tint).
-pub const TINT_CEILING: f32 = 0.08;
+/// The magenta or green cast read is counted up to this, in log chroma, before [`TINT_KEPT`]:
+/// at most 0.075 comes off in one edit (about 25 tint).
+pub const TINT_CEILING: f32 = 0.15;
 /// The most white balance may turn the faces' hue, in degrees.
 pub const FACE_HUE_CEILING: f32 = 5.0;
 /// The largest white-balance correction, in log chroma, made in one edit.
@@ -1082,6 +1094,13 @@ pub struct Notes {
 }
 
 impl Notes {
+    fn merge(&mut self, other: Self) {
+        self.applied |= other.applied;
+        self.protected |= other.protected;
+        self.changes.extend(other.changes);
+        self.checks.extend(other.checks);
+    }
+
     fn into_stage(self, stage: &mut FullStage) {
         if self.applied {
             stage.outcome = Outcome::Applied;
@@ -1395,17 +1414,25 @@ pub fn skin_hue(hue: f32) -> bool {
 
 /// The decided correction for a cast read at the camera's own balance: the multipliers wanted,
 /// as `(ln r, ln b)`, and the output cast they aim for. Removes the cast, keeping
-/// [`WARMTH_KEPT`] of a warm one, and moves at most [`BALANCE_CEILING`].
+/// [`WARMTH_KEPT`] of a warm one ([`SCENE_WARMTH_KEPT`] without people) and [`COOLNESS_KEPT`]
+/// of a cool one, and moves at most
+/// [`BALANCE_CEILING`].
 /// A cast splits into warm-cool, `(ln r/g - ln b/g) / 2`, and magenta-green,
 /// `(ln r/g + ln b/g) / 2`; the magenta-green part comes off at most this far in one edit,
 /// because a pink canopy, a green lawn or coloured decor fool every neutral estimate the same way.
 #[must_use]
-pub fn balance_goal(cast: (f32, f32)) -> ((f32, f32), (f32, f32)) {
+pub fn balance_goal(cast: (f32, f32), people: bool) -> ((f32, f32), (f32, f32)) {
     let warmth = (cast.0 - cast.1) * 0.5;
     let magenta = (cast.0 + cast.1) * 0.5;
-    let keep = if warmth > 0.0 { WARMTH_KEPT } else { 0.0 };
+    let keep = if warmth > 0.0 && people {
+        WARMTH_KEPT
+    } else if warmth > 0.0 {
+        SCENE_WARMTH_KEPT
+    } else {
+        COOLNESS_KEPT
+    };
     let warmth_left = warmth * keep;
-    let magenta_left = magenta - magenta.clamp(-TINT_CEILING, TINT_CEILING);
+    let magenta_left = magenta - magenta.clamp(-TINT_CEILING, TINT_CEILING) * (1.0 - TINT_KEPT);
     let mut goal = (magenta_left + warmth_left, magenta_left - warmth_left);
     let (dr, db) = (goal.0 - cast.0, goal.1 - cast.1);
     let size = dr.hypot(db);
@@ -1468,7 +1495,7 @@ fn balance_white(
         return (notes, None);
     };
     let size = refs.cast.0.hypot(refs.cast.1);
-    let (mut target, mut goal) = balance_goal(refs.cast);
+    let (mut target, mut goal) = balance_goal(refs.cast, !faces.is_empty());
     let mixed = refs.agreement < MIXED_LIGHT_SHARE;
     if mixed {
         // Mixed light: no one balance is right everywhere, so take half the step.
@@ -1638,58 +1665,55 @@ fn balance_white(
     }
 }
 
-/// The tones of a rendered frame outside the faces: median and 99.5th-percentile luma (0-1)
-/// and the share of pixels with a clipped channel.
-#[must_use]
-pub fn read_top(rgb: &[u8], w: usize, h: usize, faces: &[[f32; 4]]) -> Option<(f32, f32, f32)> {
-    let step = ((w * h) as f32 / 120_000.0).sqrt().ceil().max(1.0) as usize;
-    let (mut lumas, mut clipped) = (Vec::new(), 0_usize);
-    for y in (0..h).step_by(step) {
-        for x in (0..w).step_by(step) {
-            if in_boxes(
-                faces,
-                (x as f32 + 0.5) / w as f32,
-                (y as f32 + 0.5) / h as f32,
-            ) {
-                continue;
-            }
-            let i = (y * w + x) * 3;
-            let Some(&[r, g, b]) = rgb.get(i..i + 3) else {
-                continue;
-            };
-            if r.max(g).max(b) >= 250 {
-                clipped += 1;
-            }
-            lumas.push(
-                (0.2126 * f32::from(r) + 0.7152 * f32::from(g) + 0.0722 * f32::from(b)) / 255.0,
-            );
-        }
-    }
-    if lumas.len() < 100 {
-        return None;
-    }
-    let n = lumas.len();
-    lumas.sort_by(f32::total_cmp);
-    Some((
-        lumas.get(n / 2).copied()?,
-        lumas.get(n * 995 / 1000).copied()?,
-        clipped as f32 / n as f32,
-    ))
+/// The tone sliders, in the order [`crate::tone_target::Sliders`] solves them.
+const TONE_PATHS: [&str; 6] = [
+    "global.exposure",
+    "global.contrast",
+    "global.highlights",
+    "global.shadows",
+    "global.whites",
+    "global.blacks",
+];
+
+/// Whether a person set this field (or the block it is in) themselves.
+fn owned(recipe: &Recipe, path: &str) -> bool {
+    recipe.provenance.user_edited_fields.iter().any(|f| {
+        f == path
+            || path
+                .strip_prefix(f.as_str())
+                .is_some_and(|rest| rest.starts_with('.'))
+    })
 }
 
-/// The brightest tones of a frame that is not dark reach at least this.
-pub const TOP_FLOOR: f32 = 0.80;
-/// Where the whites are lifted to.
-pub const TOP_GOAL: f32 = 0.92;
-/// The most the whites are lifted in one edit.
-pub const WHITES_CEILING: f32 = 70.0;
-/// The most a lift may clip, as a share of the frame.
-pub const CLIP_CEILING: f32 = 0.004;
+/// A slider a person set keeps their value; the rest come from the solve.
+fn keep_fixed(
+    solved: crate::tone_target::Sliders,
+    kept: crate::tone_target::Sliders,
+    fixed: [bool; 6],
+) -> crate::tone_target::Sliders {
+    let mut out = solved;
+    for (i, f) in fixed.iter().enumerate() {
+        if *f {
+            match i {
+                0 => out.exposure = kept.exposure,
+                1 => out.contrast = kept.contrast,
+                2 => out.highlights = kept.highlights,
+                3 => out.shadows = kept.shadows,
+                4 => out.whites = kept.whites,
+                _ => out.blacks = kept.blacks,
+            }
+        }
+    }
+    out
+}
 
-/// Stage 1's finish: a photograph whose brightest tones stop short of white - often after the
-/// exposure came down to save skin - looks grey and flat; its whites are lifted until they
-/// reach white, checked on a render so nothing new clips.
-fn lift_whites(
+/// Stage 1's tone, ADR-0191: the light is read on a render with every tone slider at zero, the
+/// lightness the photographer's own finished photographs give that light is predicted (skin
+/// first when there are people), and exposure, contrast, highlights, shadows, whites and blacks
+/// are solved to it in a model of the renderer, then checked on the render, which corrects the
+/// model where it was wrong. Read as shot, so a second run decides the same thing.
+#[allow(clippy::too_many_arguments)]
+fn shape_tone(
     state: &AppState,
     ids: (&ProjectId, PhotoId),
     current: &mut Recipe,
@@ -1697,108 +1721,453 @@ fn lift_whites(
     shown: &Frame,
     faces: &[[f32; 4]],
     look: Look,
+    incumbent: Option<crate::tone_target::Sliders>,
+    read_as_shot: &mut Option<crate::tone_target::Reading>,
 ) -> (Notes, Option<Frame>) {
+    use crate::tone_target::{self as tt, Sliders};
     let (project, photo) = ids;
     let mut notes = Notes::default();
     if look == Look::Applied {
+        notes
+            .checks
+            .push("Tone: your chosen look sets its own tone; it was kept.".into());
         return (notes, None);
     }
-    let Some((median, top, clipped)) = read_top(&shown.0, shown.1, shown.2, faces) else {
-        return (notes, None);
-    };
-    if median < 0.25 || top >= TOP_FLOOR || clipped >= CLIP_CEILING * 0.5 {
-        notes.checks.push(format!(
-            "Whites: the brightest tones reach {:.0}% of white{}; left as they are.",
-            top * 100.0,
-            if median < 0.25 {
-                " in a dark, low-key frame"
-            } else {
-                ""
-            }
-        ));
+    let fixed = TONE_PATHS.map(|p| owned(current, p));
+    if fixed.iter().all(|f| *f) {
+        notes.protected = true;
+        notes
+            .checks
+            .push("Tone: you set exposure and every tone slider yourself; all kept.".into());
         return (notes, None);
     }
-    let mut lift = ((TOP_GOAL - top) * 160.0)
-        .round()
-        .clamp(5.0, WHITES_CEILING) as i16;
-    let mut kept: Option<(i16, Frame, f32, f32)> = None;
-    let mut over: Option<i16> = None;
-    for _ in 0..3 {
-        let mut proposal = base.clone();
-        proposal.global.whites = (base.global.whites + lift).clamp(-100, 100);
-        let Ok(rendered) = measure(state, photo, &proposal) else {
-            break;
-        };
-        let Some((_, top_after, clipped_after)) =
-            read_top(&rendered.0, rendered.1, rendered.2, faces)
-        else {
-            break;
-        };
-        if clipped_after > CLIP_CEILING {
-            // Too far: come back halfway towards the last lift that did not clip.
-            over = Some(lift);
-            let floor = kept.as_ref().map_or(0, |k| k.0 - base.global.whites);
-            lift = i16::midpoint(floor, lift);
-            if lift <= floor {
-                break;
-            }
-            continue;
-        }
-        if top_after > top + 0.01 {
-            kept = Some((proposal.global.whites, rendered, top_after, clipped_after));
-        }
-        // The slider's response is measured, not assumed: step by it to the goal.
-        let gained = top_after - top;
-        if top_after >= TOP_GOAL - 0.02 || gained <= 0.005 {
-            break;
-        }
-        let wanted = (f32::from(lift) * (TOP_GOAL - top) / gained).round();
-        let ceiling = over.map_or(WHITES_CEILING, |o| f32::from(o - 1));
-        let next = wanted.max(f32::from(lift) + 1.0).min(ceiling) as i16;
-        if next <= lift {
-            break;
-        }
-        lift = next;
+    // The light as shot: every free tone slider at zero, and no automatic levels curve (whites
+    // and blacks set the ends of the range here; a curve on top would set them twice).
+    let mut neutral = base.clone();
+    let kept = Sliders::of(&base.global);
+    keep_fixed(Sliders::ZERO, kept, fixed).write(&mut neutral.global);
+    if !owned(current, "global.curve") {
+        neutral.global.curve = aura_recipe::Curve::identity();
     }
-    let Some((whites, rendered, top_after, clipped_after)) = kept else {
-        notes.checks.push(format!(
-            "Whites: the brightest tones reach only {:.0}% of white, but lifting them clipped or changed nothing on the render; left as they are.",
-            top * 100.0
-        ));
-        return (notes, None);
-    };
-    let mut proposal = current.clone();
-    proposal.global.whites = whites;
-    let label = format!("Full auto edit 1/10 · Whites {whites:+}");
-    match save_step(state, project, &photo, current, proposal, &label) {
-        Ok((true, _)) => {
-            notes.applied = true;
-            notes.changes.push(format!(
-                "Whites {whites:+}: the brightest tones reached only {:.0}% of white, so the photo looked grey and flat; now {:.0}%, with {:.2}% clipped (checked on the render).",
-                top * 100.0,
-                top_after * 100.0,
-                clipped_after * 100.0
-            ));
-            base.global.whites = whites;
-            (notes, Some(rendered))
-        }
-        Ok((false, refused)) if !refused.is_empty() => {
-            notes.protected = true;
-            notes.checks.push(format!(
-                "Whites: kept your own setting ({}).",
-                refused.join(", ")
-            ));
-            (notes, None)
-        }
-        Ok((false, _)) => (notes, None),
+    let frame = match measure(state, photo, &neutral) {
+        Ok(frame) => frame,
         Err(error) => {
             notes.checks.push(format!(
-                "The whites could not be saved ({}); left as they are.",
+                "Tone: the photograph could not be rendered as shot ({}); left as it was.",
+                error.code
+            ));
+            return (notes, None);
+        }
+    };
+    let before = tt::read_against(&shown.0, shown.1, shown.2, faces, &frame.0);
+    let shaped = tt::shape(&frame, faces, fixed, incumbent, |sliders| {
+        let mut proposal = neutral.clone();
+        keep_fixed(sliders, kept, fixed).write(&mut proposal.global);
+        measure(state, photo, &proposal).ok()
+    });
+    let Some(tt::Shaped {
+        shot,
+        goal,
+        sliders,
+        frame: rendered,
+        reading,
+        clip_allowed,
+    }) = shaped
+    else {
+        notes
+            .checks
+            .push("Tone: the solved tone could not be checked on a render; left as it was.".into());
+        return (notes, None);
+    };
+    *read_as_shot = Some(shot);
+    let distance = |r: &tt::Reading| tt::distance(r, &goal, clip_allowed);
+    // Kept only when the render is closer to the photographer's tone than what was there.
+    if let Some(b) = before
+        .as_ref()
+        .filter(|b| distance(b) <= distance(&reading))
+    {
+        notes.checks.push(format!(
+            "Tone: read as {}; the tone in place was already as close to the photographer's as the solve came ({}).",
+            goal.intent.label(),
+            describe_tone(&shot, &goal, b)
+        ));
+        return (notes, None);
+    }
+    let sliders = keep_fixed(sliders, kept, fixed);
+    let mut proposal = current.clone();
+    sliders.write(&mut proposal.global);
+    proposal.global.curve = neutral.global.curve.clone();
+    let what = format!(
+        "exposure {:+.2} EV, highlights {:+}, shadows {:+}, whites {:+}, blacks {:+}, contrast {:+}",
+        sliders.exposure,
+        sliders.highlights,
+        sliders.shadows,
+        sliders.whites,
+        sliders.blacks,
+        sliders.contrast
+    );
+    let label = format!("Full auto edit 1/10 · Tone: {what}");
+    match save_step(state, project, &photo, current, proposal, &label) {
+        Ok((saved, refused)) => {
+            if saved {
+                notes.applied = true;
+                notes.changes.push(format!(
+                    "Tone: {what} - {} (checked on the render, {:.2}% clipped).",
+                    describe_tone(&shot, &goal, &reading),
+                    reading.clipped * 100.0
+                ));
+                notes.checks.push(format!(
+                    "Tone: read as {}; the targets are the lightness the photographer's own finished photographs give this light (learned from 651 of them, eight cameras, day and night), solved in a model of the renderer and corrected on the render.",
+                    goal.intent.label()
+                ));
+                sliders.write(&mut base.global);
+                base.global.curve = neutral.global.curve.clone();
+            }
+            if !refused.is_empty() {
+                notes.protected = true;
+                notes.checks.push(format!(
+                    "Tone: kept your own setting ({}).",
+                    refused.join(", ")
+                ));
+            }
+            (notes, saved.then_some(rendered))
+        }
+        Err(error) => {
+            notes.checks.push(format!(
+                "The tone could not be saved ({}); left as it was.",
                 error.code
             ));
             (notes, None)
         }
     }
+}
+
+/// Stage 1's colour, ADR-0191: the frame's colour strength (median CIE chroma) is brought to
+/// what the photographer's finished photographs have for this light, with vibrance first and
+/// saturation only when vibrance is not enough, never past the skin ceiling or into new
+/// clipping, and checked on the render. Runs after the tone, because chroma follows lightness.
+#[allow(clippy::too_many_arguments)]
+fn enrich_colour(
+    state: &AppState,
+    ids: (&ProjectId, PhotoId),
+    current: &mut Recipe,
+    base: &mut Recipe,
+    shown: &Frame,
+    faces: &[[f32; 4]],
+    look: Look,
+    shot: &crate::tone_target::Reading,
+) -> (Notes, Option<Frame>) {
+    use crate::tone_target as tt;
+    let (project, photo) = ids;
+    let mut notes = Notes::default();
+    if look != Look::None {
+        return (notes, None);
+    }
+    let (own_v, own_s) = (
+        owned(current, "global.vibrance"),
+        owned(current, "global.saturation"),
+    );
+    if own_v && own_s {
+        notes.protected = true;
+        notes
+            .checks
+            .push("Colour: you set vibrance and saturation yourself; kept.".into());
+        return (notes, None);
+    }
+    let samples = tt::samples(&shown.0, shown.1, shown.2, faces);
+    let Some((now, _, _)) = tt::simulate_colour(&samples, 0.0, 0.0) else {
+        return (notes, None);
+    };
+    let Some(target) = tt::chroma_target(shot, now) else {
+        notes.checks.push(
+            "Colour: the photograph has next to no colour (black and white or one tone); none was added."
+                .into(),
+        );
+        return (notes, None);
+    };
+    if (now - target).abs() < 1.0 {
+        notes.checks.push(format!(
+            "Colour: chroma {now:.0} is already the photographer's for this light ({target:.0})."
+        ));
+        return (notes, None);
+    }
+    let (v0, s0) = (base.global.vibrance, base.global.saturation);
+    let room = if own_v { 0 } else { 60 - v0 };
+    let Some((mut dv, mut ds, _)) = tt::solve_colour(&samples, target, room) else {
+        return (notes, None);
+    };
+    if own_v {
+        dv = 0;
+    }
+    if own_s {
+        ds = 0;
+    }
+    let mut best: Option<(i16, i16, Frame, f32)> = None;
+    for _ in 0..2 {
+        if dv == 0 && ds == 0 {
+            break;
+        }
+        let mut proposal = base.clone();
+        proposal.global.vibrance = (v0 + dv).clamp(-100, 100);
+        proposal.global.saturation = (s0 + ds).clamp(-100, 100);
+        let Ok(rendered) = measure(state, photo, &proposal) else {
+            break;
+        };
+        let Some(reading) = tt::read(&rendered.0, rendered.1, rendered.2, faces) else {
+            break;
+        };
+        let got = reading.chroma;
+        let closer = best
+            .as_ref()
+            .is_none_or(|b| (got - target).abs() < (b.3 - target).abs());
+        if closer {
+            best = Some((
+                proposal.global.vibrance,
+                proposal.global.saturation,
+                rendered,
+                got,
+            ));
+        }
+        if (got - target).abs() < 1.5 || (got - now).abs() < 0.3 {
+            break;
+        }
+        // The render's response is the truth: scale the move by it once.
+        let scale = ((target - now) / (got - now)).clamp(0.3, 2.0);
+        dv = (f32::from(dv) * scale).round() as i16;
+        ds = (f32::from(ds) * scale).round() as i16;
+        dv = dv.min(room.max(0));
+    }
+    let Some((vibrance, saturation, rendered, got)) = best else {
+        return (notes, None);
+    };
+    if (got - target).abs() >= (now - target).abs() {
+        notes.checks.push(format!(
+            "Colour: chroma {now:.0} against the photographer's {target:.0}; the render did not come closer, left as it was."
+        ));
+        return (notes, None);
+    }
+    let mut proposal = current.clone();
+    proposal.global.vibrance = vibrance;
+    proposal.global.saturation = saturation;
+    let what = format!("vibrance {vibrance:+}, saturation {saturation:+}");
+    match save_step(
+        state,
+        project,
+        &photo,
+        current,
+        proposal,
+        &format!("Full auto edit 1/10 · Colour: {what}"),
+    ) {
+        Ok((true, refused)) => {
+            notes.applied = true;
+            notes.changes.push(format!(
+                "Colour: {what} - chroma {now:.0} -> {got:.0}, the photographer's for this light {target:.0} (vibrance first, skin kept below chroma {:.0}; checked on the render).",
+                crate::tone_target::SKIN_CHROMA_CEILING
+            ));
+            if !refused.is_empty() {
+                notes.protected = true;
+            }
+            base.global.vibrance = vibrance;
+            base.global.saturation = saturation;
+            (notes, Some(rendered))
+        }
+        Ok((false, refused)) => {
+            if !refused.is_empty() {
+                notes.protected = true;
+                notes.checks.push(format!(
+                    "Colour: kept your own setting ({}).",
+                    refused.join(", ")
+                ));
+            }
+            (notes, None)
+        }
+        Err(error) => {
+            notes.checks.push(format!(
+                "The colour could not be saved ({}); left as it was.",
+                error.code
+            ));
+            (notes, None)
+        }
+    }
+}
+
+/// The faces the measured stages read, as boxes `[left, top, right, bottom]` (0 to 1): those
+/// on the thumbnail, and the small ones of a crowd from the proxy, as the advanced retouch
+/// finds them.
+fn faces_of(state: &AppState, project_id: &str, photo: PhotoId) -> Vec<[f32; 4]> {
+    let Ok(previews) = state.previews(project_id) else {
+        return Vec::new();
+    };
+    let Ok(thumb) = previews.get(
+        photo,
+        aura_raw::PixelLevel::Thumb(512),
+        Priority::Interactive,
+    ) else {
+        return Vec::new();
+    };
+    let Some(found) = thumb
+        .as_srgb8()
+        .and_then(|rgb| aura_vision::portrait::detect(rgb, thumb.width, thumb.height).ok())
+    else {
+        return Vec::new();
+    };
+    let proxy = previews
+        .get(
+            photo,
+            aura_raw::PixelLevel::Proxy2048,
+            Priority::Interactive,
+        )
+        .ok();
+    let all = proxy
+        .as_ref()
+        .and_then(|p| {
+            p.as_srgb8().and_then(|pixels| {
+                aura_vision::portrait::detect_small_faces(pixels, p.width, p.height, &found).ok()
+            })
+        })
+        .unwrap_or(found);
+    all.into_iter().map(|f| f.bounds).collect()
+}
+
+/// What the measured white balance, tone and colour did, and the render they leave.
+struct Basics {
+    balance: Notes,
+    finish: Notes,
+    shown: AuraResult<Frame>,
+}
+
+/// Stage 2's white balance, then stage 1's tone and colour, each measured and checked on the
+/// render, before calibration and grade read it. `show` pictures each step that changed the
+/// photograph.
+#[allow(clippy::too_many_arguments)]
+fn measured_basics(
+    state: &AppState,
+    ids: (&ProjectId, PhotoId),
+    current: &mut Recipe,
+    base: &mut Recipe,
+    mut shown: AuraResult<Frame>,
+    faces: &[[f32; 4]],
+    look: Look,
+    incumbent: Option<crate::tone_target::Sliders>,
+    show: &dyn Fn(Option<FullStageKey>, String, &Recipe),
+) -> Basics {
+    let mut balance = Notes::default();
+    let mut finish = Notes::default();
+    if let Ok(frame) = &shown {
+        let (notes, balanced) = balance_white(state, ids, current, base, frame, faces, look);
+        balance = notes;
+        if let Some(frame) = balanced {
+            show(
+                Some(FullStageKey::ColourCorrection),
+                format!("{} · White balance", FullStageKey::ColourCorrection.title()),
+                current,
+            );
+            shown = Ok(frame);
+        }
+    }
+    if let Ok(frame) = &shown {
+        let mut as_shot = None;
+        let (notes, toned) = shape_tone(
+            state,
+            ids,
+            current,
+            base,
+            frame,
+            faces,
+            look,
+            incumbent,
+            &mut as_shot,
+        );
+        finish = notes;
+        if let Some(frame) = toned {
+            show(
+                Some(FullStageKey::Basic),
+                format!("{} · Tone", FullStageKey::Basic.title()),
+                current,
+            );
+            shown = Ok(frame);
+        }
+        // Colour strength follows the tone: read after it, on the toned render.
+        if let (Some(shot), Ok(frame)) = (as_shot, &shown) {
+            let (notes, enriched) =
+                enrich_colour(state, ids, current, base, frame, faces, look, &shot);
+            finish.merge(notes);
+            if let Some(frame) = enriched {
+                show(
+                    Some(FullStageKey::Basic),
+                    format!("{} · Colour", FullStageKey::Basic.title()),
+                    current,
+                );
+                shown = Ok(frame);
+            }
+        }
+    }
+    Basics {
+        balance,
+        finish,
+        shown,
+    }
+}
+
+/// White balance, tone and colour alone, on a photograph as it is - the measured basics of the
+/// full edit without the retouch, calibration or grade. For measuring them against the
+/// photographer's own photographs quickly (`tests/photographer_pairs.rs`); not a command.
+///
+/// # Errors
+///
+/// When the identifiers are invalid or the photograph's recipe cannot be loaded.
+pub fn basics_only(state: &AppState, project_id: &str, photo_id: &str) -> IpcResult<Vec<String>> {
+    let invalid = |message: &str| aura_core::errors::render::recipe_invalid("photo", message);
+    let photo = PhotoId::from_db(photo_id).map_err(|_| invalid("Invalid photo identifier"))?;
+    let project =
+        ProjectId::from_db(project_id).map_err(|_| invalid("Invalid project identifier"))?;
+    let faces = faces_of(state, project_id, photo);
+    let mut current = crate::develop_commands::load_or_neutral(state, photo)?;
+    let mut base = current.clone();
+    let shown = measure(state, photo, &base);
+    let basics = measured_basics(
+        state,
+        (&project, photo),
+        &mut current,
+        &mut base,
+        shown,
+        &faces,
+        Look::None,
+        None,
+        &|_, _, _| {},
+    );
+    Ok(basics
+        .balance
+        .changes
+        .into_iter()
+        .chain(basics.balance.checks)
+        .chain(basics.finish.changes)
+        .chain(basics.finish.checks)
+        .collect())
+}
+
+/// "skin L* 41 -> 58 (photographer 59), middle 38 -> 53 (55), ...": as shot, now, and the
+/// photographer's target.
+fn describe_tone(
+    shot: &crate::tone_target::Reading,
+    goal: &crate::tone_target::Targets,
+    now: &crate::tone_target::Reading,
+) -> String {
+    let mut parts = Vec::new();
+    if let (Some(a), Some(b), Some(t)) = (shot.face, now.face, goal.face) {
+        parts.push(format!("skin L* {a:.0} -> {b:.0} (photographer {t:.0})"));
+    }
+    for (name, i) in [
+        ("shadows", 1),
+        ("middle", 2),
+        ("highlights", 3),
+        ("white point", 4),
+    ] {
+        if let (Some(a), Some(b), Some(t)) = (shot.l.get(i), now.l.get(i), goal.l.get(i)) {
+            parts.push(format!("{name} {a:.0} -> {b:.0} ({t:.0})"));
+        }
+    }
+    parts.join(", ")
 }
 
 /// What a save meant for the stage's outcome.
@@ -2240,27 +2609,7 @@ pub fn run(
     let after_retouch = current.clone();
 
     // The faces the calibration and grade check, from the same preview the retouch read.
-    let faces: Vec<[f32; 4]> = state
-        .previews(&input.project_id)
-        .ok()
-        .and_then(|previews| {
-            previews
-                .get(
-                    photo,
-                    aura_raw::PixelLevel::Thumb(512),
-                    Priority::Interactive,
-                )
-                .ok()
-        })
-        .and_then(|thumb| {
-            thumb
-                .as_srgb8()
-                .and_then(|rgb| aura_vision::portrait::detect(rgb, thumb.width, thumb.height).ok())
-        })
-        .unwrap_or_default()
-        .into_iter()
-        .map(|f| f.bounds)
-        .collect();
+    let faces = faces_of(state, &input.project_id, photo);
     let people = advanced.report.faces > 0 || !faces.is_empty();
 
     // Stages 3 and 4 start from the photograph without any automatic calibration or grade, so
@@ -2276,52 +2625,32 @@ pub fn run(
     }
     if input.look == Look::None {
         base.global.colour_grade = ColourGrade::default();
-    }
-    let mut shown = measure(state, photo, &base);
-    // Stage 2's white balance and stage 1's whites, both measured and checked on the render,
-    // before calibration and grade read it.
-    let mut balance = Notes::default();
-    let mut finish = Notes::default();
-    if let Ok(frame) = &shown {
-        let (notes, balanced) = balance_white(
-            state,
-            ids,
-            &mut current,
-            &mut base,
-            frame,
-            &faces,
-            input.look,
-        );
-        balance = notes;
-        if let Some(frame) = balanced {
-            show(
-                Some(FullStageKey::ColourCorrection),
-                format!("{} · White balance", FullStageKey::ColourCorrection.title()),
-                &current,
-            );
-            shown = Ok(frame);
+        // Saturation is set only by stage 1's colour step (the foundation sets vibrance on
+        // every run): a repeat run measures white balance and colour without the last one's.
+        if !owned(&current, "global.saturation") {
+            base.global.saturation = 0;
         }
     }
-    if let Ok(frame) = &shown {
-        let (notes, lifted) = lift_whites(
-            state,
-            ids,
-            &mut current,
-            &mut base,
-            frame,
-            &faces,
-            input.look,
-        );
-        finish = notes;
-        if let Some(frame) = lifted {
-            show(
-                Some(FullStageKey::Basic),
-                format!("{} · Whites", FullStageKey::Basic.title()),
-                &current,
-            );
-            shown = Ok(frame);
-        }
-    }
+    let shown = measure(state, photo, &base);
+    let Basics {
+        mut balance,
+        mut finish,
+        shown,
+    } = measured_basics(
+        state,
+        ids,
+        &mut current,
+        &mut base,
+        shown,
+        &faces,
+        input.look,
+        // A photograph the full edit finished before keeps its solved tone while it holds.
+        before
+            .extra
+            .contains_key(KEY)
+            .then(|| crate::tone_target::Sliders::of(&before.global)),
+        &show,
+    );
     let (calibration, calibrated) = if keep_calibration {
         let mut stage = FullStage::new(FullStageKey::Calibration);
         stage.outcome = Outcome::Protected;
@@ -2760,25 +3089,31 @@ mod tests {
     }
 
     #[test]
-    fn a_warm_cast_keeps_a_little_warmth_and_magenta_or_green_comes_off_only_so_far() {
-        // Warm: goal is 15% of the cast, multipliers take the rest off.
-        let ((dr, db), goal) = balance_goal((0.2, -0.2));
+    fn white_balance_keeps_what_the_photographer_keeps() {
+        // Warm: goal is a fifth of the cast, multipliers take the rest off.
+        let ((dr, db), goal) = balance_goal((0.2, -0.2), true);
         assert!(
-            (goal.0 - 0.03).abs() < 1e-4 && (goal.1 + 0.03).abs() < 1e-4,
+            (goal.0 - 0.04).abs() < 1e-4 && (goal.1 + 0.04).abs() < 1e-4,
             "{goal:?}"
         );
-        assert!((dr + 0.17).abs() < 1e-4 && (db - 0.17).abs() < 1e-4);
-        // Cool: all of it.
-        let (_, goal) = balance_goal((-0.1, 0.1));
-        assert!(goal.0.abs() < 1e-4 && goal.1.abs() < 1e-4, "{goal:?}");
-        // Magenta 0.2 (a pink canopy reads this way): at most 0.08 of it comes off.
-        let (_, goal) = balance_goal((0.2, 0.2));
+        assert!((dr + 0.16).abs() < 1e-4 && (db - 0.16).abs() < 1e-4);
+        // Cool: most of it is kept, as the photographer keeps it.
+        let (_, goal) = balance_goal((-0.1, 0.1), true);
         assert!(
-            (goal.0 - 0.12).abs() < 1e-4 && (goal.1 - 0.12).abs() < 1e-4,
+            (goal.0 + 0.07).abs() < 1e-4 && (goal.1 - 0.07).abs() < 1e-4,
             "{goal:?}"
         );
+        // Magenta 0.2 (a pink canopy reads this way): half of at most 0.15 comes off.
+        let (_, goal) = balance_goal((0.2, 0.2), true);
+        assert!(
+            (goal.0 - 0.125).abs() < 1e-4 && (goal.1 - 0.125).abs() < 1e-4,
+            "{goal:?}"
+        );
+        // Without people, half of a warm light is kept: it is most often the picture.
+        let (_, goal) = balance_goal((0.2, -0.2), false);
+        assert!((goal.0 - 0.1).abs() < 1e-4, "{goal:?}");
         // Never more than the ceiling in one edit.
-        let (step, _) = balance_goal((1.2, -1.2));
+        let (step, _) = balance_goal((1.2, -1.2), true);
         assert!(step.0.hypot(step.1) <= BALANCE_CEILING + 1e-4);
     }
 
@@ -2810,19 +3145,6 @@ mod tests {
             "{} {}",
             two.votes,
             two.agreement
-        );
-    }
-
-    #[test]
-    fn whites_short_of_white_are_read_outside_the_faces() {
-        let (rgb, w, h) = painted(|x, _| {
-            let v = 60 + (x % 130) as u8; // tops out at 189: 74% of white
-            [v, v, v]
-        });
-        let (median, top, clipped) = read_top(&rgb, w, h, &[]).expect("tones");
-        assert!(
-            median > 0.25 && top < TOP_FLOOR && clipped == 0.0,
-            "{median} {top}"
         );
     }
 }

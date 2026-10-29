@@ -1,6 +1,7 @@
 # ADR-0190: White balance on every photo, measured and checked on the render
 
-Status: accepted.
+Status: accepted; amended by ADR-0191 (the whites lift is replaced by the solved tone, and the
+white-balance goal keeps what the photographer keeps).
 Date: 2026-10-29
 
 ## Problem

@@ -163,13 +163,14 @@ fn full_edit_real_photographs() {
             }
         );
         for stage in &edited.stages {
-            // `AURA_FULL_EDIT_VERBOSE=1`: every line of the white balance and whites decisions.
+            // `AURA_FULL_EDIT_VERBOSE=1`: every line of the white balance, tone and colour decisions.
             if std::env::var_os("AURA_FULL_EDIT_VERBOSE").is_some_and(|v| v == "1")
                 && stage.number <= 2
             {
                 for line in stage.changes.iter().chain(&stage.checks) {
                     if line.starts_with("White balance")
-                        || line.starts_with("Whites")
+                        || line.starts_with("Tone")
+                        || line.starts_with("Colour")
                         || line.contains("render")
                     {
                         eprintln!("     . {line}");
