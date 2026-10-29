@@ -132,15 +132,18 @@ struct DecodeSlots {
     capacity: usize,
 }
 
-/// A held decode slot; released when dropped.
-struct Slot<'a>(&'a DecodeSlots);
+/// A held decode slot; released when dropped. `waited` says whether it had to queue for it.
+struct Slot<'a> {
+    slots: &'a DecodeSlots,
+    waited: bool,
+}
 
 impl Drop for Slot<'_> {
     fn drop(&mut self) {
-        let mut busy = self.0.busy.lock();
+        let mut busy = self.slots.busy.lock();
         *busy = busy.saturating_sub(1);
         drop(busy);
-        self.0.freed.notify_all();
+        self.slots.freed.notify_all();
     }
 }
 
@@ -169,11 +172,15 @@ impl DecodeSlots {
             Priority::AiBatch | Priority::Background => self.capacity - 1,
         };
         let mut busy = self.busy.lock();
+        let waited = *busy >= limit;
         while *busy >= limit {
             self.freed.wait(&mut busy);
         }
         *busy += 1;
-        Slot(self)
+        Slot {
+            slots: self,
+            waited,
+        }
     }
 }
 
@@ -362,13 +369,20 @@ impl Inner {
             return Ok(buffer);
         }
 
-        let _slot = self.slots.acquire(prio);
-        // Another request for the same photograph may have finished while this one waited.
-        if let Some(found) = self.memory.lock().get(&key) {
-            Self::report(id, level, prio, Served::Memory, &found);
-            return Ok(found);
+        let slot = self.slots.acquire(prio);
+        // Another request for the same photograph may have finished while this one waited. Only
+        // a request that queued looks again: a second disk lookup is a second counted miss.
+        if slot.waited {
+            if let Some(found) = self.memory.lock().get(&key) {
+                Self::report(id, level, prio, Served::Memory, &found);
+                return Ok(found);
+            }
         }
-        if let Some(found) = self.read_cached(&file.content_hash, level) {
+        if let Some(found) = slot
+            .waited
+            .then(|| self.read_cached(&file.content_hash, level))
+            .flatten()
+        {
             let buffer = Arc::new(found);
             self.memory
                 .lock()
