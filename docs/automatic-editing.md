@@ -18,8 +18,8 @@ Choose photos or a folder on the Start screen and AURA does the rest, the same w
 
    | | Stage | What it does |
    |---|---|---|
-   | Edit | 1 Basic edit | exposure, contrast, highlights, shadows, whites, blacks, levels, clarity, dehaze, noise |
-   | | 2 Colour correction | white balance, tint, vibrance, colour fringes |
+   | Edit | 1 Basic edit | exposure, contrast, highlights, shadows, whites (lifted when the brightest tones stop short of white), blacks, levels, clarity, dehaze, noise |
+   | | 2 Colour correction | white balance on every photo, measured on its whites and greys (faces and blown highlights left out) and checked on the render; vibrance, colour fringes |
    | | 3 Calibration | evens a green or magenta tint left in neutral shadows; brings back detail in reds or blues that clip on their own |
    | | 4 Colour grading | a gentle split tone in the photo's own light; shadows stay untinted when people are in the frame |
    | | 5 Crop & straighten | levels a horizon the photo's own straight lines measure, cropped so no corner is empty |
@@ -45,6 +45,12 @@ Choose photos or a folder on the Start screen and AURA does the rest, the same w
    nobody is watching make none and run at full speed.
 3. With a **look** chosen on the Start screen, the look decides light, colour and grade; every
    other stage still runs on top of it.
+
+**White balance, every photo.** The full automatic edit measures the colour of each photo's whites,
+greys and near-neutral cloth at the camera's own white balance, with faces and blown (clipped)
+highlights left out, and removes the cast, keeping a little of a warm room's warmth. It is
+checked on a render: the same whites must become neutral, faces must stay skin-coloured, and a
+blown sky must stay white; under mixed light only half the correction is made. ADR-0190.
 
 Finish Folder gives every photo the same ten stages, without stopping for the cull review.
 ADR-0187.
