@@ -3590,6 +3590,19 @@ async fn auto_advanced_retouch(
     .map_err(|_| background_request_failed())?
 }
 
+/// The hundred-step photo pass after Auto enhance: each step measures the photograph and, when
+/// it applies something, is saved as its own history step. ADR-0186.
+#[tauri::command]
+async fn photo_pass(
+    state: State<'_, AppState>,
+    input: aura_app::photo_pass::PhotoPassInput,
+) -> IpcResult<aura_app::photo_pass::PhotoPassDto> {
+    let shared = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::photo_pass::run(&shared, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
 /// The full automatic edit of one photograph: ten stages in order, each measured and each its
 /// own history step. Streams a `full-edit` event before and after every stage. ADR-0187.
 #[tauri::command]
@@ -4434,6 +4447,7 @@ fn main() {
             auto_advanced_retouch,
             full_edit_photo,
             full_edit_picture,
+            photo_pass,
             create_project,
             list_projects,
             start_ingest,

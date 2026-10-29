@@ -2,6 +2,7 @@ import { api, develop, editProfiles, type ApplyReport, type ProfileSelection } f
 import { Refusal, reasonOf } from '../look/refusal';
 import { referenceStyle, type ReferenceSelection } from '../look/referenceStyle';
 import { fullEdit, stageTally, type FullEditProgress, type FullStage } from '../../ipc/fullEdit';
+import { photoPass } from '../../ipc/photoPass';
 import type { RecipeDto } from '../../ipc/types';
 
 export type PreparedPhoto = { photoId: string; name: string; outcome: 'ready' | 'failed'; detail: string; settings?: string; stages?: FullStage[]; millis?: number };
@@ -127,6 +128,11 @@ export async function prepareCollection(projectId: string, stopped: () => boolea
         const edited = await fullEdit.run(projectId, photo.id, profile ? 'applied' : reference ? 'coming' : 'none', watched);
         const stages = edited.stages;
         adaptations.push(`Full automatic edit, 10 stages: ${stageTally(stages)}.`);
+        checkStop();
+        // Faults the ten stages do not look for, fixed before any reference look (ADR-0186).
+        onProgress(`Photo pass ${index + 1} of ${photos.length}: ${photo.fileName}`);
+        const pass = await photoPass.run(projectId, photo.id);
+        adaptations.push(`Photo pass: ${pass.report.summary}`);
         checkStop();
         if (reference) {
           onProgress(`Matching reference style ${index + 1} of ${photos.length}: ${photo.fileName}`);

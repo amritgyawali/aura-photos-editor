@@ -113,7 +113,10 @@ style, and the report says so; every wheel is an ordinary editable control.
   receives.
 * The **Auto edit** screen then works through the set **one photo at a time**, saying which stage
   of which photo is running ("Editing photo 12 of 62: 5I7A8901.CR2 · stage 6 of 10: Blemishes"),
-  and lists every photo's ten stages with their outcomes and the seconds it took.
+  and lists every photo's ten stages with their outcomes and the seconds it took. On each photo
+  the order is: a chosen edit profile, the ten stages, then the hundred-step photo pass (ADR-0186,
+  which was written to run after Auto enhance and now runs after the stages that replaced it),
+  then a reference look when one was chosen.
 * **Render final output** opens Export with **the photos just edited** chosen ("Which photos"),
   not the whole collection: the cull's left-out frames are not finished photographs and are
   exported only when the photographer picks "All N photos in the collection". Opened later, with

@@ -7,6 +7,8 @@ vi.mock('../../ipc/fullEdit', async (original) => ({
   ...(await original<typeof import('../../ipc/fullEdit')>()),
   fullEdit: { run: vi.fn(), onProgress: vi.fn(), picture: vi.fn() },
 }));
+import { photoPass } from '../../ipc/photoPass';
+vi.mock('../../ipc/photoPass', () => ({ photoPass: { run: vi.fn() } }));
 vi.mock('../look/referenceStyle', () => ({ referenceStyle: { apply: vi.fn().mockResolvedValue({}) } }));
 vi.mock('../../ipc/client', () => ({
   api: { listImages: vi.fn() }, develop: { renderImage: vi.fn(), imageRecipe: vi.fn() },
@@ -27,6 +29,7 @@ beforeEach(() => {
   vi.mocked(fullEdit.run).mockResolvedValue(edited as never);
   vi.mocked(fullEdit.onProgress).mockResolvedValue(() => undefined);
   vi.mocked(develop.renderImage).mockResolvedValue({} as never);
+  vi.mocked(photoPass.run).mockResolvedValue({ recipe: {}, report: { summary: '3 of 25 steps changed the photograph.' } } as never);
   vi.mocked(develop.imageRecipe).mockImplementation(async ({ photoId }) => ({ body: JSON.stringify({ global: { exposure: photoId === 'a' ? .75 : -.2, temperature: photoId === 'a' ? 4300 : 6200 } }) }) as never);
 });
 it('edits and renders each imported photograph without another user action', async () => {
@@ -44,6 +47,26 @@ it('edits and renders each imported photograph without another user action', asy
   expect(result[1]?.settings).toContain('Exposure -0.20 EV');
   expect(result[0]?.settings).toContain('4300 K');
   expect(result[1]?.settings).toContain('6200 K');
+});
+
+it('runs the photo pass after the ten stages on every photograph and reports what it did', async () => {
+  const order: string[] = [];
+  vi.mocked(fullEdit.run).mockImplementation(async (_project, photoId) => { order.push(`edit ${photoId}`); return edited as never; });
+  vi.mocked(photoPass.run).mockImplementation(async (_project, photoId) => {
+    order.push(`pass ${photoId}`);
+    return { recipe: {}, report: { summary: '3 of 25 steps changed the photograph.' } } as never;
+  });
+  const result = await prepareCollection('project', () => false, vi.fn(), vi.fn());
+  expect(order).toEqual(['edit a', 'pass a', 'edit b', 'pass b']);
+  expect(photoPass.run).toHaveBeenCalledWith('project', 'a');
+  expect(result[0]?.detail).toContain('Photo pass: 3 of 25 steps changed the photograph.');
+});
+
+it('a failed photo pass fails that photograph only', async () => {
+  vi.mocked(photoPass.run).mockRejectedValueOnce(backendError('Preview missing'));
+  const result = await prepareCollection('project', () => false, vi.fn(), vi.fn());
+  expect(result[0]).toMatchObject({ outcome: 'failed', detail: 'Preview missing' });
+  expect(result[1]?.outcome).toBe('ready');
 });
 
 it('reports the retouch amounts each photo was given, which differ between photos', async () => {
