@@ -182,6 +182,95 @@ gallery chosen at 3 % expression-aware was chosen on two signals instead of four
 
 ---
 
+## The Cull screen: a hundred checks for every photo
+
+The **Cull** screen, second in the sidebar, is the cull you can see. Press **Cull all photos** and
+AURA checks every photo in the collection against one hundred measurements, in ten groups of ten:
+
+* **Exposure** - nothing black or blown, the subject neither too dark nor too bright.
+* **Focus** - something is sharp, and it is the face rather than the wall behind it.
+* **Motion and shake** - no edge smeared one way; a shutter fast enough for the lens.
+* **Noise and quality** - noise in smooth areas and shadows, haze, banding, resolution.
+* **Colour** - a cast on what should be white or grey, skin inside the range every skin tone
+  occupies, nothing pushed past saturation. A black-and-white photo skips this group.
+* **Composition** - level lines, the subject on a third or in the centre, no face cut by the edge.
+* **Faces** - every face as sharp as the sharpest, well exposed, turned towards you.
+* **Eyes** - open, sharp, both equally open, not lost in shadow, with light in them.
+* **Light** - shape on the face, no burnt-out shine, the subject not dark against a bright sky.
+* **Among similar photos** - its place in its burst and its moment, eyes and sharpness against the
+  best similar shot, whether it opens a new scene.
+
+Every check is a measurement, not an opinion. "Mouth width against the eyes" is called a smile
+*measure* because that is all it is: AURA does not know whether anybody was happy.
+
+The checks become one score out of 100. A group that does not apply - eyes in a photo of the rings -
+is left out rather than counted as a failure, and a photo that fails exposure, focus, motion or eyes
+badly scores low however well it is composed.
+
+### What goes into each list
+
+**Best** holds everything delivered. The best-scoring fifth are marked **★ Top pick**.
+
+**Left out** holds:
+
+* photos that are unusable - black, blown, out of focus, smeared;
+* the duplicates of a burst, beside the frame delivered instead;
+* weaker shots of the same moment - similar frames taken within seconds, where another scored more
+  than 12 points higher;
+* photos whose hundred checks add up to almost nothing.
+
+A photo you edited by hand, or one AURA could not read, is never left out. If the rules would leave
+out more than 40% of a collection, they are describing your style rather than mistakes, and they
+are switched off for that collection.
+
+A darker, brighter or softer copy of a photo - an export dropped back into the folder, a frame
+where the flash did not fire - is recognised as the same shot even when it has no camera time, and
+only the better of the two is delivered.
+
+### How strict
+
+Above the lists, three buttons say how hard the cull is and what each would deliver:
+
+* **Gentle** leaves out only mistakes - black, blown, out of focus, smeared - and near-identical
+  frames. Every distinct shot of a moment stays.
+* **Balanced**, the starting point, also leaves out a shot of a moment that scored more than 12
+  points below the best, keeping at most half of a moment's close shots, and a photo scoring under
+  25.
+* **Strict** keeps a second shot of a moment only within 6 points of the best and at most a third
+  of the moment, keeps one frame of a burst of up to twelve, and leaves out a photo scoring under
+  50.
+
+Switching measures nothing again: it takes a moment, and every photo you brought back or left out
+stays where you put it.
+
+### Your word is final
+
+* **Bring back** puts a left-out photo in the best set. **Leave out** does the opposite.
+* **Keep every photo (remove none)** brings back everything the cull left out, in one press.
+* **Undo all my choices** hands every photo back to the cull's own decision.
+
+Your choices are saved with the collection. They survive culling again, and **Finish Folder**
+and **Edit & export** deliver exactly what the Best list shows. After an unattended Finish Folder
+run, the Cull screen shows what it left out, and **Edit & export only the ones brought back**
+finishes just those without redoing the rest.
+
+Click any photo to see its score, its ten group scores, why it is where it is, and all one hundred
+checks with what each measured. When it belongs to a burst or a moment, the panel shows the other
+frames beside it; **Deliver this instead of ...** swaps the frame AURA chose for the one you are
+looking at. With the panel open, **←** and **→** move through the list, **K** keeps, **X** leaves
+out, **U** undoes your choice and **Esc** closes. In the Left out list, the reason buttons show one
+kind at a time - only the out-of-focus frames, say.
+
+### How the checks were set
+
+The thresholds were checked against 300 professional wedding photographs, which a fair check
+should mostly pass: the median score is 91, and none fell under the low-score line. The same
+photographs, deliberately defocused, smeared or badly exposed, scored clearly lower. What has not
+been measured is how often AURA picks the same frame of a burst you would; tell it when it is wrong
+by bringing the right one back.
+
+---
+
 ## What AURA will not do
 
 * It will not delete, move, or rename a photograph. Ever. A rejection is a row.

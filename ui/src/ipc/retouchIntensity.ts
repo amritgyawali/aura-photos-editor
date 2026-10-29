@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from './client';
 
 /** One strength slider over a kind of automatic retouch (ADR-0130). */
 export type RetouchCategory =

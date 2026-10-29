@@ -63,6 +63,7 @@ pub mod color_match;
 pub mod colour_commands;
 pub mod commands;
 pub mod composition_commands;
+pub mod cull_checks;
 pub mod cull_commands;
 pub mod curate_commands;
 pub mod delivery_commands;
@@ -96,6 +97,7 @@ pub mod evoto_workflow;
 pub mod explain_commands;
 pub mod finish_commands;
 pub mod framing_workflows;
+pub mod full_edit;
 pub mod geometry_commands;
 pub mod index_commands;
 pub mod infer_commands;
@@ -256,10 +258,15 @@ pub use state::AppState;
 mod auto_edit_commands;
 // ADR-0068. The one-click finish, and its three commands.
 pub mod one_click_commands;
+pub mod photo_cull;
 pub use activity::activity_status;
 pub use auto_edit_commands::{photo_analysis, photo_auto_edit};
 pub use one_click_commands::{
     automatic_start, one_click_cancel, one_click_finish, one_click_status,
+};
+pub use photo_cull::{
+    photo_cull_cancel, photo_cull_checks, photo_cull_review, photo_cull_status,
+    set_photo_cull_choice, set_photo_cull_strictness, start_photo_cull,
 };
 pub use story_commands::{
     classify_scenes, image_scene, merge_chapters, move_chapter_boundary, scene_profiles,

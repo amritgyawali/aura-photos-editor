@@ -1,7 +1,15 @@
 // The desktop shell. It owns the window, the single-instance guard, the panic
 // hook and logging, and forwards every command to `aura-app`. No product logic
 // lives here: the shell must stay thin enough to replace.
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+//
+// No console window in any build that embeds the frontend: the installer and start-aura.ps1 ship
+// the optimised dev profile, where `debug_assertions` is on, so keying this on a release build
+// opened a console beside every photographer's window. `tauri dev` builds without
+// `custom-protocol` and keeps its console for logs; everything is also in the engine log file.
+#![cfg_attr(
+    any(not(debug_assertions), feature = "custom-protocol"),
+    windows_subsystem = "windows"
+)]
 
 use aura_app::contract::ipc::{
     AutomaticStartDto, AutomaticStartInput, PhotoAnalysisDto, PhotoAutoEditDto, PhotoAutoEditInput,
@@ -3273,6 +3281,78 @@ async fn activity_status(state: State<'_, AppState>) -> IpcResult<aura_app::acti
         .map_err(|_| background_request_failed())?
 }
 
+// ADR-0185. The Cull screen: a cull of its own, its review, and the photographer's choices.
+#[tauri::command]
+async fn start_photo_cull(
+    state: State<'_, AppState>,
+    input: aura_app::contract::ipc::PhotoCullInput,
+) -> IpcResult<aura_app::contract::ipc::PhotoCullJobDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::start_photo_cull(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn photo_cull_status(
+    job_id: String,
+) -> IpcResult<aura_app::contract::ipc::PhotoCullStatusDto> {
+    tauri::async_runtime::spawn_blocking(move || aura_app::photo_cull_status(&job_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn photo_cull_cancel(job_id: String) -> IpcResult<bool> {
+    tauri::async_runtime::spawn_blocking(move || Ok(aura_app::photo_cull_cancel(&job_id)))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn photo_cull_review(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> IpcResult<Option<aura_app::contract::ipc::PhotoCullReviewDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::photo_cull_review(&app, &project_id))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn photo_cull_checks(
+    state: State<'_, AppState>,
+    input: aura_app::contract::ipc::PhotoCullChecksInput,
+) -> IpcResult<Vec<aura_app::contract::ipc::PhotoCullCheckDto>> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::photo_cull_checks(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_photo_cull_strictness(
+    state: State<'_, AppState>,
+    input: aura_app::contract::ipc::SetPhotoCullStrictnessInput,
+) -> IpcResult<aura_app::contract::ipc::PhotoCullReviewDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_photo_cull_strictness(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+#[tauri::command]
+async fn set_photo_cull_choice(
+    state: State<'_, AppState>,
+    input: aura_app::contract::ipc::SetPhotoCullChoiceInput,
+) -> IpcResult<aura_app::contract::ipc::PhotoCullReviewDto> {
+    let app = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::set_photo_cull_choice(&app, input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
 #[tauri::command]
 async fn one_click_cancel(job_id: String) -> IpcResult<bool> {
     let found = tauri::async_runtime::spawn_blocking(move || {
@@ -3519,6 +3599,39 @@ async fn photo_pass(
 ) -> IpcResult<aura_app::photo_pass::PhotoPassDto> {
     let shared = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || aura_app::photo_pass::run(&shared, &input))
+        .await
+        .map_err(|_| background_request_failed())?
+}
+
+/// The full automatic edit of one photograph: ten stages in order, each measured and each its
+/// own history step. Streams a `full-edit` event before and after every stage. ADR-0187.
+#[tauri::command]
+async fn full_edit_photo(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    input: aura_app::full_edit::FullEditInput,
+) -> IpcResult<aura_app::full_edit::FullEditDto> {
+    use tauri::Emitter;
+    let shared = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        aura_app::full_edit::run(&shared, &input, &|progress| {
+            if let Err(error) = app.emit("full-edit", progress) {
+                tracing::error!(target: "retouch", %error, "could not deliver full edit progress");
+            }
+        })
+    })
+    .await
+    .map_err(|_| background_request_failed())?
+}
+
+/// The photograph's saved edit as a picture, for someone watching the automatic edit. ADR-0187.
+#[tauri::command]
+async fn full_edit_picture(
+    state: State<'_, AppState>,
+    input: aura_app::full_edit::PictureInput,
+) -> IpcResult<aura_app::full_edit::StagePicture> {
+    let shared = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || aura_app::full_edit::picture(&shared, &input))
         .await
         .map_err(|_| background_request_failed())?
 }
@@ -4256,6 +4369,13 @@ fn main() {
             one_click_finish,
             one_click_status,
             one_click_cancel,
+            start_photo_cull,
+            photo_cull_status,
+            photo_cull_cancel,
+            photo_cull_review,
+            photo_cull_checks,
+            set_photo_cull_choice,
+            set_photo_cull_strictness,
             activity_status,
             analyse_portrait,
             find_glare,
@@ -4325,6 +4445,8 @@ fn main() {
             enhance_portrait,
             auto_retouch,
             auto_advanced_retouch,
+            full_edit_photo,
+            full_edit_picture,
             photo_pass,
             create_project,
             list_projects,

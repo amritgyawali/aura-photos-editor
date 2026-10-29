@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from './client';
 import type { RecipeDto } from './types';
 export const MATERIAL_TOOLS = [
   ['directional_smooth', 'Directional hair smoothing', 'Smooth along the strand direction while protecting strong edges.'],

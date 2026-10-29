@@ -8,7 +8,7 @@ vi.mock('./AutomaticFinishControls', () => ({ AutomaticFinishControls: () => nul
 import { useEffectRequest } from '../../state/effectRequest';
 
 vi.mock('../../ipc/nativeRetouch',async()=>({...await vi.importActual('../../ipc/nativeRetouch'),nativeRetouch:{findGlare:vi.fn(),autoPortrait:vi.fn(),autoRetouch:vi.fn(),edit:vi.fn(),preview:vi.fn(),draftPreview:vi.fn(),selectionPreview:vi.fn(),savedSelection:vi.fn()}}));
-vi.mock('../../ipc/client',()=>({api:{listImages:vi.fn()},asIpcError:(e:Error)=>({message:e.message}),develop:{imageRecipe:vi.fn(),imageHistory:vi.fn(),historyStep:vi.fn()}}));
+vi.mock('../../ipc/client',()=>({invoke:()=>Promise.reject(new Error('Not in the desktop app')),api:{listImages:vi.fn()},asIpcError:(e:Error)=>({message:e.message}),develop:{imageRecipe:vi.fn(),imageHistory:vi.fn(),historyStep:vi.fn()}}));
 beforeEach(()=>{
   vi.resetAllMocks();forgetPreviews();vi.mocked(nativeRetouch.edit).mockResolvedValue([]);
   vi.mocked(nativeRetouch.preview).mockResolvedValue({width:1,height:1,rgbBase64:btoa(String.fromCharCode(120,100,90)),notes:[]} as never);

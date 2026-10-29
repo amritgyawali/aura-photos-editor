@@ -203,6 +203,8 @@ pub(crate) fn has_custom_skin_preferences(base: &aura_recipe::Recipe) -> bool {
                         && encoded != serde_json::to_value(fresh_skin_options(None)).ok()
                         && encoded != serde_json::to_value(natural_skin_options(None)).ok()
                         && encoded != serde_json::to_value(earlier_skin_options()).ok()
+                        // The full automatic edit's own default is nobody's choice either.
+                        && encoded != serde_json::to_value(crate::full_edit::default_options()).ok()
                 })
             })
 }

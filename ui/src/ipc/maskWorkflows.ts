@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from './client';
 import type { LocalMasksDto } from './localMasks';
 import type { MaskMode, MaskSource } from './localMasks';
 

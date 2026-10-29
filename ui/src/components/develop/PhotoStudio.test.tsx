@@ -252,3 +252,13 @@ it('jumps back to any saved automatic step and marks where the photo now is', as
   await waitFor(() => expect(develop.historyStep).toHaveBeenCalledWith({ projectId: 'project', photoId: 'portrait', action: 'goto:2' }));
   await waitFor(() => expect(screen.getByText('Auto edit 2/3 · Skin: 1 face').closest('li')?.getAttribute('aria-current')).toBe('step'));
 });
+
+it('waiting for a slow preview disables only the editor, never the rest of the app', async () => {
+  vi.mocked(develop.renderImage).mockReturnValue(new Promise(() => undefined));
+  vi.mocked(nativeRetouch.original).mockReturnValue(new Promise(() => undefined));
+  const busy = vi.fn();
+  render(<PhotoStudio projectId="project" photoId="portrait" disabled={false} onBusyChange={busy} />);
+  await waitFor(() => expect(develop.renderImage).toHaveBeenCalled());
+  expect(screen.getByRole('button', { name: 'Auto enhance photo' }).hasAttribute('disabled')).toBe(true);
+  expect(busy).not.toHaveBeenCalledWith(true);
+});

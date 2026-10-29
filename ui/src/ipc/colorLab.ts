@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from './client';
 import type { RecipeDto } from './types';
 export const COLOR_LAB_TOOLS = [
   ['spatial_neutral_bridge', 'Two-neutral spatial bridge', 'Measure two neutral reference points and interpolate their chromatic adaptation along the line between them.'],

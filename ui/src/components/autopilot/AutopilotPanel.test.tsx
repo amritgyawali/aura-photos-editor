@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { AutopilotPanel } from './AutopilotPanel';
 import { api, autopilot } from '../../ipc/client';
@@ -70,6 +70,18 @@ it('consumes an import hand-off once and prepares photos without optional model 
   expect(autopilot.autopilotPreflight).not.toHaveBeenCalled();
 });
 
+it('edits only the best photos confirmed on the Cull screen, and shows the ten stages of each photo', async () => {
+  const stages = ['Basic edit', 'Colour correction'].map((title, i) => ({ number: i + 1, key: i ? 'colour_correction' : 'basic', title, group: 'Edit',
+    outcome: i ? 'not_applicable' : 'applied', changes: i ? [] : ['Exposure +0.40 EV'], checks: ['measured'] }));
+  vi.mocked(prepareCollection).mockResolvedValueOnce([{ photoId: 'b', name: 'b.jpg', outcome: 'ready', detail: 'done', stages, millis: 6400 }] as never);
+  render(<AutopilotPanel projectId="p" automaticRequest={2} automaticPhotos={['b', 'c']} onError={vi.fn()} />);
+  await screen.findByText('b.jpg · Edited · 6.4 s');
+  expect(vi.mocked(prepareCollection).mock.calls[0]?.[7]).toEqual(['b', 'c']);
+  const list = screen.getByRole('list', { name: 'Stages for b.jpg' });
+  expect(list.textContent).toContain('1. Basic editAppliedExposure +0.40 EV');
+  expect(list.textContent).toContain('2. Colour correctionDoes not apply');
+});
+
 it('offers local editing without advanced preflight and then opens export', async () => {
   const onRender = vi.fn();
   render(<AutopilotPanel projectId="p" onError={vi.fn()} onRender={onRender} />);
@@ -96,7 +108,7 @@ it('retries only failed photos while keeping completed results', async () => {
   fireEvent.click(retry);
   await screen.findByText('2 photos have saved edits, ready to render.');
   expect(vi.mocked(prepareCollection).mock.calls[1]?.[7]).toEqual(['b']);
-  expect(screen.getByText('a.jpg · Prepared')).toBeTruthy();
+  expect(screen.getByText('a.jpg · Edited')).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'Retry failed photos only' })).toBeNull();
 });
 
@@ -120,4 +132,21 @@ it('says before a run that nothing will be decided while AURA is uncalibrated', 
   (client as unknown as { explain: unknown }).explain = { ledgerStatus: vi.fn().mockResolvedValue({ calibrationVer: 0 }) };
   render(<AutopilotPanel projectId="p" onError={vi.fn()} />);
   expect(await screen.findByText(/AURA is not yet calibrated on your weddings/)).toBeTruthy();
+});
+
+it('goes on to rendering after a minute with nobody there, only while the panel is on screen', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  try {
+    const onRender = vi.fn();
+    const { rerender } = render(<AutopilotPanel projectId="p" automaticRequest={4} onError={vi.fn()} onRender={onRender} active={false} />);
+    await screen.findByText('1 photos have saved edits, ready to render.');
+    act(() => { vi.advanceTimersByTime(120_000); });
+    expect(onRender).not.toHaveBeenCalled();
+    rerender(<AutopilotPanel projectId="p" automaticRequest={4} onError={vi.fn()} onRender={onRender} active />);
+    expect(screen.getByText(/AURA will go on to render the 1 edited photos in/)).toBeTruthy();
+    act(() => { vi.advanceTimersByTime(60_500); });
+    expect(onRender).toHaveBeenCalledOnce();
+  } finally {
+    vi.useRealTimers();
+  }
 });

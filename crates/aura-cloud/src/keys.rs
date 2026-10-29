@@ -189,16 +189,23 @@ impl CommandRunner for SystemRunner {
         use std::io::Write;
         use std::process::{Command, Stdio};
 
-        let mut child = Command::new(&command.program)
+        let mut process = Command::new(&command.program);
+        process
             .args(&command.args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|err| {
-                keystore_failed("spawn", format!("could not run {}: {err}", command.program))
-                    .with_context("program", command.program.clone())
-            })?;
+            .stderr(Stdio::piped());
+        // PowerShell is a console program, so without CREATE_NO_WINDOW every key lookup opens a
+        // console window beside AURA's own.
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            process.creation_flags(0x0800_0000);
+        }
+        let mut child = process.spawn().map_err(|err| {
+            keystore_failed("spawn", format!("could not run {}: {err}", command.program))
+                .with_context("program", command.program.clone())
+        })?;
 
         if let Some(secret) = &command.stdin {
             match child.stdin.as_mut() {

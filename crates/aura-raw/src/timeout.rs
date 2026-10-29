@@ -94,6 +94,27 @@ impl DecodeLimits {
     }
 }
 
+/// Wall-clock allowance per megabyte of file, for files whose pixel count is not read up front.
+const TIMEOUT_PER_FILE_MB_MS: u64 = 400;
+
+impl DecodeLimits {
+    /// These limits with the deadline grown for this file: by the pixels a JPEG or PNG
+    /// declares, and by its size for everything else. A 38 MB camera file is a 20-megapixel
+    /// decode however small its tier, and five seconds made it "unreadable" on a busy laptop.
+    #[must_use]
+    pub fn for_file(self, bytes: &[u8]) -> Self {
+        let by_pixels = self.for_pixels(declared_pixels(bytes).unwrap_or(0));
+        let megabytes = u64::try_from(bytes.len()).unwrap_or(u64::MAX) / 1_000_000;
+        let scaled = TIMEOUT_PER_FILE_MB_MS
+            .saturating_mul(megabytes)
+            .min(LONGEST_TIMEOUT_MS);
+        Self {
+            timeout_ms: by_pixels.timeout_ms.max(scaled),
+            ..by_pixels
+        }
+    }
+}
+
 /// The pixel count a JPEG or PNG declares in its header, read without decoding anything.
 ///
 /// Bounded by the bytes it is given and by a fixed number of JPEG segments, so a malformed
@@ -206,6 +227,22 @@ pub fn check_dimensions(
 #[allow(clippy::expect_used)]
 mod declared_tests {
     use super::*;
+
+    #[test]
+    fn a_large_camera_file_is_given_time_by_its_size() {
+        let raw = vec![0_u8; 38_000_000];
+        assert_eq!(DecodeLimits::tier1().for_file(&raw).timeout_ms, 15_200);
+        assert_eq!(
+            DecodeLimits::tier1().for_file(&[0_u8; 100]).timeout_ms,
+            5_000
+        );
+        assert_eq!(
+            DecodeLimits::tier1()
+                .for_file(&vec![0_u8; 400_000_000])
+                .timeout_ms,
+            60_000
+        );
+    }
 
     #[test]
     fn a_large_image_is_given_time_in_proportion_and_no_more_than_a_minute() {

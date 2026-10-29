@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from './client';
 import { listen } from '@tauri-apps/api/event';
 import type { RecipeDto } from './types';
 import type { AutoRetouchOptions } from './nativeRetouch';

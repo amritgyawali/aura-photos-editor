@@ -3,7 +3,7 @@ import { HotFeatures, type HotFeature } from './components/features/HotFeatures'
 import { StylePanel } from './components/style/StylePanel';
 import { AutomaticProgress } from './components/workflow/AutomaticProgress';
 import { FinishFolder } from './components/workflow/FinishFolder';
-import { StatusBar } from './components/workflow/StatusBar';
+import { StatusBar, type UiLock } from './components/workflow/StatusBar';
 import { automaticBusy, useAutomatic } from './state/automaticStore';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -29,6 +29,7 @@ import { EffectsLibrary } from './components/effects/EffectsLibrary';
 import { GalleryPanel } from './components/gallery/GalleryPanel';
 import { QcPanel } from './components/qc/QcPanel';
 import { VirtualGrid } from './components/grid/VirtualGrid';
+import { PhotoCullWorkspace } from './components/cull/PhotoCullWorkspace';
 import { PAGE_SIZE, useStore } from './state/store';
 import { useThumbnails } from './stores/thumbnailStore';
 
@@ -51,6 +52,13 @@ export function App(): JSX.Element {
   const [exporting, setExporting] = useState(false);
   const [revision, setRevision] = useState(0);
   const [automaticRequest, setAutomaticRequest] = useState(0);
+  /** The photos the next automatic edit works on: the best set confirmed on the Cull screen, or all. */
+  const [automaticPhotos, setAutomaticPhotos] = useState<string[] | null>(null);
+  /** A cull the import asked for: several photos are culled and reviewed before anything is edited. */
+  const [cullRequest, setCullRequest] = useState(0);
+  /** The export screen was reached from the automatic edit: it exports on its own after an idle minute. ADR-0189. */
+  const [autoExport, setAutoExport] = useState(false);
+  useEffect(() => { if (workspace !== 'export') setAutoExport(false); }, [workspace]);
   const automaticSequence = useRef(0);
   const automaticConsumed = useCallback(() => setAutomaticRequest(0), []);
   const editAfterImport = useRef(false);
@@ -217,8 +225,15 @@ export function App(): JSX.Element {
         } else if (event.kind === 'finished') {
           importFinished.current = true;
           setProgress({ running: false, jobId: null });
-          if (editAfterImport.current && event.inserted > 0) {
+          if (editAfterImport.current && event.inserted > 1) {
+            // Several photos: cull first, and let the photographer confirm the best set before
+            // anything is edited. ADR-0187.
             editAfterImport.current = false;
+            setWorkspace('cull');
+            setCullRequest(++automaticSequence.current);
+          } else if (editAfterImport.current && event.inserted > 0) {
+            editAfterImport.current = false;
+            setAutomaticPhotos(null);
             setWorkspace('edit');
             setAutomaticRequest(++automaticSequence.current);
           }
@@ -324,11 +339,33 @@ export function App(): JSX.Element {
     finally { setChoosingPhotos(false); }
   };
 
-  const locked = workflowBusy || editing || matching || saving || exporting || progress.running || analysingReference || choosingPhotos || queuedImport !== null;
+  /** Every reason the other sections are shut, named, so the status bar can say which (ADR-0188). */
+  const locks: UiLock[] = [
+    { key: 'folder', label: 'Finish a folder is running', active: workflowBusy },
+    { key: 'edit', label: 'Auto edit is running', active: editing },
+    { key: 'look', label: 'Matching a look or training a style', active: matching },
+    { key: 'studio', label: 'The photo studio is saving or rendering', active: saving },
+    { key: 'export', label: 'Exporting', active: exporting },
+    { key: 'import', label: 'Importing photos', active: progress.running },
+    { key: 'reference', label: 'Analysing the reference', active: analysingReference },
+    { key: 'dialog', label: 'Choosing photos in the file dialog', active: choosingPhotos },
+    { key: 'queued', label: 'Getting the import ready', active: queuedImport !== null },
+  ];
+  const locked = locks.some(lock => lock.active);
+  const lockReason = locks.filter(lock => lock.active).map(lock => lock.label).join(', ');
+  /** Release every lock by hand: the status bar offers it when nothing is running behind them. */
+  const unlockSections = useCallback(() => {
+    setEditing(false); setMatching(false); setSaving(false); setExporting(false);
+    setAnalysingReference(false); setChoosingPhotos(false); setQueuedImport(null);
+    if (useStore.getState().progress.running) setProgress({ running: false });
+    const run = useAutomatic.getState();
+    if (run.starting || run.jobId !== null) useAutomatic.setState({ starting: false, jobId: null, projectId: null, status: null, error: null });
+  }, [setProgress]);
   const profileName = profile ? profileNames[profile.profileId] ?? profile.profileId : undefined;
   const tabs = [
     ['start', 'Start', 'Look, reference, photos'],
     ['library', 'Photos', 'Browse your collection'],
+    ['cull', 'Cull', 'Best photos & left out'],
     ['edit', 'Auto edit', 'One click, start to finish'],
     ['effects', 'Effects', 'Every retouch tool & creative look'],
     ['look', 'Match a look', 'Your reference, your photos'],
@@ -343,7 +380,7 @@ export function App(): JSX.Element {
         <div className="studio-brand"><span className="brand-mark" aria-hidden="true">a</span><div><strong>AURA</strong><span>PHOTO STUDIO</span></div></div>
         <nav className="studio-nav" aria-label="Workspace">
           {tabs.map(([id, title, description]) => <button key={id} type="button" aria-current={workspace === id ? 'page' : undefined}
-            disabled={locked && workspace !== id} onClick={() => setWorkspace(id ?? 'library')}><strong>{title}</strong><span>{description}</span></button>)}
+            disabled={locked && workspace !== id} title={locked && workspace !== id ? `Locked while: ${lockReason}. See the status bar below.` : undefined} onClick={() => setWorkspace(id ?? 'library')}><strong>{title}</strong><span>{description}</span></button>)}
         </nav>
         <fieldset className="project-picker" disabled={locked}>
           <ProjectSwitcher projects={projects} activeProjectId={activeProjectId} onSelect={setActiveProject} onCreate={name => void createProject(name)} />
@@ -378,7 +415,7 @@ export function App(): JSX.Element {
               {!focusedPhoto && <p>Add your target photos in Photos to match a single reference.</p>}</div></header>}
             <details open={workspace === 'start'}><summary>Learn a style from a reference folder or Instagram export</summary>
             <InstagramStyle selection={reference} disabled={locked} onChange={changeReference} onBusyChange={setAnalysingReference}
-              onAddPhotos={() => void chooseAndImport()} onApply={activeProjectId && rows.length ? () => { setWorkspace('edit'); setAutomaticRequest(++automaticSequence.current); } : undefined} compact={workspace === 'start'}
+              onAddPhotos={() => void chooseAndImport()} onApply={activeProjectId && rows.length ? () => { setAutomaticPhotos(null); setWorkspace('edit'); setAutomaticRequest(++automaticSequence.current); } : undefined} compact={workspace === 'start'}
               heading={<header className="step-heading"><span className="step-number">2</span><div><span className="eyebrow">OPTIONAL</span><h2>Match a look you love</h2>
                 <p>Choose a folder of reference photos, or your own Instagram data export, to learn its tone and colour and fit it on top of your profile. Skip this step to use the profile alone.</p></div></header>} />
             </details>
@@ -394,9 +431,9 @@ export function App(): JSX.Element {
             <div className="import-actions">
               <button type="button" disabled={!inTauri() || locked} onClick={() => void chooseAndImport()}>{choosingPhotos ? 'Choosing…' : 'Choose photos'}</button>
               <button type="button" disabled={!inTauri() || locked} onClick={() => void chooseAndImport(true)}>Choose a folder</button>
-              {activeProjectId && rows.length > 0 && <button type="button" disabled={locked} onClick={() => { setWorkspace('edit'); setAutomaticRequest(++automaticSequence.current); }}>Apply to the {rows.length} photos in this collection</button>}
+              {activeProjectId && rows.length > 0 && <button type="button" disabled={locked} onClick={() => { setAutomaticPhotos(null); setWorkspace('edit'); setAutomaticRequest(++automaticSequence.current); }}>Apply to the {rows.length} photos in this collection</button>}
             </div>
-            {progress.running && <p role="status">Importing {progress.done} of {progress.total || '…'} photos. Editing starts automatically when the import finishes.</p>}
+            {progress.running && <p role="status">Importing {progress.done} of {progress.total || '…'} photos. Next: several photos are culled for you to confirm the best ones; a single photo is edited straight away.</p>}
             <p className="studio-footnote">Choose photos or Choose a folder imports and edits, then waits for you to review before you export.</p>
             {!inTauri() && <p className="studio-footnote">Open the AURA desktop app to import and edit your photos.</p>}
           </section>}
@@ -415,11 +452,15 @@ export function App(): JSX.Element {
               <ImportWizard disabled={locked} running={progress.running} done={progress.done} total={progress.total} onStart={roots => void startImport(roots)} onCancel={() => void cancelImport()} />
               {rows.length > 0 ? <div className="studio-library"><VirtualGrid rows={rows} onNeedMore={() => void loadPage(activeProjectId, loadedPages, false)} /></div> : <div className="studio-empty"><strong>Your next great edit starts here.</strong><p>Choose a folder above. Your photos will appear here.</p></div>}
             </>}
+            {workspace === 'cull' && <PhotoCullWorkspace key={activeProjectId} projectId={activeProjectId} disabled={locked} onError={setError}
+              autoStart={cullRequest} onAutoStarted={() => setCullRequest(0)}
+              onEditBest={ids => { setAutomaticPhotos(ids); setWorkspace('edit'); setAutomaticRequest(++automaticSequence.current); }}
+              onOpen={id => { const index = rows.findIndex(row => row.id === id); if (index >= 0) { useStore.getState().focusIndex(index); useStore.getState().selectOnly(id); setWorkspace('edit'); } }} />}
             <div hidden={workspace !== 'edit' && workspace !== 'look' && !(workspace === 'hot' && hotFeature !== 'train')}>
               <div hidden={workspace !== 'edit'}>
               <div className="workspace-heading"><div><span className="eyebrow">LIGHT. COLOR. FINISH.</span><h1>A good starting point, in one click.</h1></div><button type="button" disabled={locked} onClick={() => setWorkspace('look')}>Match a reference look →</button></div>
               <AutopilotPanel key={activeProjectId} projectId={activeProjectId} onError={setError} onBusyChange={editBusyChanged}
-                automaticRequest={automaticRequest} onAutomaticConsumed={automaticConsumed} onRender={() => setWorkspace('export')} reference={reference}
+                automaticRequest={automaticRequest} automaticPhotos={automaticPhotos} onAutomaticConsumed={automaticConsumed} onRender={() => { setAutoExport(true); setWorkspace('export'); }} active={workspace === 'edit'} reference={reference}
                 profile={profile} profileName={profileName} />
               </div>
               {/* Stays mounted while another section is open, so the photograph, its full-quality
@@ -434,7 +475,8 @@ export function App(): JSX.Element {
               </>}
             </div>
             {workspace === 'look' && <details className="advanced-tools"><summary>Advanced lighting-bucket look profiles</summary><MatchLookPanel key={activeProjectId} projectId={activeProjectId} onError={setError} onBusyChange={setMatching} /></details>}
-            {workspace === 'export' && <><header className="workspace-heading"><div><span className="eyebrow">THE FINISHING TOUCH</span><h1>Render your final output.</h1></div></header><DeliveryPanel key={activeProjectId} projectId={activeProjectId} profileId={null} onError={setError} onBusyChange={setExporting} /></>}
+            {workspace === 'export' && <><header className="workspace-heading"><div><span className="eyebrow">THE FINISHING TOUCH</span><h1>Render your final output.</h1></div></header><DeliveryPanel key={activeProjectId} projectId={activeProjectId} profileId={null} onError={setError} onBusyChange={setExporting} editedPhotos={automaticPhotos}
+              autoExport={autoExport} collectionName={projects.find(project => project.id === activeProjectId)?.name ?? ''} /></>}
             {workspace === 'advanced' && <><header className="workspace-heading"><div><span className="eyebrow">MORE CONTROL</span><h1>The details make the difference.</h1></div></header>
               <AdvancedTools onBusyChange={setSaving} projectId={activeProjectId} photoId={focusedPhoto?.id ?? null} onError={setError}
                 onRefresh={() => { void refreshProjects(); void loadPage(activeProjectId, 0, true); }}
@@ -449,7 +491,7 @@ export function App(): JSX.Element {
             {problems.length > 0 && <details className="advanced-tools"><summary>Problems to review ({problems.length})</summary><ProblemsPanel problems={problems} /></details>}
           </>}
         </div>
-        <StatusBar />
+        <StatusBar locks={locks} onUnlock={unlockSections} screen={workspace} />
       </main>
     </div>
   );

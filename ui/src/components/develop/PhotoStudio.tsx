@@ -140,7 +140,10 @@ export function PhotoStudio({ projectId, photoId, photoIds, disabled, revision =
     quality => nativeRetouch.original(projectId, photoId, quality), refresh);
   // Edits wait for the first look at a new version; the full-quality one follows unblocked.
   const waiting = Boolean(version) && !inRetouch && !editedPreview.current && !editedPreview.error;
-  useEffect(() => { if (!inRetouch) onBusyChange(busy || loading || waiting); }, [busy, loading, waiting, onBusyChange, inRetouch]);
+  // Only a save in flight holds the rest of the app. Loading or waiting for a preview disables
+  // this editor's own controls (below) and nothing else: the editor stays mounted behind every
+  // other screen, and a slow camera file once locked the whole window while the Cull ran.
+  useEffect(() => { if (!inRetouch) onBusyChange(busy); }, [busy, onBusyChange, inRetouch]);
   const render: RenderDto | null = editedPreview.image;
   const edited = useMemo(() => previewSource(render), [render]);
   const original = useMemo(() => previewSource(originalPreview.image), [originalPreview.image]);

@@ -1,9 +1,20 @@
 import { invoke as rawInvoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { join, pictureDir } from '@tauri-apps/api/path';
 import type { InternalAiStatus } from './internalAi';
 import type { AutomaticStartDto, AutomaticStartInput, PhotoAnalysisDto, PhotoAutoEditInput, PhotoAutoEditDto, OneClickFinishInput, OneClickFinishDto, OneClickStatusDto } from './types';
+import type { PhotoCullInput, PhotoCullJobDto, PhotoCullStatusDto, PhotoCullReviewDto, PhotoCullChecksInput, PhotoCullCheckDto, SetPhotoCullChoiceInput, SetPhotoCullStrictnessInput } from './types';
 
 import { audit, drainAuditBatch, isQuietIpc } from '../audit/log';
+import { beginRequest, endRequest } from '../state/inflight';
+
+/** The engine's message for a refusal, for the status bar's history. */
+function errorText(error: unknown): string {
+  const record = typeof error === 'object' && error !== null ? (error as Record<string, unknown>) : {};
+  const text = typeof record['message'] === 'string' ? record['message']
+    : typeof record['user_message'] === 'string' ? record['user_message'] : String(error);
+  return text.slice(0, 200);
+}
 
 /**
  * Every command in the product passes through here, and the audit log hangs off
@@ -24,8 +35,10 @@ export function invoke<T>(command: string, args?: Record<string, unknown>): Prom
     audit('ipc', command, { phase: 'start' });
   }
   const startedAt = Date.now();
+  const tracked = beginRequest(command, quiet || relay, startedAt);
   return rawInvoke<T>(command, args).then(
     (value) => {
+      endRequest(tracked, true);
       const ms = Date.now() - startedAt;
       if (!quiet && !relay) {
         audit('ipc', command, { phase: 'ok', ms });
@@ -35,6 +48,7 @@ export function invoke<T>(command: string, args?: Record<string, unknown>): Prom
       return value;
     },
     (error: unknown) => {
+      endRequest(tracked, false, errorText(error));
       if (!relay) {
         const code =
           typeof error === 'object' && error !== null && 'code' in error
@@ -118,6 +132,31 @@ export const oneClickStatus = (jobId: string): Promise<OneClickStatusDto> =>
 /** Stop between photographs. True when the id was known. */
 export const oneClickCancel = (jobId: string): Promise<boolean> =>
   invoke<boolean>('one_click_cancel', { jobId });
+
+/** ADR-0185. Cull a collection on its own; poll `photoCullStatus`. Nothing is edited or deleted. */
+export const startPhotoCull = (input: PhotoCullInput): Promise<PhotoCullJobDto> =>
+  invoke<PhotoCullJobDto>('start_photo_cull', { input });
+
+export const photoCullStatus = (jobId: string): Promise<PhotoCullStatusDto> =>
+  invoke<PhotoCullStatusDto>('photo_cull_status', { jobId });
+
+export const photoCullCancel = (jobId: string): Promise<boolean> =>
+  invoke<boolean>('photo_cull_cancel', { jobId });
+
+/** The last cull with the photographer's choices applied; null when never culled. */
+export const photoCullReview = (projectId: string): Promise<PhotoCullReviewDto | null> =>
+  invoke<PhotoCullReviewDto | null>('photo_cull_review', { projectId });
+
+export const photoCullChecks = (input: PhotoCullChecksInput): Promise<PhotoCullCheckDto[]> =>
+  invoke<PhotoCullCheckDto[]>('photo_cull_checks', { input });
+
+/** Bring back (`keep`), leave out, or hand back to the cull (`auto`). */
+export const setPhotoCullChoice = (input: SetPhotoCullChoiceInput): Promise<PhotoCullReviewDto> =>
+  invoke<PhotoCullReviewDto>('set_photo_cull_choice', { input });
+
+/** Re-decide the last cull at `gentle`, `balanced` or `strict`, without measuring again. */
+export const setPhotoCullStrictness = (input: SetPhotoCullStrictnessInput): Promise<PhotoCullReviewDto> =>
+  invoke<PhotoCullReviewDto>('set_photo_cull_strictness', { input });
 
 export async function pickImportPaths(directory: boolean): Promise<string[]> {
   const result = await invoke<string | string[] | null>('plugin:dialog|open', {
@@ -271,16 +310,40 @@ export const portrait = {
     invoke<PortraitRetouch>('auto_portrait_retouch', { input: { projectId, photoId, style } }),
 };
 
+/** A window test's answer to the operating system's file dialog, which a script cannot click.
+ *  Nothing in the app sets it; `scripts/test-full-auto-gui.py` does, before pressing a button. */
+function testPick(): string | null {
+  const value: unknown = typeof window === 'undefined' ? undefined : (window as unknown as { __AURA_TEST_PICK__?: unknown }).__AURA_TEST_PICK__;
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
 /** Ask the desktop for a folder; cancel leaves the current selection intact. */
 export async function pickPhotoFolder(title = 'Choose a photo folder'): Promise<string | null> {
+  const picked = testPick();
+  if (picked) return picked;
   const result: string | string[] | null = await invoke('plugin:dialog|open', {
     options: { directory: true, multiple: false, title },
   });
   return Array.isArray(result) ? result[0] ?? null : result;
 }
 
+/**
+ * Where an export goes when nobody chose a folder: `Pictures\AURA Exports\<collection> <date time>`,
+ * a folder of its own for every run, as Finish Folder does. ADR-0189.
+ */
+export async function defaultExportFolder(collection: string): Promise<string> {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  // eslint-disable-next-line no-control-regex -- control characters are not allowed in a Windows folder name
+  const name = collection.replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ').replace(/[. ]+$/, '').trim() || 'AURA';
+  return join(await pictureDir(), 'AURA Exports', `${name} ${stamp}`);
+}
+
 /** Select individual photographs without importing their entire folder. */
 export async function pickPhotos(): Promise<string[]> {
+  const picked = testPick();
+  if (picked) return [picked];
   const result: string | string[] | null = await invoke('plugin:dialog|open', {
     options: { directory: false, multiple: true, title: 'Choose photos to edit',
       filters: [{ name: 'Photos', extensions: ['jpg', 'jpeg', 'jpe', 'png', 'dng', 'cr2', 'cr3', 'nef', 'arw', 'raf', 'orf', 'rw2', 'pef'] }] },
