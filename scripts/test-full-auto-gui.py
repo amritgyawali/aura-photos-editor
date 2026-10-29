@@ -238,6 +238,23 @@ def main():
                 if finished.search(text):
                     break
                 time.sleep(0.5)
+            # The checks below take minutes with nobody at the mouse, and after an idle minute the
+            # app goes on to render and export by itself (ADR-0189). A photographer reviewing the
+            # edits says "Let me decide"; scripts/test-idle-auto-gui.py covers the unattended path.
+            notice = page.locator('.automatic-result .auto-choice')
+            render_button = page.get_by_role('button', name='Render final output →', exact=True)
+            offered = False
+            try:
+                notice.wait_for(state='visible', timeout=15000)
+                offered = True
+                notice.get_by_role('button', name='Let me decide', exact=True).click()
+                notice.wait_for(state='detached', timeout=5000)
+                waiting = render_button.is_visible()
+            except Exception as error:  # noqa: BLE001 - reported as the check's detail
+                waiting = False
+                print(f'  let me decide: {error}', flush=True)
+            check('the window offers to go on by itself and waits once told "Let me decide"', offered and waiting,
+                  f'offered={offered}')
             report['timings']['editSeconds'] = round(time.monotonic() - started, 1)
             report['timings']['secondsPerPhoto'] = round(report['timings']['editSeconds'] / max(1, len(best)), 1)
             check('the window said which stage was running', len(stages_seen) >= 5, ', '.join(sorted(stages_seen)))
